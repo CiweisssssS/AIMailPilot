@@ -1,0 +1,5 @@
+{
+  "user_id": "u_123",
+  "add_keywords": [{"term": "interview", "weight": 2.5, "scope": "subject"}],
+  "remove_keywords": ["newsletter"]
+}

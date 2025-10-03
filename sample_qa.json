@@ -1,0 +1,15 @@
+{
+  "question": "What do I need to deliver before the meeting?",
+  "thread": {
+    "thread_id": "t1",
+    "participants": ["alice@company.com", "bob@company.com", "me@us.edu"],
+    "timeline": [
+      {"id": "m1", "date": "2025-10-01T10:45:00Z", "subject": "Project kickoff this Friday"},
+      {"id": "m2", "date": "2025-10-01T18:10:00Z", "subject": "Re: Project kickoff this Friday"}
+    ],
+    "normalized_messages": [
+      {"id": "m1", "clean_body": "Hi team, please finalize slides by Thu EOD. Bob owns agenda."},
+      {"id": "m2", "clean_body": "Action items: Alice → timeline, You → metrics. Meeting Fri 2pm."}
+    ]
+  }
+}

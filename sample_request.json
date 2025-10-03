@@ -1,0 +1,28 @@
+{
+  "user_id": "u_123",
+  "personalized_keywords": [
+    {"term": "metrics", "weight": 1.2, "scope": "subject|body|sender"}
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "thread_id": "t1",
+      "date": "2025-10-01T10:45:00Z",
+      "from": "alice@company.com",
+      "to": ["me@us.edu"],
+      "cc": [],
+      "subject": "Project kickoff this Friday",
+      "body": "Hi team, please finalize slides by Thu EOD. Bob owns agenda."
+    },
+    {
+      "id": "m2",
+      "thread_id": "t1",
+      "date": "2025-10-01T18:10:00Z",
+      "from": "bob@company.com",
+      "to": ["me@us.edu"],
+      "cc": [],
+      "subject": "Re: Project kickoff this Friday",
+      "body": "Action items: Alice → timeline, You → metrics. Meeting Fri 2pm."
+    }
+  ]
+}
