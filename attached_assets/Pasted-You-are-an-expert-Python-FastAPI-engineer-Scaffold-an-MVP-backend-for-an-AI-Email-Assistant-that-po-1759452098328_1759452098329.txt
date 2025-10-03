@@ -1,0 +1,333 @@
+You are an expert Python/FastAPI engineer. Scaffold an MVP backend for an AI Email Assistant that powers a Gmail Workspace Add-on sidebar. Follow these exact requirements.
+
+0) Project goals (MVP)
+
+Build a FastAPI service that:
+
+Normalizes an email thread payload → returns a cleaned, time-sorted thread JSON.
+
+Generates a concise thread summary (map-reduce over messages).
+
+Extracts tasks/entities (action items, owners, dates/deadlines).
+
+Produces a simple priority label (P1 Urgent / P2 To-do / P3 FYI) using baseline rules + optional keyword weights.
+
+(Optional) Answers a simple chatbot QA question grounded in the provided thread JSON (RAG-lite over the same payload).
+
+Stores user keyword weights in a simple store (SQLite) and allows updates.
+
+These correspond to endpoints:
+
+POST /api/process-thread (AI-1/2/3/4)
+
+POST /api/chatbot-qa (AI-5)
+
+POST /api/update-user-settings (AI-6)
+
+1) Tech stack & structure
+
+Language: Python 3.11+
+
+Framework: FastAPI + Uvicorn
+
+Deps: pydantic, python-dateutil, numpy, scikit-learn (for simple classifier stub), sqlite3 (stdlib), httpx (for LLM calls), tenacity (retry), rapidfuzz (keyword match), python-dotenv
+
+LLM abstraction: simple provider class for OpenAI (default) with env-config; also a “mock LLM” fallback for offline.
+
+No raw email storage: Only derived objects (summaries, tasks, labels) in memory; user settings in SQLite.
+
+Repo layout
+
+/app
+  main.py
+  api/
+    __init__.py
+    routes.py
+  core/
+    config.py
+    llm.py
+    prompts.py
+  services/
+    normalizer.py
+    summarizer.py
+    extractor.py
+    prioritizer.py
+    qa.py
+    user_settings.py
+  models/
+    schemas.py
+  tests/
+    test_process_thread.py
+    test_chatbot_qa.py
+    test_update_user.py
+.env.example
+requirements.txt
+README.md
+
+2) Environment & running
+
+Create .env.example with:
+
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your_key_here
+OPENAI_MODEL=gpt-4o-mini
+MAX_INPUT_TOKENS=12000
+
+
+Add safe defaults if no key provided (use mock LLM).
+
+requirements.txt with the libraries above.
+
+Run command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+3) API contracts (pydantic schemas)
+
+POST /api/process-thread
+Request:
+
+{
+  "user_id": "u_123",
+  "personalized_keywords": [
+    {"term": "CPT", "weight": 2.0, "scope": "subject|body|sender"}
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "thread_id": "t1",
+      "date": "2025-10-01T10:45:00Z",
+      "from_": "alice@company.com",
+      "to": ["me@us.edu"],
+      "cc": [],
+      "subject": "Project kickoff this Friday",
+      "body": "Hi team, please finalize slides by Thu EOD. Bob owns agenda."
+    },
+    {
+      "id": "m2",
+      "thread_id": "t1",
+      "date": "2025-10-01T18:10:00Z",
+      "from_": "bob@company.com",
+      "to": ["me@us.edu"],
+      "cc": [],
+      "subject": "Re: Project kickoff this Friday",
+      "body": "Action items: Alice → timeline, You → metrics. Meeting Fri 2pm."
+    }
+  ]
+}
+
+
+Response:
+
+{
+  "thread": {
+    "thread_id": "t1",
+    "participants": ["alice@company.com","bob@company.com","me@us.edu"],
+    "timeline": [
+      {"id":"m1","date":"2025-10-01T10:45:00Z","subject":"Project kickoff this Friday"},
+      {"id":"m2","date":"2025-10-01T18:10:00Z","subject":"Re: Project kickoff this Friday"}
+    ],
+    "normalized_messages": [
+      {"id":"m1","clean_body":"Hi team, please finalize slides by Thu EOD. Bob owns agenda."},
+      {"id":"m2","clean_body":"Action items: Alice → timeline, You → metrics. Meeting Fri 2pm."}
+    ]
+  },
+  "summary": "Project kickoff on Fri 2pm; finalize slides by Thu EOD. Owners: Bob(agenda), Alice(timeline), You(metrics).",
+  "tasks": [
+    {
+      "title": "Finalize slides",
+      "owner": "team",
+      "due": "2025-10-02T23:59:00",
+      "source_message_id": "m1",
+      "type": "deadline"
+    },
+    {
+      "title": "Prepare metrics",
+      "owner": "me@us.edu",
+      "due": null,
+      "source_message_id": "m2",
+      "type": "action"
+    },
+    {
+      "title": "Kickoff meeting",
+      "owner": "team",
+      "due": "2025-10-03T14:00:00",
+      "source_message_id": "m2",
+      "type": "meeting"
+    }
+  ],
+  "priority": {
+    "label": "P1",
+    "score": 0.82,
+    "reasons": ["contains meeting time within 48h", "due date within 24h", "personalized keyword hit: metrics (weight 1.2)"]
+  }
+}
+
+
+POST /api/chatbot-qa
+Request:
+
+{
+  "question": "What do I need to deliver before the meeting?",
+  "thread": { "...": "use the exact object returned by /api/process-thread.thread plus normalized_messages" }
+}
+
+
+Behavior: RAG-lite—scan normalized messages + summary; answer grounded in those; include citations to source_message_id.
+Response:
+
+{
+  "answer": "You need to finalize the slides by Thu EOD and prepare metrics.",
+  "sources": ["m1","m2"]
+}
+
+
+POST /api/update-user-settings
+Request:
+
+{
+  "user_id": "u_123",
+  "add_keywords": [{"term":"interview","weight":2.5,"scope":"subject"}],
+  "remove_keywords": ["newsletter"]
+}
+
+
+Response:
+
+{"ok": true}
+
+4) Implementation details
+4.1 Normalizer (services/normalizer.py)
+
+Sort by date, dedupe by id.
+
+Strip quoted replies/signatures (basic regex heuristics: lines starting with >, common signature delimiters).
+
+Return participants, timeline, normalized message list.
+
+4.2 Summarizer (services/summarizer.py)
+
+If OPENAI_API_KEY present, call core.llm.summarize_map_reduce(messages) using gpt-4o-mini.
+
+Else, fallback to rule-based bullet condensation (first/last emails + imperative sentence extraction).
+
+Keep output ~1–3 sentences.
+
+4.3 Extractor (services/extractor.py)
+
+Rule + pattern first:
+
+Date/time via dateutil parser on phrases like “Fri 2pm”, “Thu EOD”.
+
+Action verbs list: finalize, submit, schedule, prepare, review.
+
+Owner detection: explicit names/emails, “you/cc/name → owner mapping” (if “you” and recipient list contains a single personal address, map to that).
+
+If LLM available, post-process with a compact JSON schema prompt to improve precision.
+
+Return structured tasks: {title, owner, due, source_message_id, type}.
+
+4.4 Prioritizer (services/prioritizer.py)
+
+Baseline scoring:
+
+Due date proximity (≤24h strong boost; ≤72h medium).
+
+Presence of concrete meeting time.
+
+Sender weight: if sender domain contains “boss/client” list (config placeholder).
+
+Personalized keyword hits: use rapidfuzz partial ratio; weight from user settings.
+
+Map score → label: ≥0.75 → P1, ≥0.4 → P2, else P3. Return reasons.
+
+4.5 QA (services/qa.py)
+
+Build a small in-memory index (list of {message_id, text}).
+
+Retrieve top-k by naive keyword match (and/or rapidfuzz score).
+
+If LLM available, compose an instruction to answer only from retrieved snippets; include source_message_ids.
+
+If no LLM, return bullet list extracted from matched snippets.
+
+4.6 User settings (services/user_settings.py)
+
+SQLite table user_keywords(user_id TEXT, term TEXT, weight REAL, scope TEXT).
+
+Simple CRUD; load into memory on request.
+
+4.7 LLM wrapper (core/llm.py)
+
+Provider select via LLM_PROVIDER.
+
+OpenAI default; graceful fallback to “mock” if no key.
+
+Implement functions: summarize_map_reduce(messages), extract_tasks(messages), answer(question, snippets).
+
+4.8 Prompts (core/prompts.py)
+
+Keep minimal, deterministic:
+
+Summary: “Summarize the email thread in ≤3 sentences. Include dates, owners, and concrete deliverables if present.”
+
+Extraction: “From these emails, return JSON with fields: title, owner (email or name if explicit), due (ISO if parseable else null), source_message_id, type in {deadline, meeting, action}. No prose.”
+
+QA: “Answer strictly from the provided snippets. If unknown, say ‘Not found in thread.’ Return a concise sentence; also list the source_message_ids used.”
+
+5) Security & privacy
+
+Do not persist raw bodies. Only keep derived results in memory for the response.
+
+SQLite stores only keyword preferences (no email content).
+
+Add a simple rate limiter (per IP) and request size guard (e.g., max 1.5 MB).
+
+6) Tests (Pytest)
+
+Create unit tests with small mock threads:
+
+test_process_thread.py
+
+Verifies sorted timeline, non-empty summary, ≥1 extracted task, valid priority label.
+
+test_chatbot_qa.py
+
+Asks a question; expects grounded answer and sources array.
+
+test_update_user.py
+
+Adds/removes keywords; verifies impact on scoring (e.g., term boosts priority to P1).
+
+7) Sample curl commands
+curl -X POST http://localhost:8000/api/process-thread \
+  -H "Content-Type: application/json" -d @sample_request.json
+
+curl -X POST http://localhost:8000/api/chatbot-qa \
+  -H "Content-Type: application/json" -d @sample_qa.json
+
+curl -X POST http://localhost:8000/api/update-user-settings \
+  -H "Content-Type: application/json" -d @sample_user.json
+
+8) Acceptance criteria (demo-ready)
+
+Given a 10–30 message thread JSON, /api/process-thread returns:
+
+sorted timeline, a ≤3-sentence summary, ≥1 task with parsed due OR meeting time, and a priority label with reasons.
+
+/api/chatbot-qa answers at least:
+
+“What do I need to deliver before the meeting?”
+
+“When is the meeting and who owns the agenda?”
+with sources pointing to message IDs.
+
+Updating user keywords can flip borderline P2→P1 in a realistic case.
+
+9) Nice-to-have (if time remains)
+
+Add /healthz and /version.
+
+Add simple Swagger docs via FastAPI (enabled by default).
+
+Add CORS for Apps Script origin.
+
+Build now.
