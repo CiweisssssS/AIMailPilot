@@ -11,10 +11,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^https://(script\.google\.com|script\.googleusercontent\.com|mail\.google\.com|(?:[\w-]+\.)*replit\.(dev|app))$|^http://localhost:5000$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 app.include_router(router)

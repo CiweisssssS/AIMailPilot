@@ -1,18 +1,85 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const emailMessageSchema = z.object({
+  id: z.string(),
+  thread_id: z.string(),
+  date: z.string(),
+  from: z.string(),
+  to: z.array(z.string()),
+  cc: z.array(z.string()).optional(),
+  subject: z.string(),
+  body: z.string(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const keywordSchema = z.object({
+  term: z.string(),
+  weight: z.number(),
+  scope: z.string(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export const processThreadRequestSchema = z.object({
+  user_id: z.string(),
+  personalized_keywords: z.array(keywordSchema).optional(),
+  messages: z.array(emailMessageSchema),
+});
+
+export const normalizedMessageSchema = z.object({
+  id: z.string(),
+  clean_body: z.string(),
+});
+
+export const timelineEntrySchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  subject: z.string(),
+});
+
+export const threadResponseSchema = z.object({
+  thread_id: z.string(),
+  participants: z.array(z.string()),
+  timeline: z.array(timelineEntrySchema),
+  normalized_messages: z.array(normalizedMessageSchema),
+});
+
+export const taskSchema = z.object({
+  title: z.string(),
+  owner: z.string().nullable(),
+  due: z.string().nullable(),
+  source_message_id: z.string(),
+  type: z.string(),
+});
+
+export const prioritySchema = z.object({
+  label: z.string(),
+  score: z.number(),
+  reasons: z.array(z.string()),
+});
+
+export const processThreadResponseSchema = z.object({
+  thread: threadResponseSchema,
+  summary: z.string(),
+  tasks: z.array(taskSchema),
+  priority: prioritySchema,
+});
+
+export const chatbotQARequestSchema = z.object({
+  question: z.string(),
+  thread: threadResponseSchema,
+});
+
+export const chatbotQAResponseSchema = z.object({
+  answer: z.string(),
+  sources: z.array(z.string()),
+});
+
+export type EmailMessage = z.infer<typeof emailMessageSchema>;
+export type Keyword = z.infer<typeof keywordSchema>;
+export type ProcessThreadRequest = z.infer<typeof processThreadRequestSchema>;
+export type NormalizedMessage = z.infer<typeof normalizedMessageSchema>;
+export type TimelineEntry = z.infer<typeof timelineEntrySchema>;
+export type ThreadResponse = z.infer<typeof threadResponseSchema>;
+export type Task = z.infer<typeof taskSchema>;
+export type Priority = z.infer<typeof prioritySchema>;
+export type ProcessThreadResponse = z.infer<typeof processThreadResponseSchema>;
+export type ChatbotQARequest = z.infer<typeof chatbotQARequestSchema>;
+export type ChatbotQAResponse = z.infer<typeof chatbotQAResponseSchema>;

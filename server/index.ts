@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { spawn } from "child_process";
 
 const app = express();
 app.use(express.json());
@@ -36,6 +37,8 @@ app.use((req, res, next) => {
   next();
 });
 
+let pythonBackend: any = null;
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -67,5 +70,28 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    log(`starting FastAPI backend on port 8000...`);
+    pythonBackend = spawn("uvicorn", ["app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"], {
+      stdio: "inherit",
+      shell: true,
+    });
+
+    pythonBackend.on("error", (err: Error) => {
+      console.error("Failed to start FastAPI backend:", err);
+    });
+
+    pythonBackend.on("exit", (code: number) => {
+      if (code !== 0) {
+        console.error(`FastAPI backend exited with code ${code}`);
+      }
+    });
+  });
+
+  process.on("SIGTERM", () => {
+    if (pythonBackend) {
+      pythonBackend.kill();
+    }
+    process.exit(0);
   });
 })();
