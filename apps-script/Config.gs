@@ -5,7 +5,7 @@
 
 // Replace with your actual Replit backend URL
 // Example: https://your-repl-name.your-username.replit.dev
-const BACKEND_URL = 'https://YOUR_REPL_NAME.YOUR_USERNAME.replit.dev';
+const BACKEND_URL = 'https://ai-mail-pilot-yulingsong44.replit.app';
 
 // API Endpoints
 const API_ENDPOINTS = {
