@@ -5,10 +5,16 @@
 
 /**
  * Show chatbot interface
- * @param {Object} e - Event object with context parameter
+ * @param {Object} e - Event object with contextKey parameter
  */
 function showChatbot(e) {
-  const context = e.parameters.context ? JSON.parse(e.parameters.context) : null;
+  let context = null;
+  
+  // Get context from cache if contextKey provided
+  if (e.parameters.contextKey) {
+    const contextJson = getCacheService().get(e.parameters.contextKey);
+    context = contextJson ? JSON.parse(contextJson) : null;
+  }
   
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation()

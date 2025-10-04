@@ -74,6 +74,10 @@ function createCategoryExpandedCard(categoryName, threadIds) {
       });
     }
     
+    // Store threadIds in cache to avoid parameter size limits
+    const cacheKey = 'expand_' + categoryName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
+    getCacheService().put(cacheKey, JSON.stringify(threadIds), 300);
+    
     // Action buttons
     const actionButtons = CardService.newButtonSet()
       .addButton(CardService.newTextButton()
@@ -88,7 +92,7 @@ function createCategoryExpandedCard(categoryName, threadIds) {
           .setParameters({
             threadId: threadId,
             categoryName: categoryName,
-            remainingIds: JSON.stringify(threadIds)
+            cacheKey: cacheKey
           })))
       .addButton(CardService.newTextButton()
         .setText('Snooze')
@@ -97,7 +101,7 @@ function createCategoryExpandedCard(categoryName, threadIds) {
           .setParameters({
             threadId: threadId,
             categoryName: categoryName,
-            remainingIds: JSON.stringify(threadIds)
+            cacheKey: cacheKey
           })))
       .addButton(CardService.newTextButton()
         .setText('Dismiss')
@@ -106,7 +110,7 @@ function createCategoryExpandedCard(categoryName, threadIds) {
           .setParameters({
             threadId: threadId,
             categoryName: categoryName,
-            remainingIds: JSON.stringify(threadIds)
+            cacheKey: cacheKey
           })));
     
     section.addWidget(actionButtons);
@@ -125,15 +129,20 @@ function createCategoryExpandedCard(categoryName, threadIds) {
   
   // Footer section with "Ask Assistant" button
   const footerSection = CardService.newCardSection();
+  
+  // Store context in cache
+  const chatCacheKey = 'chat_' + categoryName.replace(/[^a-zA-Z0-9]/g, '_');
+  getCacheService().put(chatCacheKey, JSON.stringify({
+    category: categoryName,
+    threadIds: threadIds
+  }), 300);
+  
   footerSection.addWidget(CardService.newTextButton()
     .setText('💬 Ask Assistant')
     .setOnClickAction(CardService.newAction()
       .setFunctionName('showChatbot')
       .setParameters({
-        context: JSON.stringify({
-          category: categoryName,
-          threadIds: threadIds
-        })
+        contextKey: chatCacheKey
       })));
   
   card.addSection(footerSection);
@@ -181,7 +190,11 @@ function openThreadAction(e) {
 function markThreadDone(e) {
   const threadId = e.parameters.threadId;
   const categoryName = e.parameters.categoryName;
-  const remainingIds = JSON.parse(e.parameters.remainingIds);
+  const cacheKey = e.parameters.cacheKey;
+  
+  // Get remainingIds from cache
+  const remainingIdsJson = getCacheService().get(cacheKey);
+  const remainingIds = remainingIdsJson ? JSON.parse(remainingIdsJson) : [];
   
   // Remove from unresolved pool
   removeUnresolvedThreadId(threadId);
@@ -215,19 +228,19 @@ function markThreadDone(e) {
 function snoozeThreadAction(e) {
   const threadId = e.parameters.threadId;
   const categoryName = e.parameters.categoryName;
-  const remainingIds = JSON.parse(e.parameters.remainingIds);
+  const cacheKey = e.parameters.cacheKey;
   
-  // Show snooze options card
+  // Show snooze options card (pass cacheKey instead of remainingIds)
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation()
-      .pushCard(createSnoozeOptionsCard(threadId, categoryName, remainingIds)))
+      .pushCard(createSnoozeOptionsCard(threadId, categoryName, cacheKey)))
     .build();
 }
 
 /**
  * Create snooze options card
  */
-function createSnoozeOptionsCard(threadId, categoryName, remainingIds) {
+function createSnoozeOptionsCard(threadId, categoryName, cacheKey) {
   const card = CardService.newCardBuilder();
   
   card.setHeader(CardService.newCardHeader()
@@ -255,7 +268,7 @@ function createSnoozeOptionsCard(threadId, categoryName, remainingIds) {
           threadId: threadId,
           untilIso: snoozeUntil.toISOString(),
           categoryName: categoryName,
-          remainingIds: JSON.stringify(remainingIds)
+          cacheKey: cacheKey
         })));
   });
   
@@ -271,7 +284,11 @@ function confirmSnooze(e) {
   const threadId = e.parameters.threadId;
   const untilIso = e.parameters.untilIso;
   const categoryName = e.parameters.categoryName;
-  const remainingIds = JSON.parse(e.parameters.remainingIds);
+  const cacheKey = e.parameters.cacheKey;
+  
+  // Get remainingIds from cache
+  const remainingIdsJson = getCacheService().get(cacheKey);
+  const remainingIds = remainingIdsJson ? JSON.parse(remainingIdsJson) : [];
   
   // Snooze the thread
   snoozeThread(threadId, untilIso);
@@ -294,7 +311,11 @@ function confirmSnooze(e) {
 function dismissThreadAction(e) {
   const threadId = e.parameters.threadId;
   const categoryName = e.parameters.categoryName;
-  const remainingIds = JSON.parse(e.parameters.remainingIds);
+  const cacheKey = e.parameters.cacheKey;
+  
+  // Get remainingIds from cache
+  const remainingIdsJson = getCacheService().get(cacheKey);
+  const remainingIds = remainingIdsJson ? JSON.parse(remainingIdsJson) : [];
   
   // Dismiss the thread
   dismissThread(threadId);

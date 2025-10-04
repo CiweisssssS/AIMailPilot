@@ -173,13 +173,17 @@ function addCategoryCard(cardBuilder, categoryName, threadIds, color, analysisRe
   
   // "View more" button
   if (threadIds.length > 0) {
+    // Store threadIds in cache to avoid parameter size limits
+    const cacheKey = 'category_' + categoryName.replace(/[^a-zA-Z0-9]/g, '_');
+    getCacheService().put(cacheKey, JSON.stringify(threadIds), 300); // 5 min TTL
+    
     section.addWidget(CardService.newTextButton()
       .setText(`View ${categoryName} →`)
       .setOnClickAction(CardService.newAction()
         .setFunctionName('expandCategory')
         .setParameters({
           category: categoryName,
-          threadIds: JSON.stringify(threadIds)
+          cacheKey: cacheKey
         })));
   }
   
@@ -219,7 +223,11 @@ function refreshInbox(e) {
  */
 function expandCategory(e) {
   const category = e.parameters.category;
-  const threadIds = JSON.parse(e.parameters.threadIds);
+  const cacheKey = e.parameters.cacheKey;
+  
+  // Retrieve threadIds from cache
+  const threadIdsJson = getCacheService().get(cacheKey);
+  const threadIds = threadIdsJson ? JSON.parse(threadIdsJson) : [];
   
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation()
