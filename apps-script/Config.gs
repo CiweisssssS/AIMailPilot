@@ -10,6 +10,10 @@ const BACKEND_URL = 'https://ai-mail-pilot-yulingsong44.replit.app';
 // API Endpoints
 const API_ENDPOINTS = {
   PROCESS_THREAD: '/api/process-thread',
+  BATCH_ANALYZE: '/api/batch-analyze',
+  SUMMARIZE: '/api/summarize',
+  EXTRACT_TASKS: '/api/extract-tasks',
+  PRIORITIZE: '/api/prioritize',
   CHATBOT_QA: '/api/chatbot-qa',
   UPDATE_SETTINGS: '/api/update-user-settings',
   HEALTH: '/healthz'

@@ -4,60 +4,54 @@
  */
 
 /**
- * Homepage trigger - shown when no message is selected
+ * Homepage trigger - shown when sidebar opens
+ * Implements inbox-level analysis with delta fetch + unresolved pool
  */
 function onHomepage(e) {
-  return createWelcomeCard();
-}
-
-/**
- * Context trigger - shown when a message is selected
- */
-function onGmailMessageSelected(e) {
-  const messageId = e.gmail.messageId;
-  const accessToken = e.gmail.accessToken;
-  
   try {
-    // Fetch the email thread
-    const messages = getEmailThread(messageId, accessToken);
+    // Fetch candidate threads using delta + unresolved pool strategy
+    const threadIds = fetchCandidateThreads('all');
     
-    if (!messages || messages.length === 0) {
-      return createErrorCard('Failed to load email thread');
+    if (threadIds.length === 0) {
+      return [createEmptyInboxCard()];
     }
     
-    // Get user's keywords from properties
-    const keywords = getUserKeywords();
+    // Analyze threads with caching
+    const analysisResults = analyzeThreadsWithCache(threadIds);
     
-    // Process thread through backend
-    const result = processThread(messages, keywords);
-    
-    if (!result) {
-      return createErrorCard('Failed to process email thread. Check backend connection.');
-    }
-    
-    // Create and return the sidebar card
-    return createSidebarCard(result);
+    // Create and return inbox reminder card (Layer 1 default view)
+    return [createInboxReminderCard(analysisResults, 'all')];
     
   } catch (error) {
-    console.error('Error in onGmailMessageSelected:', error);
-    return createErrorCard('Error: ' + error.message);
+    console.error('Error in onHomepage:', error);
+    return [createErrorCard('Error loading inbox: ' + error.message)];
   }
 }
 
 /**
- * Welcome card shown on homepage
+ * Empty inbox card
  */
-function createWelcomeCard() {
+function createEmptyInboxCard() {
   const card = CardService.newCardBuilder()
     .setHeader(CardService.newCardHeader()
-      .setTitle('AI Email Assistant')
-      .setSubtitle('Select an email to analyze'))
+      .setTitle('📬 Inbox Reminder')
+      .setSubtitle('All caught up!'))
     .addSection(CardService.newCardSection()
       .addWidget(CardService.newTextParagraph()
-        .setText('Open any email to see:<br>• AI Summary<br>• Priority Score<br>• Extracted Tasks<br>• Timeline')))
+        .setText('No emails to analyze. Great job staying on top of things! 🎉')))
+    .addSection(CardService.newCardSection()
+      .addWidget(CardService.newButtonSet()
+        .addButton(CardService.newTextButton()
+          .setText('🔄 Refresh')
+          .setOnClickAction(CardService.newAction()
+            .setFunctionName('refreshInbox')))
+        .addButton(CardService.newTextButton()
+          .setText('⚙️ Settings')
+          .setOnClickAction(CardService.newAction()
+            .setFunctionName('showKeywordSettings')))))
     .build();
   
-  return [card];
+  return card;
 }
 
 /**
@@ -104,24 +98,3 @@ function getEmailThread(messageId, accessToken) {
   return messages;
 }
 
-/**
- * Get user's personalized keywords from properties
- */
-function getUserKeywords() {
-  const userProperties = PropertiesService.getUserProperties();
-  const keywordsJson = userProperties.getProperty('keywords');
-  
-  if (keywordsJson) {
-    return JSON.parse(keywordsJson);
-  }
-  
-  return [];
-}
-
-/**
- * Save user's keywords to properties
- */
-function saveUserKeywords(keywords) {
-  const userProperties = PropertiesService.getUserProperties();
-  userProperties.setProperty('keywords', JSON.stringify(keywords));
-}

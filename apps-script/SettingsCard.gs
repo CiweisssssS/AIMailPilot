@@ -1,23 +1,48 @@
 /**
- * Settings card for managing personalized keywords
+ * Layer 4 - Settings card for managing personalized keywords
  */
 
 function showSettingsCard(e) {
+  return showKeywordSettings(e);
+}
+
+function showKeywordSettings(e) {
+  const card = buildKeywordSettingsCard();
+  
+  // Wrap in ActionResponse for onClick handlers
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation()
+      .pushCard(card))
+    .build();
+}
+
+/**
+ * Build keyword settings card
+ */
+function buildKeywordSettingsCard() {
   const keywords = getUserKeywords();
   
   const card = CardService.newCardBuilder()
     .setHeader(CardService.newCardHeader()
-      .setTitle('Keyword Settings')
-      .setSubtitle('Manage priority keywords'));
+      .setTitle('⚙️ Keyword Settings')
+      .setSubtitle('Customize priority keywords'));
   
   // Current keywords section
   const currentSection = CardService.newCardSection()
     .setHeader('Current Keywords');
   
   if (keywords.length > 0) {
-    keywords.forEach(function(keyword) {
+    keywords.forEach(function(keyword, index) {
+      const weight = keyword.weight || 'Medium';
       currentSection.addWidget(CardService.newTextParagraph()
-        .setText(`<b>${keyword.term}</b> (weight: ${keyword.weight}, scope: ${keyword.scope})`));
+        .setText(`<b>${keyword.term}</b> • ${weight} • ${keyword.scope}`));
+      
+      // Delete button for each keyword
+      currentSection.addWidget(CardService.newTextButton()
+        .setText('Delete')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('handleDeleteKeyword')
+          .setParameters({term: keyword.term})));
     });
   } else {
     currentSection.addWidget(CardService.newTextParagraph()
@@ -32,19 +57,22 @@ function showSettingsCard(e) {
     .addWidget(CardService.newTextInput()
       .setFieldName('keyword_term')
       .setTitle('Keyword')
-      .setHint('e.g., urgent, deadline'))
-    .addWidget(CardService.newTextInput()
+      .setHint('e.g., urgent, deadline, recruiting'))
+    .addWidget(CardService.newSelectionInput()
       .setFieldName('keyword_weight')
-      .setTitle('Weight')
-      .setValue('1.5')
-      .setHint('Higher = more important'))
+      .setTitle('Priority Weight')
+      .setType(CardService.SelectionInputType.DROPDOWN)
+      .addItem('High', 'High', false)
+      .addItem('Medium', 'Medium', true)
+      .addItem('Low', 'Low', false))
     .addWidget(CardService.newSelectionInput()
       .setFieldName('keyword_scope')
-      .setTitle('Scope')
+      .setTitle('Search In')
       .setType(CardService.SelectionInputType.DROPDOWN)
       .addItem('Subject only', 'subject', true)
       .addItem('Body only', 'body', false)
-      .addItem('Subject or Body', 'subject|body', false));
+      .addItem('Subject or Body', 'subject|body', false)
+      .addItem('Everywhere', 'subject|body|sender', false));
   
   const addAction = CardService.newAction()
     .setFunctionName('handleAddKeyword');
@@ -67,16 +95,7 @@ function showSettingsCard(e) {
         .setOnClickAction(clearAction)));
   }
   
-  // Back button
-  const backAction = CardService.newAction()
-    .setFunctionName('goBackToMain');
-  
-  card.setFixedFooter(CardService.newFixedFooter()
-    .setPrimaryButton(CardService.newTextButton()
-      .setText('← Back')
-      .setOnClickAction(backAction)));
-  
-  return CardService.newNavigation().pushCard(card.build());
+  return card.build();
 }
 
 /**
@@ -84,24 +103,18 @@ function showSettingsCard(e) {
  */
 function handleAddKeyword(e) {
   const term = e.formInput.keyword_term;
-  const weight = parseFloat(e.formInput.keyword_weight || '1.5');
+  const weight = e.formInput.keyword_weight || 'Medium';
   const scope = e.formInput.keyword_scope || 'subject|body';
   
   if (!term || term.trim() === '') {
-    return createNotification('Please enter a keyword');
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Please enter a keyword'))
+      .build();
   }
   
-  const keywords = getUserKeywords();
-  
-  // Add new keyword
-  keywords.push({
-    term: term.trim(),
-    weight: weight,
-    scope: scope
-  });
-  
-  // Save locally
-  saveUserKeywords(keywords);
+  // Add keyword using StateManager
+  addKeyword(term.trim(), weight, scope);
   
   // Update backend
   updateUserSettings([{
@@ -112,9 +125,29 @@ function handleAddKeyword(e) {
   
   return CardService.newActionResponseBuilder()
     .setNotification(CardService.newNotification()
-      .setText('Keyword added: ' + term))
+      .setText('✅ Keyword added: ' + term))
     .setNavigation(CardService.newNavigation().updateCard(
-      showSettingsCard(e).card()))
+      buildKeywordSettingsCard()))
+    .build();
+}
+
+/**
+ * Handle delete keyword
+ */
+function handleDeleteKeyword(e) {
+  const term = e.parameters.term;
+  
+  // Remove keyword using StateManager
+  removeKeyword(term);
+  
+  // Update backend
+  updateUserSettings([], [term]);
+  
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification()
+      .setText('🗑️ Keyword deleted: ' + term))
+    .setNavigation(CardService.newNavigation().updateCard(
+      buildKeywordSettingsCard()))
     .build();
 }
 
@@ -123,17 +156,18 @@ function handleAddKeyword(e) {
  */
 function handleClearKeywords(e) {
   const keywords = getUserKeywords();
+  const terms = keywords.map(kw => kw.term);
   
-  // Clear locally
-  saveUserKeywords([]);
+  // Clear locally using StateManager
+  setUserKeywords([]);
   
   // Update backend
-  updateUserSettings([], keywords);
+  updateUserSettings([], terms);
   
   return CardService.newActionResponseBuilder()
     .setNotification(CardService.newNotification()
-      .setText('All keywords cleared'))
+      .setText('🗑️ All keywords cleared'))
     .setNavigation(CardService.newNavigation().updateCard(
-      showSettingsCard(e).card()))
+      buildKeywordSettingsCard()))
     .build();
 }
