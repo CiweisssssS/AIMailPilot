@@ -17,12 +17,6 @@
     "homepageTrigger": {
       "runFunction": "onHomepage"
     },
-    "universalActions": [
-      {
-        "label": "Refresh Inbox",
-        "runFunction": "refreshInbox"
-      }
-    ],
     "primaryColor": "#4285F4",
     "secondaryColor": "#EA4335"
   },
