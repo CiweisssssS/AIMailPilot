@@ -1,0 +1,74 @@
+You misunderstood my requirements earlier. Right now the Gmail Add-on sidebar only shows results when a single email is opened. That is incorrect. 
+
+I need you to rebuild the Gmail Add-on logic following a clear **four-layer product structure**. The Add-on must display meaningful content as soon as the user opens the sidebar, not only after clicking on an email.
+
+---
+
+### Layer 1 – Initial Sidebar
+- When the user opens Gmail and clicks the Add-on icon, the sidebar must immediately show content.
+- Provide two toggle views at the top:
+  1. **Inbox Reminder view** (default):
+     - Show total unread emails.
+     - Show unread counts by categories: Urgent / To-do / FYI / plus any user-defined categories (e.g., Recruiting, Alerts).
+     - Each category card shows: unread count + 1–2 one-line previews.
+     - Clicking a category opens Layer 2.
+  2. **Task & Schedule view**:
+     - Show time-based tasks/events extracted from emails.
+     - Group by timeline buckets: Overdue / Today / This Week / Later.
+     - Each event card shows: title, date/time, source email, and quick actions (“Add to Calendar”, “Open email”).
+- Global actions:
+  - **Refresh** to re-fetch N latest unread threads (default 25).
+  - **Customize Priorities** → leads to Layer 4.
+
+Data flow:
+- On sidebar open, fetch N unread threads via Gmail API.
+- For each thread, call backend endpoints:
+  - `/prioritize` for P1/P2/P3 scores,
+  - `/summarize` for one-line summaries,
+  - `/extract` for time-bound tasks/events.
+
+---
+
+### Layer 2 – Category Expanded View
+- Triggered when user clicks any category (Urgent / To-do / FYI / or custom categories).
+- Show category title + total count.
+- List emails in that category:
+  - Subject line
+  - One-line summary
+  - Timestamp
+  - Priority label (for default categories) or custom tag (for user-defined).
+- If tasks/dates detected, show them under the summary with quick “Add to Calendar” action.
+- User interactions:
+  - Click email → open original Gmail thread.
+  - Click “More” → load additional emails.
+  - Bottom of the list: button **“Ask Assistant 💬”** → leads to Layer 3.
+
+---
+
+### Layer 3 – Chatbot
+- Simple conversational interface inside sidebar.
+- Users can type questions such as:
+  - “What are my top 3 urgent tasks?”
+  - “Summarize all recruiting emails.”
+  - “Find any deadlines next week.”
+- Chatbot answers using the data already extracted by `/summarize`, `/extract`, `/prioritize`.
+- Responses may include quick action buttons (e.g., “Add to Calendar”).
+
+---
+
+### Layer 4 – Keyword Customization
+- Accessed from Layer 1 (“Customize Priorities”).
+- UI: list of user-defined keywords with weights (High/Medium/Low).
+- Actions:
+  - Add new keyword,
+  - Delete keyword,
+  - Adjust weight.
+- Store preferences in backend (or Google PropertiesService).
+- Backend must integrate these keywords when calculating priority scores in `/prioritize`.
+
+---
+
+### Key correction
+The Add-on is not an email-level analyzer. It must work at **inbox level first** (Layer 1), then progressively drill down (Layer 2, Layer 3, Layer 4).
+
+Please update the code and logic so the Gmail Add-on strictly follows this four-layer user flow, with Layer 1 always showing Inbox Reminder by default at startup.

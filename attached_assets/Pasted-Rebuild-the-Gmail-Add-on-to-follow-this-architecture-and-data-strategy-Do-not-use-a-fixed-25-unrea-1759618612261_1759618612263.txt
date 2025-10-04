@@ -1,0 +1,102 @@
+Rebuild the Gmail Add-on to follow this architecture and data strategy. Do not use a fixed “25 unread” slice as the source of truth. Use a time-window delta + unresolved pool approach so we never miss emails between sessions and we continue to show unhandled threads.
+
+GOALS
+- Inbox-level analysis rendered immediately when sidebar opens.
+- Four-layer navigation with working UI and basic data flow.
+- Time-window fetch to avoid missing items; unresolved pool so unhandled threads persist.
+- CPU-friendly, no paid LLMs in this phase (heuristics or stubs acceptable).
+
+DATA STATE (Apps Script PropertiesService)
+- LAST_OPEN_TS: number (ms since epoch)
+- UNRESOLVED_THREAD_IDS: array<string> (threadId), max 1000, LRU eviction
+- SNOOZED_UNTIL: map<string, ISODatetime>
+- DISMISSED_SET: array<string>
+- USER_KEYWORDS: array<{ term: string, weight: "High"|"Medium"|"Low" }>
+- ANALYSIS_CACHE_TTL_MIN: number (default 5); cache is in-memory per execution for now
+
+FETCH STRATEGY
+1) On sidebar open:
+   - If LAST_OPEN_TS exists: fetch threads where internalDate > LAST_OPEN_TS (or Gmail query `after:last_open_ts` / `newer_than`).
+   - Else (first run): fetch unread from the last 7 days (cap with pagination).
+   - Let DELTA = set of fetched threadIds.
+   - CANDIDATE = dedupe( DELTA ∪ UNRESOLVED_THREAD_IDS ).
+   - Filter CANDIDATE:
+       remove any in DISMISSED_SET;
+       remove any with SNOOZED_UNTIL[threadId] > now.
+   - Analyze CANDIDATE in small batches (e.g., 5 at a time), with a lightweight cache (5–10 min TTL) to avoid reprocessing within the TTL.
+   - Render Layer 1 (Inbox Reminder + Task & Schedule).
+   - Finally, set LAST_OPEN_TS = now.
+
+2) Display mode toggle (Layer 1 settings):
+   - “New since last open” (DELTA only)
+   - “Unresolved only” (UNRESOLVED_THREAD_IDS only, minus snoozed/dismissed)
+   - “All (delta + unresolved)”
+
+THREAD ACTIONS (available on Category Expanded view)
+- Mark as Done: remove threadId from UNRESOLVED_THREAD_IDS; (optional) add Gmail label `AI/Processed`.
+- Snooze: set SNOOZED_UNTIL[threadId] to a chosen ISO time.
+- Dismiss: add to DISMISSED_SET.
+
+BACKEND (FastAPI) — stubbed or light heuristics ok
+Endpoints:
+- POST /batch-analyze { threads:[{ id, subject, snippet, last_message? }] }
+  -> [{ id, summary, priority:{ score,label:"P1"|"P2"|"P3", rationale }, tasks:[{ title, owner, due_iso, source_span }] }]
+- POST /summarize { subject, text } -> { summary }
+- POST /extract { text } -> { tasks:[...], dates:[...] }
+- POST /prioritize { features, keywords:[{term,weight}] } -> { score, label, rationale }
+- GET /health, GET /version
+Implementation notes:
+- Prioritize: rule-based baseline (sender weight, urgent terms, deadline proximity, direct recipient, thread activity) + keyword hits from USER_KEYWORDS (weight High=+2, Medium=+1, Low=+0.5). Thresholds: P1>=0.75, P2>=0.45 else P3.
+- Summarize: heuristic (subject + last sentence trimmed) stub for now.
+- Extract: regex verbs + dateparser; return normalized due_iso when found.
+- Batch: process in chunks of 5 to protect memory; do not store raw email.
+
+FOUR-LAYER UI (Apps Script, CardService)
+
+Layer 1 — Initial Sidebar (default on open)
+- Top toggle: [Inbox Reminder] | [Task & Schedule]
+- Inbox Reminder:
+  - Show total unread.
+  - Category cards: Urgent / To-do / FYI + user-defined categories (from USER_KEYWORDS).
+  - Each card: count + 1–2 one-line previews (subject + summary).
+  - Tap a card → Layer 2 for that category.
+- Task & Schedule:
+  - Timeline buckets: Overdue | Today | This Week | Later.
+  - Event cards: { title, when, source (thread subject) } with buttons [Add to Calendar] [Open email].
+- Global actions:
+  - [Refresh] → re-run delta + unresolved merge and re-render.
+  - [Customize Priorities] → Layer 4.
+- Display mode toggle:
+  - New since last open / Unresolved only / All (delta + unresolved).
+
+Layer 2 — Category Expanded View (for any category: Urgent/To-do/FYI/User-defined)
+- Header: Category name + total count.
+- List rows: subject | one-line summary | timestamp | priority/custom tag.
+- If tasks/dates exist: show inline with [Add to Calendar].
+- Row actions: [Open email] [Mark as Done] [Snooze] [Dismiss].
+- Footer: [Ask Assistant 💬] → Layer 3.
+- Paging: “Load more” to fetch next page.
+
+Layer 3 — Chatbot (simple)
+- Textbox + history view.
+- Answers questions using already extracted summaries/tasks/priorities (no raw-email re-fetch).
+- May include quick actions (e.g., “Add to Calendar”).
+
+Layer 4 — Keyword Customization
+- Simple list of keywords with weight (High/Medium/Low).
+- Actions: [Add] [Delete] [Change weight] [Save].
+- Persist to USER_KEYWORDS; backend /prioritize uses these weights.
+
+CACHING / PERFORMANCE
+- Keep a simple in-memory cache for the current execution (threadId → {summary, priority, tasks, ts}), TTL default 5 min.
+- Batch calls to /batch-analyze in groups of 5; parallelize where safe.
+- Avoid re-analysis within TTL.
+
+ACCEPTANCE CRITERIA
+- Opening the sidebar immediately renders Inbox Reminder without clicking any email.
+- Delta fetch since LAST_OPEN_TS + unresolved merge prevents missed emails between sessions.
+- Category expand shows list with working actions: Open, Mark as Done, Snooze, Dismiss.
+- Task & Schedule shows event cards with Add to Calendar.
+- Keyword Customization persists and influences prioritization.
+- Display mode toggle works (New / Unresolved / All).
+- No paid APIs; all stubs or simple heuristics are acceptable for this rebuild.
