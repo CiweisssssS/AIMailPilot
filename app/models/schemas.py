@@ -5,7 +5,7 @@ from datetime import datetime
 
 class PersonalizedKeyword(BaseModel):
     term: str
-    weight: float = 1.0
+    weight: Literal["High", "Medium", "Low"] = "Medium"
     scope: str = "subject|body|sender"
 
 
@@ -80,7 +80,7 @@ class ChatbotQAResponse(BaseModel):
 
 class KeywordUpdate(BaseModel):
     term: str
-    weight: float
+    weight: Literal["High", "Medium", "Low"]
     scope: str
 
 
@@ -92,3 +92,68 @@ class UpdateUserSettingsRequest(BaseModel):
 
 class UpdateUserSettingsResponse(BaseModel):
     ok: bool
+
+
+class ThreadInput(BaseModel):
+    id: str
+    subject: str
+    snippet: str
+    last_message: Optional[str] = None
+    from_: Optional[str] = Field(None, alias="from")
+    to: Optional[List[str]] = []
+    date: Optional[str] = None
+    
+    class Config:
+        populate_by_name = True
+
+
+class ThreadAnalysisResult(BaseModel):
+    id: str
+    summary: str
+    priority: Priority
+    tasks: List[Task]
+
+
+class BatchAnalyzeRequest(BaseModel):
+    threads: List[ThreadInput]
+    keywords: List[PersonalizedKeyword] = []
+
+
+class BatchAnalyzeResponse(BaseModel):
+    results: List[ThreadAnalysisResult]
+
+
+class SummarizeRequest(BaseModel):
+    subject: str
+    text: str
+
+
+class SummarizeResponse(BaseModel):
+    summary: str
+
+
+class ExtractTasksRequest(BaseModel):
+    text: str
+
+
+class ExtractTasksResponse(BaseModel):
+    tasks: List[Task]
+
+
+class PrioritizeRequest(BaseModel):
+    subject: str
+    body: str
+    from_: str = Field(alias="from")
+    to: List[str] = []
+    has_deadline: bool = False
+    deadline_hours: Optional[float] = None
+    has_meeting: bool = False
+    meeting_hours: Optional[float] = None
+    keywords: List[PersonalizedKeyword] = []
+    
+    class Config:
+        populate_by_name = True
+
+
+class PrioritizeResponse(BaseModel):
+    priority: Priority

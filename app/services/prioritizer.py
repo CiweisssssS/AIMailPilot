@@ -46,9 +46,11 @@ def calculate_priority(
                 reasons.append(f"important sender: {domain}")
                 break
     
+    weight_map = {"High": 2.0, "Medium": 1.0, "Low": 0.5}
+    
     for keyword in personalized_keywords:
         term = keyword.term.lower()
-        weight = keyword.weight
+        weight_value = weight_map.get(keyword.weight, 1.0)
         scope = keyword.scope.lower()
         
         for msg in messages:
@@ -58,24 +60,24 @@ def calculate_priority(
                 subject = msg.get('subject', '').lower()
                 ratio = fuzz.partial_ratio(term, subject)
                 if ratio > 70:
-                    score += 0.1 * weight
-                    reasons.append(f"personalized keyword hit: {term} (weight {weight})")
+                    score += 0.1 * weight_value
+                    reasons.append(f"personalized keyword hit: {term} (weight {keyword.weight})")
                     match_found = True
             
             if not match_found and 'body' in scope:
                 body = msg.get('clean_body', msg.get('body', '')).lower()
                 ratio = fuzz.partial_ratio(term, body)
                 if ratio > 70:
-                    score += 0.1 * weight
-                    reasons.append(f"personalized keyword hit: {term} (weight {weight})")
+                    score += 0.1 * weight_value
+                    reasons.append(f"personalized keyword hit: {term} (weight {keyword.weight})")
                     match_found = True
             
             if not match_found and 'sender' in scope:
                 sender = msg.get('from_', '').lower()
                 ratio = fuzz.partial_ratio(term, sender)
                 if ratio > 70:
-                    score += 0.1 * weight
-                    reasons.append(f"personalized keyword hit in sender: {term} (weight {weight})")
+                    score += 0.1 * weight_value
+                    reasons.append(f"personalized keyword hit in sender: {term} (weight {keyword.weight})")
             
             if match_found:
                 break
@@ -84,7 +86,7 @@ def calculate_priority(
     
     if score >= 0.75:
         label = "P1"
-    elif score >= 0.4:
+    elif score >= 0.45:
         label = "P2"
     else:
         label = "P3"

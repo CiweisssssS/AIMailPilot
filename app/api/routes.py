@@ -6,14 +6,24 @@ from app.models.schemas import (
     ChatbotQAResponse,
     UpdateUserSettingsRequest,
     UpdateUserSettingsResponse,
-    PersonalizedKeyword
+    PersonalizedKeyword,
+    BatchAnalyzeRequest,
+    BatchAnalyzeResponse,
+    ThreadAnalysisResult,
+    SummarizeRequest,
+    SummarizeResponse,
+    ExtractTasksRequest,
+    ExtractTasksResponse,
+    PrioritizeRequest,
+    PrioritizeResponse
 )
 from app.services.normalizer import normalize_thread
-from app.services.summarizer import summarize_thread
-from app.services.extractor import extract_tasks
+from app.services.summarizer import summarize_thread, rule_based_summary
+from app.services.extractor import extract_tasks, rule_based_extraction
 from app.services.prioritizer import calculate_priority
 from app.services.qa import answer_question
 from app.services.user_settings import update_user_settings, get_user_keywords
+import asyncio
 
 
 router = APIRouter()
@@ -74,6 +84,148 @@ async def update_settings(request: UpdateUserSettingsRequest):
         )
         
         return UpdateUserSettingsResponse(ok=success)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/batch-analyze", response_model=BatchAnalyzeResponse)
+async def batch_analyze(request: BatchAnalyzeRequest):
+    try:
+        results = []
+        threads = request.threads
+        keywords = request.keywords
+        
+        async def analyze_single_thread(thread):
+            try:
+                summary = rule_based_summary([{
+                    'subject': thread.subject,
+                    'clean_body': thread.snippet or thread.last_message or '',
+                    'body': thread.snippet or thread.last_message or ''
+                }])
+                
+                tasks = rule_based_extraction([{
+                    'id': thread.id,
+                    'subject': thread.subject,
+                    'clean_body': thread.last_message or thread.snippet or '',
+                    'body': thread.last_message or thread.snippet or '',
+                    'to': thread.to or [],
+                    'from_': thread.from_ or 'unknown'
+                }])
+                
+                priority = calculate_priority(
+                    [{
+                        'subject': thread.subject,
+                        'clean_body': thread.last_message or thread.snippet or '',
+                        'body': thread.last_message or thread.snippet or '',
+                        'from_': thread.from_ or 'unknown',
+                        'to': thread.to or []
+                    }],
+                    tasks,
+                    keywords
+                )
+                
+                return ThreadAnalysisResult(
+                    id=thread.id,
+                    summary=summary,
+                    priority=priority,
+                    tasks=tasks
+                )
+            except Exception as e:
+                from app.models.schemas import Priority
+                return ThreadAnalysisResult(
+                    id=thread.id,
+                    summary=f"Error: {str(e)}",
+                    priority=Priority(label="P3", score=0.0, reasons=["analysis failed"]),
+                    tasks=[]
+                )
+        
+        batch_size = 5
+        for i in range(0, len(threads), batch_size):
+            batch = threads[i:i + batch_size]
+            batch_results = await asyncio.gather(*[analyze_single_thread(t) for t in batch])
+            results.extend(batch_results)
+        
+        return BatchAnalyzeResponse(results=results)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/summarize", response_model=SummarizeResponse)
+async def summarize_text(request: SummarizeRequest):
+    try:
+        summary = rule_based_summary([{
+            'subject': request.subject,
+            'clean_body': request.text,
+            'body': request.text
+        }])
+        
+        return SummarizeResponse(summary=summary)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/extract-tasks", response_model=ExtractTasksResponse)
+async def extract_tasks_from_text(request: ExtractTasksRequest):
+    try:
+        tasks = rule_based_extraction([{
+            'id': 'temp',
+            'clean_body': request.text,
+            'body': request.text,
+            'to': [],
+            'from_': 'unknown'
+        }])
+        
+        return ExtractTasksResponse(tasks=tasks)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/prioritize", response_model=PrioritizeResponse)
+async def prioritize_email(request: PrioritizeRequest):
+    try:
+        from datetime import datetime, timedelta
+        from app.models.schemas import Task
+        
+        tasks = []
+        now = datetime.now()
+        
+        if request.has_deadline and request.deadline_hours is not None:
+            due_time = now + timedelta(hours=request.deadline_hours)
+            tasks.append(Task(
+                title="Deadline detected",
+                owner="you",
+                due=due_time.isoformat(),
+                source_message_id="temp",
+                type="deadline"
+            ))
+        
+        if request.has_meeting and request.meeting_hours is not None:
+            meeting_time = now + timedelta(hours=request.meeting_hours)
+            tasks.append(Task(
+                title="Meeting detected",
+                owner="you",
+                due=meeting_time.isoformat(),
+                source_message_id="temp",
+                type="meeting"
+            ))
+        
+        priority = calculate_priority(
+            [{
+                'subject': request.subject,
+                'clean_body': request.body,
+                'body': request.body,
+                'from_': request.from_,
+                'to': request.to
+            }],
+            tasks,
+            request.keywords
+        )
+        
+        return PrioritizeResponse(priority=priority)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
