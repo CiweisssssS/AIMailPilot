@@ -17,13 +17,14 @@ function createTaskScheduleCard(analysisResults) {
   
   // View toggle (back to Inbox Reminder)
   const viewToggle = CardService.newCardSection();
+  viewToggle.addWidget(CardService.newTextParagraph()
+    .setText('<b>• 📅 Tasks View</b>'));
+  
   const viewButtonSet = CardService.newButtonSet()
     .addButton(CardService.newTextButton()
-      .setText('📧 Inbox')
+      .setText('📧 Switch to Inbox')
       .setOnClickAction(CardService.newAction()
-        .setFunctionName('showInboxReminderView')))
-    .addButton(CardService.newTextButton()
-      .setText('• 📅 Tasks'));
+        .setFunctionName('showInboxReminderView')));
   
   viewToggle.addWidget(viewButtonSet);
   card.addSection(viewToggle);

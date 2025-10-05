@@ -41,11 +41,12 @@ function createInboxReminderCard(analysisResults, displayMode) {
   
   // View toggle (Inbox Reminder vs Task & Schedule)
   const viewToggle = CardService.newCardSection();
+  viewToggle.addWidget(CardService.newTextParagraph()
+    .setText('<b>• 📧 Inbox View</b>'));
+  
   const viewButtonSet = CardService.newButtonSet()
     .addButton(CardService.newTextButton()
-      .setText('• 📧 Inbox'))
-    .addButton(CardService.newTextButton()
-      .setText('📅 Tasks')
+      .setText('📅 Switch to Tasks')
       .setOnClickAction(CardService.newAction()
         .setFunctionName('showTaskScheduleView')));
   
