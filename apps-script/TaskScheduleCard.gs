@@ -23,9 +23,7 @@ function createTaskScheduleCard(analysisResults) {
       .setOnClickAction(CardService.newAction()
         .setFunctionName('showInboxReminderView')))
     .addButton(CardService.newTextButton()
-      .setText('📅 Tasks')
-      .setBackgroundColor('#4285F4')
-      .setDisabled(true));
+      .setText('• 📅 Tasks'));
   
   viewToggle.addWidget(viewButtonSet);
   card.addSection(viewToggle);
