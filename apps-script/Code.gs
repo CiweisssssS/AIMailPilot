@@ -66,7 +66,7 @@ function createErrorCard(message) {
         .setText(message)))
     .build();
   
-  return [card];
+  return card;
 }
 
 /**
