@@ -12,6 +12,13 @@ function getCache() {
 }
 
 /**
+ * Get cache service (alias for getCache)
+ */
+function getCacheService() {
+  return getCache();
+}
+
+/**
  * Generate cache key for thread analysis
  */
 function getCacheKey(threadId) {
