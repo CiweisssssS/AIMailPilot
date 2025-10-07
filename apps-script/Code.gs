@@ -98,3 +98,146 @@ function getEmailThread(messageId, accessToken) {
   return messages;
 }
 
+// ==================== ACTION HANDLERS ====================
+
+/**
+ * Save a task for later
+ */
+function onSaveTask(e) {
+  try {
+    const params = e.parameters;
+    const taskData = {
+      threadId: params.threadId,
+      title: params.title,
+      deadline: params.deadline,
+      owner: params.owner
+    };
+    
+    const taskId = saveTask(taskData);
+    
+    const cards = onHomepage(e);
+    const notification = CardService.newNotification()
+      .setText('✅ Task saved for later');
+    
+    return CardService.newActionResponseBuilder()
+      .setNotification(notification)
+      .setNavigation(CardService.newNavigation()
+        .updateCard(cards[0]))
+      .build();
+    
+  } catch (error) {
+    console.error('Error in onSaveTask:', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('❌ Error saving task'))
+      .build();
+  }
+}
+
+/**
+ * Flag a mail
+ */
+function onFlagMail(e) {
+  try {
+    const params = e.parameters;
+    const mailData = {
+      threadId: params.threadId,
+      subject: params.subject,
+      tags: params.tags ? JSON.parse(params.tags) : []
+    };
+    
+    flagMail(mailData);
+    
+    const cards = onHomepage(e);
+    const notification = CardService.newNotification()
+      .setText('🚩 Mail flagged');
+    
+    return CardService.newActionResponseBuilder()
+      .setNotification(notification)
+      .setNavigation(CardService.newNavigation()
+        .updateCard(cards[0]))
+      .build();
+    
+  } catch (error) {
+    console.error('Error in onFlagMail:', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('❌ Error flagging mail'))
+      .build();
+  }
+}
+
+/**
+ * Unflag a mail
+ */
+function onUnflagMail(e) {
+  try {
+    const threadId = e.parameters.threadId;
+    unflagMail(threadId);
+    
+    const cards = onHomepage(e);
+    const notification = CardService.newNotification()
+      .setText('Mail unflagged');
+    
+    return CardService.newActionResponseBuilder()
+      .setNotification(notification)
+      .setNavigation(CardService.newNavigation()
+        .updateCard(cards[0]))
+      .build();
+    
+  } catch (error) {
+    console.error('Error in onUnflagMail:', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('❌ Error unflagging mail'))
+      .build();
+  }
+}
+
+/**
+ * Mark thread as done (remove from unresolved pool)
+ */
+function onMarkAsDone(e) {
+  try {
+    const threadId = e.parameters.threadId;
+    removeUnresolvedThreadId(threadId);
+    
+    const cards = onHomepage(e);
+    const notification = CardService.newNotification()
+      .setText('✓ Marked as done');
+    
+    return CardService.newActionResponseBuilder()
+      .setNotification(notification)
+      .setNavigation(CardService.newNavigation()
+        .updateCard(cards[0]))
+      .build();
+    
+  } catch (error) {
+    console.error('Error in onMarkAsDone:', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('❌ Error marking as done'))
+      .build();
+  }
+}
+
+/**
+ * Refresh inbox - triggers new analysis
+ */
+function refreshInbox(e) {
+  try {
+    const cards = onHomepage(e);
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation()
+        .updateCard(cards[0]))
+      .build();
+    
+  } catch (error) {
+    console.error('Error in refreshInbox:', error);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('❌ Error refreshing'))
+      .build();
+  }
+}
+
