@@ -1,11 +1,16 @@
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-from rapidfuzz import fuzz
+import logging
 from app.models.schemas import Priority, Task, PersonalizedKeyword
+from app.core.model_manager import model_manager
 
+logger = logging.getLogger(__name__)
 
 BOSS_DOMAINS = ['ceo', 'boss', 'manager', 'director']
 CLIENT_DOMAINS = ['client', 'customer']
+
+# Semantic similarity threshold for keyword matching
+SEMANTIC_THRESHOLD = 0.65  # Lower than exact match but higher than random
 
 
 def calculate_priority(
@@ -46,6 +51,7 @@ def calculate_priority(
                 reasons.append(f"important sender: {domain}")
                 break
     
+    # Semantic keyword matching with MiniLM
     weight_map = {"High": 2.0, "Medium": 1.0, "Low": 0.5}
     
     for keyword in personalized_keywords:
@@ -53,34 +59,83 @@ def calculate_priority(
         weight_value = weight_map.get(keyword.weight, 1.0)
         scope = keyword.scope.lower()
         
-        for msg in messages:
-            match_found = False
+        try:
+            # Embed keyword once
+            keyword_emb = model_manager.embed_texts([term])[0]
             
-            if 'subject' in scope:
-                subject = msg.get('subject', '').lower()
-                ratio = fuzz.partial_ratio(term, subject)
-                if ratio > 70:
-                    score += 0.1 * weight_value
-                    reasons.append(f"personalized keyword hit: {term} (weight {keyword.weight})")
-                    match_found = True
+            # Check for zero vector
+            if sum(keyword_emb) == 0 or any(x != x for x in keyword_emb):  # NaN check
+                logger.warning(f"Invalid embedding for keyword '{term}', using fallback")
+                # Fallback to simple substring matching
+                for msg in messages:
+                    match_found = False
+                    
+                    if 'subject' in scope and term in msg.get('subject', '').lower():
+                        score += 0.1 * weight_value
+                        reasons.append(f"keyword '{term}' in subject (exact)")
+                        match_found = True
+                    
+                    if not match_found and 'body' in scope and term in msg.get('clean_body', msg.get('body', '')).lower():
+                        score += 0.1 * weight_value
+                        reasons.append(f"keyword '{term}' in body (exact)")
+                        match_found = True
+                    
+                    if not match_found and 'sender' in scope and term in msg.get('from_', '').lower():
+                        score += 0.1 * weight_value
+                        reasons.append(f"keyword '{term}' in sender (exact)")
+                    
+                    if match_found:
+                        break
+                continue
             
-            if not match_found and 'body' in scope:
-                body = msg.get('clean_body', msg.get('body', '')).lower()
-                ratio = fuzz.partial_ratio(term, body)
-                if ratio > 70:
-                    score += 0.1 * weight_value
-                    reasons.append(f"personalized keyword hit: {term} (weight {keyword.weight})")
-                    match_found = True
-            
-            if not match_found and 'sender' in scope:
-                sender = msg.get('from_', '').lower()
-                ratio = fuzz.partial_ratio(term, sender)
-                if ratio > 70:
-                    score += 0.1 * weight_value
-                    reasons.append(f"personalized keyword hit in sender: {term} (weight {keyword.weight})")
-            
-            if match_found:
-                break
+            for msg in messages:
+                match_found = False
+                
+                if 'subject' in scope:
+                    subject = msg.get('subject', '')
+                    if subject:
+                        subject_emb = model_manager.embed_texts([subject])[0]
+                        similarity = cosine_similarity(keyword_emb, subject_emb)
+                        
+                        if similarity >= SEMANTIC_THRESHOLD:
+                            score += 0.1 * weight_value
+                            reasons.append(f"keyword '{term}' in subject (semantic {similarity:.2f})")
+                            match_found = True
+                
+                if not match_found and 'body' in scope:
+                    body = msg.get('clean_body', msg.get('body', ''))
+                    if body:
+                        # For long bodies, chunk into sentences and find best match
+                        body_sentences = body.split('. ')[:10]  # Limit to first 10 sentences
+                        body_embs = model_manager.embed_texts(body_sentences)
+                        
+                        max_sim = max(
+                            (cosine_similarity(keyword_emb, emb) for emb in body_embs),
+                            default=0.0
+                        )
+                        
+                        if max_sim >= SEMANTIC_THRESHOLD:
+                            score += 0.1 * weight_value
+                            reasons.append(f"keyword '{term}' in body (semantic {max_sim:.2f})")
+                            match_found = True
+                
+                if not match_found and 'sender' in scope:
+                    sender = msg.get('from_', '')
+                    if sender:
+                        sender_emb = model_manager.embed_texts([sender])[0]
+                        similarity = cosine_similarity(keyword_emb, sender_emb)
+                        
+                        if similarity >= SEMANTIC_THRESHOLD:
+                            score += 0.1 * weight_value
+                            reasons.append(f"keyword '{term}' in sender (semantic {similarity:.2f})")
+                
+                if match_found:
+                    break
+                    
+        except Exception as e:
+            logger.error(f"Semantic matching failed for keyword '{term}': {e}")
+            # Silent fallback - skip this keyword
+            continue
     
     score = min(score, 1.0)
     
@@ -99,3 +154,18 @@ def calculate_priority(
         score=round(score, 2),
         reasons=reasons[:5]
     )
+
+
+def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+    """Compute cosine similarity between two vectors"""
+    if len(vec_a) != len(vec_b):
+        return 0.0
+    
+    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = (sum(a ** 2 for a in vec_a)) ** 0.5
+    norm_b = (sum(b ** 2 for b in vec_b)) ** 0.5
+    
+    if norm_a < 1e-9 or norm_b < 1e-9:
+        return 0.0
+    
+    return dot / (norm_a * norm_b)
