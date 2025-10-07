@@ -18,8 +18,8 @@ from app.models.schemas import (
     PrioritizeResponse
 )
 from app.services.normalizer import normalize_thread
-from app.services.summarizer import summarize_thread, rule_based_summary
-from app.services.extractor import extract_tasks, rule_based_extraction
+from app.services.summarizer import summarize_thread
+from app.services.extractor import extract_tasks
 from app.services.prioritizer import calculate_priority
 from app.services.qa import answer_question
 from app.services.user_settings import update_user_settings, get_user_keywords
@@ -91,6 +91,12 @@ async def update_settings(request: UpdateUserSettingsRequest):
 
 @router.post("/api/batch-analyze", response_model=BatchAnalyzeResponse)
 async def batch_analyze(request: BatchAnalyzeRequest):
+    """
+    Batch analyze threads using local Hugging Face models:
+    - DistilBART for summarization
+    - MiniLM + NER + Flan-T5 for task extraction
+    - MiniLM for semantic keyword matching in prioritization
+    """
     try:
         results = []
         threads = request.threads
@@ -98,29 +104,25 @@ async def batch_analyze(request: BatchAnalyzeRequest):
         
         async def analyze_single_thread(thread):
             try:
-                summary = rule_based_summary([{
-                    'subject': thread.subject,
-                    'clean_body': thread.snippet or thread.last_message or '',
-                    'body': thread.snippet or thread.last_message or ''
-                }])
-                
-                tasks = rule_based_extraction([{
+                # Build message dict for analysis
+                messages_dict = [{
                     'id': thread.id,
                     'subject': thread.subject,
                     'clean_body': thread.last_message or thread.snippet or '',
                     'body': thread.last_message or thread.snippet or '',
                     'to': thread.to or [],
                     'from_': thread.from_ or 'unknown'
-                }])
+                }]
                 
+                # Summarize with DistilBART
+                summary = await summarize_thread(messages_dict)
+                
+                # Extract tasks with MiniLM + NER + Flan-T5
+                tasks = await extract_tasks(messages_dict)
+                
+                # Prioritize with MiniLM semantic keyword matching
                 priority = calculate_priority(
-                    [{
-                        'subject': thread.subject,
-                        'clean_body': thread.last_message or thread.snippet or '',
-                        'body': thread.last_message or thread.snippet or '',
-                        'from_': thread.from_ or 'unknown',
-                        'to': thread.to or []
-                    }],
+                    messages_dict,
                     tasks,
                     keywords
                 )
@@ -140,6 +142,7 @@ async def batch_analyze(request: BatchAnalyzeRequest):
                     tasks=[]
                 )
         
+        # Process in batches of 5 (model_manager batch_size)
         batch_size = 5
         for i in range(0, len(threads), batch_size):
             batch = threads[i:i + batch_size]
@@ -154,8 +157,9 @@ async def batch_analyze(request: BatchAnalyzeRequest):
 
 @router.post("/api/summarize", response_model=SummarizeResponse)
 async def summarize_text(request: SummarizeRequest):
+    """Summarize text using DistilBART with rule-based fallback"""
     try:
-        summary = rule_based_summary([{
+        summary = await summarize_thread([{
             'subject': request.subject,
             'clean_body': request.text,
             'body': request.text
@@ -169,9 +173,11 @@ async def summarize_text(request: SummarizeRequest):
 
 @router.post("/api/extract-tasks", response_model=ExtractTasksResponse)
 async def extract_tasks_from_text(request: ExtractTasksRequest):
+    """Extract tasks using MiniLM + NER + Flan-T5 with rule-based fallback"""
     try:
-        tasks = rule_based_extraction([{
+        tasks = await extract_tasks([{
             'id': 'temp',
+            'subject': request.subject if hasattr(request, 'subject') else '',
             'clean_body': request.text,
             'body': request.text,
             'to': [],
