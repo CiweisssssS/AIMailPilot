@@ -2,7 +2,7 @@
 
 ## Overview
 
-An AI-powered email assistant designed as a Gmail Workspace Add-on with a Python FastAPI backend and Google Apps Script frontend. The system provides inbox-level intelligence through a 4-layer sidebar interface that analyzes multiple emails using delta fetch + unresolved pool strategy. All analysis is heuristic-based (no paid LLM APIs required).
+An AI-powered email assistant designed as a Gmail Workspace Add-on with a Python FastAPI backend and Google Apps Script frontend. The system provides inbox-level intelligence through a **5-layer sidebar interface** that analyzes multiple emails using **delta fetch + "Read = Processed" strategy**. All analysis runs on **local CPU-only Hugging Face models** (no paid LLM APIs required).
 
 ## User Preferences
 
@@ -14,17 +14,20 @@ Preferred communication style: Simple, everyday language.
 
 **Framework**: Google Apps Script with Gmail Add-on Cards UI framework
 
-**State Management**: PropertiesService for persistent storage (LAST_OPEN_TS, UNRESOLVED_THREAD_IDS, SNOOZED_UNTIL, DISMISSED_SET, USER_KEYWORDS) + CacheService for in-memory caching with 5-minute TTL
+**State Management**: PropertiesService for persistent storage (LAST_OPEN_TS, SAVED_THREAD_IDS, FLAGGED_THREAD_IDS, CUSTOM_TAGS) + CacheService for in-memory caching with 5-minute TTL
 
-**4-Layer Navigation**:
-1. **Inbox Reminder** - Category overview (Urgent/To-do/FYI) with display mode toggle (New/Unresolved/All)
-2. **Category Expanded** - Filtered email list with actions (Open/Mark as Done/Snooze/Dismiss)
-3. **Chatbot Q&A** - Context-aware questions using already-extracted data
-4. **Keyword Settings** - Customize priority keywords with High/Medium/Low weights
+**5-Layer Navigation**:
+1. **Inbox Overview** - Category breakdown (Urgent/To-do/FYI) + Saved for Later section
+2. **Category Details** - Filtered email list with actions (Save for Later/Flag/Mark as Done)
+3. **Chatbot Q&A** - RAG-powered chatbot using backend embedding/retrieval pipeline
+4. **Settings** - Customize tags and keywords for personalized prioritization
+5. **Flagged Mails** - Dedicated view for all flagged emails across categories
 
-**Delta Fetch Strategy**: Fetches threads since last sidebar open OR last 7 days (first run), merges with unresolved pool, filters out snoozed/dismissed threads
+**"Read = Processed" Strategy**: Core principle - read emails are automatically hidden UNLESS explicitly saved or flagged. Filters show only: unread emails OR saved emails OR flagged emails. Eliminates need for snooze/dismiss actions.
 
-**Design Philosophy**: Inbox-level intelligence (not single-email), stateful thread tracking, cache-optimized backend calls, persistent user preferences
+**Delta Fetch Strategy**: Fetches threads since last sidebar open OR last 7 days (first run), filters based on read status + saved/flagged state
+
+**Design Philosophy**: Inbox-level intelligence (not single-email), "Read = Processed" core logic, stateful thread tracking, cache-optimized backend calls, persistent user preferences
 
 ### Backend Architecture
 
@@ -32,13 +35,20 @@ Preferred communication style: Simple, everyday language.
 
 **Service Layer Pattern**: Modular services for distinct responsibilities:
 - **Normalizer**: Sorts messages chronologically, deduplicates, strips quoted replies and signatures
-- **Summarizer**: Map-reduce summarization with LLM or rule-based fallback
-- **Extractor**: Pattern-matching for tasks, owners, dates/deadlines with optional LLM enhancement
+- **Summarizer**: CPU-only DistilBART (distilbart-cnn-12-6) for extractive summarization with rule-based fallback
+- **Extractor**: Hybrid approach - MiniLM embeddings (all-MiniLM-L6-v2), BERT-NER (bert-base-NER), and Flan-T5-small for task/owner/deadline extraction with regex patterns as fallback
 - **Prioritizer**: Score-based classification (P1 Urgent / P2 To-do / P3 FYI) using deadline proximity, sender importance, meeting detection, and personalized keyword weights
-- **QA Service**: RAG-lite chatbot using fuzzy text matching for retrieval and LLM for answer generation
-- **User Settings**: SQLite-based keyword preference storage
+- **QA Service**: RAG pipeline with ms-marco-MiniLM-L-6-v2 for embedding/retrieval, fuzzy matching with rapidfuzz, and Flan-T5-small for answer generation
+- **User Settings**: SQLite-based custom tag storage
 
-**Analysis Mode**: Fully heuristic-based (no LLM APIs) - rule-based summarization, regex task extraction, deadline proximity scoring, keyword matching with enum weights (High=2.0, Medium=1.0, Low=0.5)
+**Analysis Mode**: Local CPU-only Hugging Face models (no paid APIs) - embedding-based retrieval, transformer-based NER, seq2seq summarization/QA, with heuristic fallbacks for robustness
+
+**Model Stack**: All models run on CPU with batch_size=5 lazy loading:
+- **all-MiniLM-L6-v2**: Sentence embeddings (384-dim)
+- **bert-base-NER**: Named entity recognition for persons/organizations
+- **distilbart-cnn-12-6**: Abstractive summarization
+- **flan-t5-small**: Task extraction and QA answer generation
+- **ms-marco-MiniLM-L-6-v2**: Passage retrieval embeddings
 
 **Data Flow**: Stateless request/response model - no email storage, only derived analysis results. User preferences persisted in SQLite.
 
@@ -69,20 +79,22 @@ Preferred communication style: Simple, everyday language.
 
 **Gmail Add-on Structure**: Cards UI framework with modular components:
 - `Code.gs`: Homepage trigger entry point
-- `StateManager.gs`: PropertiesService wrapper for persistent state
-- `GmailFetcher.gs`: Delta fetch + unresolved pool logic
+- `StateManager.gs`: PropertiesService wrapper for persistent state (saved/flagged threads)
+- `GmailFetcher.gs`: Delta fetch + "Read = Processed" filter logic
 - `CacheManager.gs`: In-memory caching with TTL
 - `BackendClient.gs`: HTTP client for FastAPI backend
 - `Config.gs`: Backend URL configuration
-- `InboxReminderCard.gs`: Layer 1 - Category overview
-- `TaskScheduleCard.gs`: Layer 1 - Timeline view
-- `CategoryExpandedCard.gs`: Layer 2 - Email list with actions
-- `ChatbotCardNew.gs`: Layer 3 - Q&A interface
-- `SettingsCard.gs`: Layer 4 - Keyword customization
+- `InboxReminderCard.gs`: Layer 1 - Inbox overview with Saved for Later section
+- `CategoryExpandedCard.gs`: Layer 2 - Email list with Save/Flag/Done actions
+- `ChatbotCardNew.gs`: Layer 3 - RAG-powered Q&A interface
+- `SettingsCard.gs`: Layer 4 - Custom tags and keyword management
+- `FlaggedMailCard.gs`: Layer 5 - Dedicated flagged emails view
 
 **Deployment Model**: Google Workspace Add-on installed per user, communicating with Replit-hosted backend via secure HTTPS
 
 **Data Strategy**: Time-window delta fetching (tracks `LAST_OPEN_TS`) combined with unresolved thread pool to prevent missed emails, LRU capping at 1000 threads, stored in PropertiesService
+
+**Note**: Apps Script field names used in backend payloads: `from`, `to`, `subject`, `snippet`, `last_message` (not `from_` or `body`)
 
 **Trigger Model**: Homepage trigger (sidebar open) - analyzes inbox immediately, no contextual email trigger
 
@@ -103,6 +115,10 @@ Preferred communication style: Simple, everyday language.
 - **httpx**: Async HTTP client for LLM API calls
 - **tenacity**: Retry logic with exponential backoff
 - **rapidfuzz**: Fuzzy text matching for QA retrieval and keyword matching
+- **transformers**: Hugging Face transformers for NLP models
+- **sentence-transformers**: Sentence embeddings for semantic search
+- **torch**: PyTorch backend for model inference (CPU-only)
+- **tokenizers**: Fast tokenization for transformer models
 
 ### Key JavaScript/TypeScript Libraries (Frontend Dev Environment - Not Used in Gmail Add-on)
 
