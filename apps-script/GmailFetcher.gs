@@ -5,39 +5,37 @@
 
 /**
  * Fetch candidate threads using delta + unresolved pool strategy
- * @param {string} displayMode - "new", "unresolved", or "all"
+ * Core principle: "Read = Processed" - hide read emails unless saved/flagged
+ * @param {string} displayMode - Legacy parameter, now uses "all" by default
  * @returns {Array} Array of thread IDs to analyze
  */
 function fetchCandidateThreads(displayMode) {
   const lastOpenTs = getLastOpenTs();
   const unresolvedIds = getUnresolvedThreadIds();
   
-  let deltaIds = [];
+  // Always fetch delta (threads since last open or last 7 days)
+  const deltaIds = fetchDeltaThreads(lastOpenTs);
   
-  // Fetch delta (threads since last open or last 7 days)
-  if (displayMode === 'new' || displayMode === 'all') {
-    deltaIds = fetchDeltaThreads(lastOpenTs);
-  }
+  // Get saved and flagged thread IDs (always show these)
+  const savedTasks = getSavedTasks();
+  const flaggedMails = getFlaggedMails();
+  const savedIds = savedTasks.map(task => task.threadId);
+  const flaggedIds = flaggedMails.map(mail => mail.threadId);
   
-  // Combine delta + unresolved based on display mode
-  let candidateIds = [];
+  // Combine delta + unresolved + saved + flagged
+  let candidateIds = [...new Set([...deltaIds, ...unresolvedIds, ...savedIds, ...flaggedIds])];
   
-  switch (displayMode) {
-    case 'new':
-      candidateIds = deltaIds;
-      break;
-    case 'unresolved':
-      candidateIds = unresolvedIds;
-      break;
-    case 'all':
-    default:
-      candidateIds = [...new Set([...deltaIds, ...unresolvedIds])];
-      break;
-  }
-  
-  // Filter out snoozed and dismissed threads
+  // Filter based on "Read = Processed" principle
   candidateIds = candidateIds.filter(threadId => {
-    return !isThreadSnoozed(threadId) && !isThreadDismissed(threadId);
+    const thread = GmailApp.getThreadById(threadId);
+    if (!thread) return false;
+    
+    const isRead = !thread.isUnread();
+    const isSaved = savedIds.includes(threadId);
+    const isFlagged = flaggedIds.includes(threadId);
+    
+    // Show if: unread OR saved OR flagged
+    return !isRead || isSaved || isFlagged;
   });
   
   // Update unresolved pool with delta
