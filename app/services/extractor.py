@@ -73,15 +73,23 @@ def parse_date_from_text(text: str, reference_date: Optional[datetime] = None) -
 def extract_owner_with_ner(text: str, entities: List[Dict[str, Any]]) -> str:
     """Extract owner using NER entities + rule-based fallback"""
     
-    # First try NER-detected persons - join multi-token entities
+    # First try NER-detected persons - join multi-token entities and clean subwords
     person_tokens = []
     for entity in entities:
         if entity.get('entity_group') in ['PER', 'PERSON']:
-            person_tokens.append(entity['word'].strip())
+            word = entity['word'].strip()
+            # Clean subword tokens (e.g., "##son" -> "son")
+            word = word.replace('##', '')
+            person_tokens.append(word)
     
     if person_tokens:
         # Join tokens (e.g., ["Alex", "Johnson"] -> "Alex Johnson")
-        return ' '.join(person_tokens)
+        # Remove duplicate adjacent tokens
+        cleaned = [person_tokens[0]]
+        for token in person_tokens[1:]:
+            if token.lower() != cleaned[-1].lower():
+                cleaned.append(token)
+        return ' '.join(cleaned)
     
     # Fallback to rules
     text_lower = text.lower()
@@ -154,8 +162,11 @@ def select_candidate_sentences(
         # Compute task intent embedding
         intent_embeddings = model_manager.embed_texts(intent_texts)
         
-        # Check for zero vectors (model failure)
-        if all(sum(emb) == 0 for emb in intent_embeddings):
+        # Check for zero vectors (model failure) - robust check
+        def is_zero_vector(emb):
+            return all(abs(x) < 1e-9 for x in emb) or len(emb) == 0
+        
+        if all(is_zero_vector(emb) for emb in intent_embeddings):
             raise ValueError("MiniLM returned zero vectors")
         
         intent_vec = [sum(col)/len(col) for col in zip(*intent_embeddings)]
@@ -163,8 +174,8 @@ def select_candidate_sentences(
         # Embed candidate sentences
         sentence_embeddings = model_manager.embed_texts(valid_sentences)
         
-        # Check for zero vectors
-        if all(sum(emb) == 0 for emb in sentence_embeddings):
+        # Check for zero vectors - robust check
+        if all(is_zero_vector(emb) for emb in sentence_embeddings):
             raise ValueError("MiniLM returned zero vectors for sentences")
         
         # Compute cosine similarity
