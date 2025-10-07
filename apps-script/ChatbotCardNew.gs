@@ -127,24 +127,53 @@ function answerCustomQuestion(e) {
 }
 
 /**
- * Generate answer using already-extracted data
+ * Generate answer using backend RAG pipeline
  */
 function generateAnswer(question, context) {
-  const questionLower = question.toLowerCase();
-  
-  // Fetch candidate threads
-  let threadIds = [];
-  
-  if (context && context.threadIds) {
-    threadIds = context.threadIds;
-  } else {
-    threadIds = fetchCandidateThreads('all');
+  try {
+    // Fetch candidate threads
+    let threadIds = [];
+    
+    if (context && context.threadIds) {
+      threadIds = context.threadIds.slice(0, 10); // Limit to 10 threads
+    } else {
+      threadIds = fetchCandidateThreads('all').slice(0, 10);
+    }
+    
+    if (threadIds.length === 0) {
+      return 'No emails found to answer your question.';
+    }
+    
+    // Get thread details for backend
+    const threadDetails = batchGetThreadDetails(threadIds);
+    
+    if (threadDetails.length === 0) {
+      return 'Error retrieving email details.';
+    }
+    
+    // Call backend /api/chatbot-qa using RAG pipeline
+    const result = askQuestion(question, threadDetails);
+    
+    if (result && result.answer) {
+      return result.answer;
+    } else {
+      // Fallback to rule-based if backend fails
+      return generateFallbackAnswer(question, threadIds);
+    }
+    
+  } catch (error) {
+    console.error('Error generating answer:', error);
+    return 'Sorry, I encountered an error. Please try again.';
   }
-  
-  // Get analysis results
+}
+
+/**
+ * Fallback answer generation using rules
+ */
+function generateFallbackAnswer(question, threadIds) {
+  const questionLower = question.toLowerCase();
   const analysisResults = analyzeThreadsWithCache(threadIds);
   
-  // Answer based on question type
   if (questionLower.includes('urgent') || questionLower.includes('top')) {
     return answerUrgentTasks(analysisResults);
   } else if (questionLower.includes('deadline') || questionLower.includes('due')) {
@@ -153,8 +182,6 @@ function generateAnswer(question, context) {
     return answerMeetings(analysisResults);
   } else if (questionLower.includes('summarize') || questionLower.includes('summary')) {
     return answerSummary(analysisResults);
-  } else if (questionLower.includes('recruiting') || questionLower.includes('recruit')) {
-    return answerKeywordFilter(analysisResults, 'recruiting');
   } else {
     return 'I can help you with:\n• Urgent tasks\n• Deadlines\n• Meetings\n• Email summaries\n\nTry asking one of the quick questions above!';
   }

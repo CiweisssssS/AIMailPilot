@@ -84,7 +84,7 @@ function buildKeywordSettingsCard() {
   
   card.addSection(addSection);
   
-  // Clear all button
+  // Clear all keywords button
   if (keywords.length > 0) {
     const clearAction = CardService.newAction()
       .setFunctionName('handleClearKeywords');
@@ -94,6 +94,46 @@ function buildKeywordSettingsCard() {
         .setText('Clear All Keywords')
         .setOnClickAction(clearAction)));
   }
+  
+  // Custom Tags section
+  const tags = getCustomTags();
+  const tagsSection = CardService.newCardSection()
+    .setHeader('Custom Tags for Flagged Emails');
+  
+  if (tags.length > 0) {
+    tagsSection.addWidget(CardService.newTextParagraph()
+      .setText(`<b>Available tags:</b> ${tags.join(', ')}`));
+    
+    // Delete tag dropdown
+    const tagSelection = CardService.newSelectionInput()
+      .setFieldName('tag_to_delete')
+      .setTitle('Delete Tag')
+      .setType(CardService.SelectionInputType.DROPDOWN);
+    
+    tags.forEach(tag => {
+      tagSelection.addItem(tag, tag, false);
+    });
+    
+    tagsSection.addWidget(tagSelection);
+    tagsSection.addWidget(CardService.newTextButton()
+      .setText('Delete Tag')
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('handleDeleteTag')));
+  }
+  
+  // Add tag input
+  tagsSection.addWidget(CardService.newTextInput()
+    .setFieldName('new_tag')
+    .setTitle('Add New Tag')
+    .setHint('e.g., urgent, follow-up, review'));
+  
+  tagsSection.addWidget(CardService.newTextButton()
+    .setText('Add Tag')
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('handleAddTag'))
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED));
+  
+  card.addSection(tagsSection);
   
   return card.build();
 }
@@ -167,6 +207,54 @@ function handleClearKeywords(e) {
   return CardService.newActionResponseBuilder()
     .setNotification(CardService.newNotification()
       .setText('🗑️ All keywords cleared'))
+    .setNavigation(CardService.newNavigation().updateCard(
+      buildKeywordSettingsCard()))
+    .build();
+}
+
+/**
+ * Handle add custom tag
+ */
+function handleAddTag(e) {
+  const tag = e.formInput.new_tag;
+  
+  if (!tag || tag.trim() === '') {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Please enter a tag name'))
+      .build();
+  }
+  
+  // Add tag using StateManager
+  addCustomTag(tag.trim().toLowerCase());
+  
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification()
+      .setText('✅ Tag added: ' + tag))
+    .setNavigation(CardService.newNavigation().updateCard(
+      buildKeywordSettingsCard()))
+    .build();
+}
+
+/**
+ * Handle delete custom tag
+ */
+function handleDeleteTag(e) {
+  const tag = e.formInput.tag_to_delete;
+  
+  if (!tag) {
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification()
+        .setText('Please select a tag to delete'))
+      .build();
+  }
+  
+  // Remove tag using StateManager
+  removeCustomTag(tag);
+  
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification()
+      .setText('🗑️ Tag deleted: ' + tag))
     .setNavigation(CardService.newNavigation().updateCard(
       buildKeywordSettingsCard()))
     .build();

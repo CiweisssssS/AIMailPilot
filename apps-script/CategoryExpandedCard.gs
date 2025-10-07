@@ -78,40 +78,43 @@ function createCategoryExpandedCard(categoryName, threadIds) {
     const cacheKey = 'expand_' + categoryName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
     getCacheService().put(cacheKey, JSON.stringify(threadIds), 300);
     
-    // Action buttons
+    // Action buttons - simplified to Save/Flag/Done
     const actionButtons = CardService.newButtonSet()
       .addButton(CardService.newTextButton()
         .setText('Open')
         .setOnClickAction(CardService.newAction()
           .setFunctionName('openThreadAction')
-          .setParameters({threadId: threadId})))
-      .addButton(CardService.newTextButton()
-        .setText('Done')
+          .setParameters({threadId: threadId})));
+    
+    // Add Save button if there are tasks
+    if (analysis.tasks && analysis.tasks.length > 0) {
+      const firstTask = analysis.tasks[0];
+      actionButtons.addButton(CardService.newTextButton()
+        .setText('💾 Save')
         .setOnClickAction(CardService.newAction()
-          .setFunctionName('markThreadDone')
+          .setFunctionName('onSaveTask')
           .setParameters({
             threadId: threadId,
-            categoryName: categoryName,
-            cacheKey: cacheKey
-          })))
-      .addButton(CardService.newTextButton()
-        .setText('Snooze')
-        .setOnClickAction(CardService.newAction()
-          .setFunctionName('snoozeThreadAction')
-          .setParameters({
-            threadId: threadId,
-            categoryName: categoryName,
-            cacheKey: cacheKey
-          })))
-      .addButton(CardService.newTextButton()
-        .setText('Dismiss')
-        .setOnClickAction(CardService.newAction()
-          .setFunctionName('dismissThreadAction')
-          .setParameters({
-            threadId: threadId,
-            categoryName: categoryName,
-            cacheKey: cacheKey
+            title: firstTask.title,
+            deadline: firstTask.due || '',
+            owner: firstTask.owner || ''
           })));
+    }
+    
+    actionButtons.addButton(CardService.newTextButton()
+      .setText('🚩 Flag')
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('onFlagMail')
+        .setParameters({
+          threadId: threadId,
+          subject: subject,
+          tags: JSON.stringify([])
+        })))
+      .addButton(CardService.newTextButton()
+        .setText('✓ Done')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('onMarkAsDone')
+          .setParameters({threadId: threadId})));
     
     section.addWidget(actionButtons);
     section.addWidget(CardService.newDivider());
@@ -184,152 +187,3 @@ function openThreadAction(e) {
     .build();
 }
 
-/**
- * Mark thread as done
- */
-function markThreadDone(e) {
-  const threadId = e.parameters.threadId;
-  const categoryName = e.parameters.categoryName;
-  const cacheKey = e.parameters.cacheKey;
-  
-  // Get remainingIds from cache
-  const remainingIdsJson = getCacheService().get(cacheKey);
-  const remainingIds = remainingIdsJson ? JSON.parse(remainingIdsJson) : [];
-  
-  // Remove from unresolved pool
-  removeUnresolvedThreadId(threadId);
-  
-  // Clear cache
-  clearThreadCache(threadId);
-  
-  // Optionally add Gmail label
-  try {
-    const thread = GmailApp.getThreadById(threadId);
-    const label = GmailApp.getUserLabelByName('AI/Processed') || GmailApp.createLabel('AI/Processed');
-    thread.addLabel(label);
-  } catch (error) {
-    console.error('Error adding label:', error);
-  }
-  
-  // Update the category view
-  const updatedIds = remainingIds.filter(id => id !== threadId);
-  
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification()
-      .setText('✅ Marked as done'))
-    .setNavigation(CardService.newNavigation()
-      .updateCard(createCategoryExpandedCard(categoryName, updatedIds)))
-    .build();
-}
-
-/**
- * Snooze thread action
- */
-function snoozeThreadAction(e) {
-  const threadId = e.parameters.threadId;
-  const categoryName = e.parameters.categoryName;
-  const cacheKey = e.parameters.cacheKey;
-  
-  // Show snooze options card (pass cacheKey instead of remainingIds)
-  return CardService.newActionResponseBuilder()
-    .setNavigation(CardService.newNavigation()
-      .pushCard(createSnoozeOptionsCard(threadId, categoryName, cacheKey)))
-    .build();
-}
-
-/**
- * Create snooze options card
- */
-function createSnoozeOptionsCard(threadId, categoryName, cacheKey) {
-  const card = CardService.newCardBuilder();
-  
-  card.setHeader(CardService.newCardHeader()
-    .setTitle('Snooze Until'));
-  
-  const section = CardService.newCardSection();
-  
-  // Snooze options
-  const options = [
-    {label: '1 hour', hours: 1},
-    {label: '3 hours', hours: 3},
-    {label: 'Tomorrow', hours: 24},
-    {label: 'Next week', hours: 168}
-  ];
-  
-  options.forEach(option => {
-    const now = new Date();
-    const snoozeUntil = new Date(now.getTime() + option.hours * 60 * 60 * 1000);
-    
-    section.addWidget(CardService.newTextButton()
-      .setText(option.label)
-      .setOnClickAction(CardService.newAction()
-        .setFunctionName('confirmSnooze')
-        .setParameters({
-          threadId: threadId,
-          untilIso: snoozeUntil.toISOString(),
-          categoryName: categoryName,
-          cacheKey: cacheKey
-        })));
-  });
-  
-  card.addSection(section);
-  
-  return card.build();
-}
-
-/**
- * Confirm snooze
- */
-function confirmSnooze(e) {
-  const threadId = e.parameters.threadId;
-  const untilIso = e.parameters.untilIso;
-  const categoryName = e.parameters.categoryName;
-  const cacheKey = e.parameters.cacheKey;
-  
-  // Get remainingIds from cache
-  const remainingIdsJson = getCacheService().get(cacheKey);
-  const remainingIds = remainingIdsJson ? JSON.parse(remainingIdsJson) : [];
-  
-  // Snooze the thread
-  snoozeThread(threadId, untilIso);
-  
-  // Update the category view
-  const updatedIds = remainingIds.filter(id => id !== threadId);
-  
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification()
-      .setText('⏰ Snoozed'))
-    .setNavigation(CardService.newNavigation()
-      .popToRoot()
-      .updateCard(createCategoryExpandedCard(categoryName, updatedIds)))
-    .build();
-}
-
-/**
- * Dismiss thread action
- */
-function dismissThreadAction(e) {
-  const threadId = e.parameters.threadId;
-  const categoryName = e.parameters.categoryName;
-  const cacheKey = e.parameters.cacheKey;
-  
-  // Get remainingIds from cache
-  const remainingIdsJson = getCacheService().get(cacheKey);
-  const remainingIds = remainingIdsJson ? JSON.parse(remainingIdsJson) : [];
-  
-  // Dismiss the thread
-  dismissThread(threadId);
-  
-  // Clear cache
-  clearThreadCache(threadId);
-  
-  // Update the category view
-  const updatedIds = remainingIds.filter(id => id !== threadId);
-  
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification()
-      .setText('🚫 Dismissed'))
-    .setNavigation(CardService.newNavigation()
-      .updateCard(createCategoryExpandedCard(categoryName, updatedIds)))
-    .build();
-}

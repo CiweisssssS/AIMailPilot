@@ -6,7 +6,7 @@
 /**
  * Create Inbox Reminder Card (default view)
  * @param {Object} analysisResults - Map of threadId -> analysis
- * @param {string} displayMode - "new", "unresolved", or "all"
+ * @param {string} displayMode - "new", "unresolved", or "all" (kept for compatibility)
  */
 function createInboxReminderCard(analysisResults, displayMode) {
   const card = CardService.newCardBuilder();
@@ -16,42 +16,48 @@ function createInboxReminderCard(analysisResults, displayMode) {
     .setTitle('📬 Inbox Reminder')
     .setSubtitle('AI-powered email insights'));
   
-  // Display mode toggle section
-  const toggleSection = CardService.newCardSection();
-  
-  const buttonSet = CardService.newButtonSet()
-    .addButton(CardService.newTextButton()
-      .setText(displayMode === 'new' ? '• New' : 'New')
-      .setOnClickAction(CardService.newAction()
-        .setFunctionName('switchDisplayMode')
-        .setParameters({mode: 'new'})))
-    .addButton(CardService.newTextButton()
-      .setText(displayMode === 'unresolved' ? '• Unresolved' : 'Unresolved')
-      .setOnClickAction(CardService.newAction()
-        .setFunctionName('switchDisplayMode')
-        .setParameters({mode: 'unresolved'})))
-    .addButton(CardService.newTextButton()
-      .setText(displayMode === 'all' ? '• All' : 'All')
-      .setOnClickAction(CardService.newAction()
-        .setFunctionName('switchDisplayMode')
-        .setParameters({mode: 'all'})));
-  
-  toggleSection.addWidget(buttonSet);
-  card.addSection(toggleSection);
-  
-  // View toggle (Inbox Reminder vs Task & Schedule)
-  const viewToggle = CardService.newCardSection();
-  viewToggle.addWidget(CardService.newTextParagraph()
+  // View navigation section
+  const viewNav = CardService.newCardSection();
+  viewNav.addWidget(CardService.newTextParagraph()
     .setText('<b>• 📧 Inbox View</b>'));
   
-  const viewButtonSet = CardService.newButtonSet()
+  const navButtonSet = CardService.newButtonSet()
     .addButton(CardService.newTextButton()
-      .setText('📅 Switch to Tasks')
+      .setText('📅 Tasks')
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('showTaskScheduleView')))
+    .addButton(CardService.newTextButton()
+      .setText('🚩 Flagged')
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('showFlaggedMails')));
+  
+  viewNav.addWidget(navButtonSet);
+  card.addSection(viewNav);
+  
+  // Saved Tasks section
+  const savedTasks = getSavedTasks();
+  if (savedTasks.length > 0) {
+    const savedSection = CardService.newCardSection();
+    savedSection.addWidget(CardService.newTextParagraph()
+      .setText(`<b>💾 Saved for Later</b> (${savedTasks.length})`));
+    
+    // Show first 2 saved tasks
+    const previewCount = Math.min(2, savedTasks.length);
+    for (let i = 0; i < previewCount; i++) {
+      const task = savedTasks[i];
+      const taskText = `• <b>${task.title.substring(0, 50)}</b>`;
+      const deadlineText = task.deadline ? `<br><i>Due: ${task.deadline}</i>` : '';
+      savedSection.addWidget(CardService.newTextParagraph()
+        .setText(taskText + deadlineText));
+    }
+    
+    savedSection.addWidget(CardService.newTextButton()
+      .setText('View All Saved →')
       .setOnClickAction(CardService.newAction()
         .setFunctionName('showTaskScheduleView')));
-  
-  viewToggle.addWidget(viewButtonSet);
-  card.addSection(viewToggle);
+    
+    card.addSection(savedSection);
+  }
   
   // Categorize emails
   const categories = categorizeEmails(analysisResults);
@@ -187,31 +193,13 @@ function addCategoryCard(cardBuilder, categoryName, threadIds, color, analysisRe
 }
 
 /**
- * Switch display mode (new/unresolved/all)
+ * Show flagged mails (Layer 5)
  */
-function switchDisplayMode(e) {
-  const mode = e.parameters.mode;
-  return refreshInboxWithMode(mode);
-}
-
-/**
- * Refresh inbox with specific display mode
- */
-function refreshInboxWithMode(displayMode) {
-  const threadIds = fetchCandidateThreads(displayMode || 'all');
-  const analysisResults = analyzeThreadsWithCache(threadIds);
-  
+function showFlaggedMails(e) {
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation()
-      .updateCard(createInboxReminderCard(analysisResults, displayMode)))
+      .pushCard(createFlaggedMailCard()))
     .build();
-}
-
-/**
- * Refresh inbox (default action)
- */
-function refreshInbox(e) {
-  return refreshInboxWithMode('all');
 }
 
 /**
