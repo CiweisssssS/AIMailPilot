@@ -1,0 +1,216 @@
+Update the Gmail Add-on to the following 5-layer IA and simplified interaction model. 
+Key principles:
+- Reading an email = processed (don’t keep surfacing unless user explicitly Saved or Flagged it).
+- Minimal actions per email: Save (to Saved Tasks), Flag (to Flagged Mails). 
+- Keep delta fetch (time-window) + unresolved carry-over internally, but do NOT expose New/Unresolved/All chips.
+
+========================================
+DATA MODEL (PropertiesService keys)
+========================================
+- LAST_OPEN_TS: number (ms epoch)
+- USER_KEYWORDS: array<{ term: string, weight: "High"|"Medium"|"Low" }>
+- CUSTOM_TAGS: array<{ id: string, name: string, order: number }>    // user-defined categories
+- SAVED_TASKS: array<{
+    id: string,                  // unique id = `${threadId}:${taskId || hash(title)}`
+    threadId: string,
+    title: string,               // extracted task title
+    due_iso?: string,            // optional ISO datetime
+    subject: string,             // source email subject
+    category?: string,           // Urgent | To-Do | FYI | custom
+    saved_at_iso: string         // when user saved it
+  }>
+- FLAGGED_MAILS: array<{
+    threadId: string,
+    subject: string,
+    sender?: string,
+    preview?: string,
+    category?: string,           // original category when flagged
+    flagged_at_iso: string
+  }>
+- ANALYSIS_CACHE_TTL_MIN: number (default 5)
+
+Server (FastAPI) endpoints remain:
+- POST /batch-analyze
+- POST /summarize
+- POST /extract
+- POST /prioritize
+- GET /health, GET /version
+
+========================================
+FETCH + CARRY-OVER STRATEGY (unchanged under the hood)
+========================================
+- On sidebar open:
+  - If LAST_OPEN_TS exists: fetch threads with internalDate > LAST_OPEN_TS (delta).
+  - Else (first run): fetch unread from last 7 days (with pagination cap).
+  - CANDIDATE = dedupe(DELTA ∪ unresolvedPoolInternal) 
+    (unresolvedPoolInternal stays internal; we won’t expose controls for it).
+  - Exclude threads that are 'read' and not in SAVED_TASKS/FLAGGED_MAILS.
+  - Batch-analyze with cache (TTL 5–10 min).
+  - Render Layer 1a by default.
+
+========================================
+LAYER SPECS
+========================================
+Layer 1a – Inbox Reminder view (default)
+- Header: Greeting message + total unread email count.
+- Category List:
+  - Built-in: Urgent / To-Do / FYI
+  - Plus USER-defined tags from CUSTOM_TAGS
+  - Each category card shows: unread count + latest email preview (subject + one-line summary)
+  - Tap category → enter Layer 2 (Category Detail)
+  - “+ Add more tags” → Layer 4 (Keyword/Tag Customization)
+- Global Actions:
+  - “Flagged mails” → Layer 5
+  - “Customize Priorities” → Layer 4
+- Remove any “New / Unresolved / All” chips.
+
+Layer 1b – Task & Schedule view (switchable)
+- Header: Greeting + total unread.
+- Timeline View:
+  - Groups: Overdue / Today / This Week / Later
+  - Each event card: time + subject line
+  - Actions: [Add to Calendar], double-click to open related email
+- Global Actions:
+  - “Flagged mails” → Layer 5
+  - “Bookmark / Prioritize” (no-op UI or simple dialog that explains this is driven by keywords in Layer 4)
+
+Layer 2 – Category Detail view (e.g., Urgent Mails)
+- Header: Category title + unread count
+- Email List:
+  - Each row: subject + preview (one-line summary) + time
+  - Row actions: [Add to Calendar] [Mark as Done] [Flag]
+    * Mark as Done: if thread is read or user taps Done → we won’t resurface next session (unless Saved/Flagged).
+    * Flag: add to FLAGGED_MAILS with timestamp + category; visible in Layer 5.
+  - (Optional) “Save” appears where a task is detected → add selected task to SAVED_TASKS
+- Assistant Entry:
+  - “Talk with our chatbot” → Layer 3
+
+Layer 3 – Chatbot View
+- Entry: from Layer 2 (Ask Assistant).
+- Simple chat UI: input field + transcript.
+- Capabilities:
+  - Summarize all items within the selected category
+  - Keyword search across extracted summaries/tasks
+  - Natural queries: “Top 3 urgent tasks”
+  - Suggest actions: “Add to Calendar?”
+- First-time hints: greeting + example prompts.
+
+Layer 4 – Keyword Customization View
+- Entry: from Layer 1 (Customize Priorities).
+- List built-in priority tags (Urgent / To-Do / FYI) + CUSTOM_TAGS (user-defined).
+- Each tag: editable name + reorder (Sort)
+- “Add more tags” to create new user-defined categories
+- “Finish” saves to CUSTOM_TAGS and USER_KEYWORDS
+
+Layer 5 – Flagged Mail View
+- Entry: from Layer 1 (Flagged mails)
+- Header: “Flagged Mails” + total flagged count
+- List:
+  - Each email card: subject + sender + brief preview
+  - Original category label (Urgent/To-Do/FYI/custom)
+  - Flagged timestamp (e.g., “Flagged on Oct 5, 2025”)
+- Purpose: quick-access hub for “to follow up / keep / review later”
+
+========================================
+SAVE / RENDER PSEUDOCODE (Apps Script)
+========================================
+
+// ---------- Save a task ----------
+function onSaveTask(threadId, task) {
+  const props = PropertiesService.getUserProperties();
+  const saved = JSON.parse(props.getProperty('SAVED_TASKS') || '[]');
+  const id = threadId + ':' + (task.id || hash(task.title));
+  const item = {
+    id,
+    threadId,
+    title: task.title,
+    due_iso: task.due_iso || null,
+    subject: task.subject || '(no subject)',
+    category: task.category || null,
+    saved_at_iso: new Date().toISOString()
+  };
+  // upsert (avoid duplicates by id)
+  const idx = saved.findIndex(x => x.id === id);
+  if (idx >= 0) saved[idx] = item; else saved.unshift(item);  // newest first
+  props.setProperty('SAVED_TASKS', JSON.stringify(saved));
+  return item;
+}
+
+// ---------- Flag a mail ----------
+function onFlagMail(thread) {
+  const props = PropertiesService.getUserProperties();
+  const flagged = JSON.parse(props.getProperty('FLAGGED_MAILS') || '[]');
+  const exists = flagged.find(x => x.threadId === thread.id);
+  const record = {
+    threadId: thread.id,
+    subject: thread.subject || '(no subject)',
+    sender: thread.sender || null,
+    preview: thread.summary || thread.snippet || null,
+    category: thread.category || null,
+    flagged_at_iso: new Date().toISOString()
+  };
+  if (exists) {
+    // update timestamp/fields
+    Object.assign(exists, record);
+  } else {
+    flagged.unshift(record);
+  }
+  props.setProperty('FLAGGED_MAILS', JSON.stringify(flagged));
+  return record;
+}
+
+// ---------- Render Layer 1a (Inbox Reminder) ----------
+function renderLayer1a(results, unreadCount) {
+  // results: analyzed threads with {threadId, category, subject, summary, ts}
+  // build cards for Urgent/To-Do/FYI + custom
+  const cards = buildCategoryCards(results); // each card has preview + count
+  const savedTasks = JSON.parse(PropertiesService.getUserProperties().getProperty('SAVED_TASKS') || '[]');
+
+  return CardService.newCardBuilder()
+    .addSection(makeHeaderSection(unreadCount))                     // Greeting + total unread
+    .addSection(makeTabs('Inbox Reminder', 'Task & Schedule'))      // segmented control
+    .addSection(makeCategoryCardsSection(cards))                    // Urgent/To-Do/FYI/custom
+    .addSection(makeSavedForLaterSection(savedTasks))               // expandable, list tasks with link-to-thread
+    .addSection(makeGlobalActionsSection())                         // Flagged mails / Customize Priorities
+    .build();
+}
+
+// ---------- Render Saved for Later section ----------
+function makeSavedForLaterSection(items) {
+  // If collapsed by default, render a header chip; on tap, push a new card
+  // Each item row: {title} • {due} • {subject}, tap -> open Gmail thread
+  // If empty: show hint "No saved tasks yet"
+}
+
+// ---------- Category Detail actions ----------
+function onCategoryRowAction(action, thread) {
+  if (action === 'ADD_TO_CALENDAR') createCalendarEventFromThread(thread);
+  if (action === 'MARK_DONE') markDone(thread.id);    // removes from unresolved/internal pool
+  if (action === 'FLAG') onFlagMail(thread);
+  if (action === 'SAVE') onSaveTask(thread.id, pickTopTask(thread));
+}
+
+// ---------- Mark as Done ----------
+function markDone(threadId) {
+  // Remove from internal unresolved pool if present
+  // Optional: add Gmail label AI/Processed
+}
+
+========================================
+WIREFRAME CONSTRAINTS
+========================================
+- Replace current p1 look with p2-style rounded cards (title+preview on left, count badge on right).
+- Remove the chip row for “New / Unresolved / All”.
+- Keep two-tab switch between Layer 1a and Layer 1b.
+- Double-click on an event card in Layer 1b opens the email; single click selects.
+
+========================================
+ACCEPTANCE
+========================================
+- Layer 1a shows: Greeting + total unread + category cards (with latest preview) + “Add more tags” + “Saved for Later” + two global actions.
+- Layer 1b shows: timeline with event cards and the specified actions.
+- Layer 2 shows: list and simplified actions (Add to Calendar, Mark as Done, Flag, Save when task exists).
+- Layer 3 works with category context (summary/search/top-3 tasks).
+- Layer 4 supports adding/editing/reordering tags and saving.
+- Layer 5 lists flagged mails with subject/sender/preview/original category/flagged timestamp.
+- Reading an email removes it from future surfacing unless it was Saved or Flagged.

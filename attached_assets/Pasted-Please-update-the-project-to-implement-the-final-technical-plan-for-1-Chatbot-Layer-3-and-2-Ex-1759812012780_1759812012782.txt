@@ -1,0 +1,159 @@
+Please update the project to implement the final technical plan for
+(1) Chatbot (Layer 3) and
+(2) Extract / Summarize / Prioritize pipelines,
+keeping CPU-only, open-source models, no paid APIs, with rule fallback.
+
+========================================
+A) MODEL CHOICES (Hugging Face IDs)
+========================================
+- Embeddings (retrieval & semantic boost): sentence-transformers/all-MiniLM-L6-v2
+- NER (owners/entities): dslim/bert-base-NER
+- Summarization (1–2 sentences): sshleifer/distilbart-cnn-12-6
+- Optional generator for structuring tasks: google/flan-t5-small
+- Optional reranker for chatbot: cross-encoder/ms-marco-MiniLM-L-6-v2
+
+Constraints:
+- CPU only, lazy-load models (singleton), small batch size (5), in-memory cache TTL 5–10 min.
+- Privacy: never send raw full emails to models; use cleaned snippets, summaries, or candidate sentences.
+
+========================================
+B) BACKEND ENDPOINTS & CONTRACTS
+========================================
+1) POST /summarize
+   Input: { subject: string, text: string }
+   Logic:
+     - Clean text (strip signatures/quotes) and prefer the last 1–2 messages.
+     - Try DistilBART (max_new_tokens≈80) -> summary
+     - On error/timeout -> rule fallback (first+last informative sentence).
+   Output: { summary: string, confidence?: number }
+
+2) POST /extract
+   Input: { text: string, subject?: string }
+   Logic:
+     - Sentence segmentation.
+     - Candidate selection: embeddings (MiniLM) vs a “task intent” vector and/or user keywords (MiniLM); take top-k sentences.
+     - NER with bert-base-NER to get owner/person/org.
+     - Date normalization: dateparser (EOD/COB/etc custom vocab).
+     - Optional: pass candidate sentence + NER/date hints to flan-t5-small to produce structured JSON; else rule fallback.
+   Output (schema):
+     {
+       "tasks":[
+         {
+           "title": "verb + object",
+           "owner": "string|null",
+           "due_iso": "YYYY-MM-DDTHH:mm:ssZ|null",
+           "source_span": {"start":number,"end":number}
+         }, ...
+       ]
+     }
+
+3) POST /prioritize
+   Input:
+     {
+       "features": {
+         "deadline_hours": number|null,
+         "has_meeting_48h": boolean,
+         "sender_weight": number,          // 1.0 boss/advisor/client, else 0.3
+         "direct_recipient": boolean,      // To:you vs Cc
+         "newsletter_noise": boolean,      // unsubscribe/%off/etc
+         "urgent_terms": number,           // 1.0 strong, 0.5 weak, 0 otherwise
+         "deescalator_terms": boolean      // "not urgent", "no rush" -> true
+       },
+       "keywords": [{ "term": string, "weight": "High"|"Medium"|"Low" }],
+       "text_for_semantic": "subject + summary + tasks"
+     }
+   Logic:
+     - Compute semantic similarity with MiniLM between text_for_semantic and user keywords (average top similarity).
+       Map High=+2.0, Medium=+1.0, Low=+0.5 in weighting.
+     - Final score (configurable):
+         score =
+           0.40*deadline_proximity +
+           0.25*urgent_terms +
+           0.20*user_keyword_sem_sim +
+           0.10*sender_weight +
+           0.10*direct_recipient
+           -0.15*deescalator
+           -0.20*newsletter_noise
+     - Thresholds: P1≥0.75, P2≥0.45, else P3.
+   Output: { score:number, label:"P1"|"P2"|"P3", rationale:string[] }
+
+4) POST /batch-analyze
+   Input: { threads: [{ id, subject, snippet?, last_message? }] }
+   Logic:
+     - Clean + cache per threadId (TTL 5–10 min).
+     - For each thread: call /summarize, /extract, /prioritize.
+     - Attach derived tasks and category label.
+   Output:
+     {
+       "results":[
+         {
+           "id":"...", "subject":"...",
+           "summary":"...",
+           "priority":{ "score":..., "label":"P1|P2|P3", "rationale":[...] },
+           "tasks":[{ "title","owner","due_iso","source_span" }]
+         }, ...
+       ]
+     }
+
+5) POST /chatbot/answer
+   Input: { question: string }
+   Logic:
+     - Retrieval: embed question (MiniLM) vs cached doc embeddings built from `subject + summary + tasks`.
+     - Take top-k=8; optional rerank with cross-encoder to top-m=3.
+     - Build concise prompt for flan-t5-small (or rule-compose if generator unavailable).
+     - Generate short answer (≤80 tokens).
+     - Return sources [{threadId, subject, due_iso?}].
+   Output:
+     { answer: string, sources:[{threadId, subject, due_iso?, category?}], used_models:{...}, confidence?: number }
+
+Security: require x-api-key for all POSTs.
+
+========================================
+C) UI / UX REQUIREMENTS (tie to existing 5-layer IA)
+========================================
+Layer 1a – Inbox Reminder (default)
+- Show greeting + total unread.
+- Category cards: Urgent / To-Do / FYI + custom tags.
+  Each card shows: count + "Latest:" preview from /summarize.
+- Clicking a card → Layer 2.
+- “+ Add more tags” → Layer 4.
+- Global actions: “Flagged mails” (Layer 5), “Customize Priorities” (Layer 4).
+- In-card ordering logic (when expanded): sort tasks by `due_iso` ascending; if due missing, push to bottom.
+
+Layer 1b – Task & Schedule
+- Timeline buckets: Overdue / Today / This Week / Later.
+- Each event card: time + subject; actions: [Add to Calendar], double-click opens email.
+
+Layer 2 – Category Detail
+- Header: category + unread count.
+- List rows: subject + one-line summary + time.
+- Row actions (minimal): [Add to Calendar], [Flag], [Save] (if a task exists).
+- Reading an email = processed; only Saved/Flagged persist across sessions.
+
+Layer 3 – Chatbot
+- Use /chatbot/answer; render answer + per-source buttons:
+  [Open] deep link, [Add to Calendar] (uses due_iso or prompt), [Flag].
+- First-time hints with 2–3 example prompts.
+
+Layer 4 – Keyword Customization
+- Edit/reorder tags; add new tags; persist to USER_KEYWORDS/CUSTOM_TAGS.
+
+Layer 5 – Flagged Mail
+- List flagged items with subject/sender/preview/category and flagged timestamp.
+
+========================================
+D) CONFIG & FALLBACKS
+========================================
+- Keep weights/thresholds in config.json; allow easy tuning without code change.
+- Strict JSON outputs for endpoints; on any model failure, return rule-based fallback.
+- Cache model instances; do not reload per request.
+- Batch processing size 5; parallelize safely.
+
+========================================
+E) ACCEPTANCE
+========================================
+- On open, Layer 1a shows category cards with latest preview from /summarize and counts from /batch-analyze.
+- Layer 2 lists items sorted by due date; rows expose Add to Calendar / Flag / Save (if task).
+- /extract returns {title, owner, due_iso}; /prioritize returns {score,label,rationale}.
+- Chatbot answers with sources and renders action buttons below the answer.
+- CPU-only; no paid APIs; privacy respected (derived data only).
