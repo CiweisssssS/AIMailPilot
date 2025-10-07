@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -68,9 +68,23 @@ class ProcessThreadResponse(BaseModel):
     priority: Priority
 
 
+class AppsScriptMessage(BaseModel):
+    """Message format from Google Apps Script"""
+    id: str
+    subject: str
+    snippet: Optional[str] = None
+    last_message: Optional[str] = None
+    from_: Optional[str] = Field(None, alias="from")
+    to: Optional[List[str]] = []
+    date: Optional[str] = None
+    
+    class Config:
+        populate_by_name = True
+
+
 class ChatbotQARequest(BaseModel):
     question: str
-    thread: ThreadData
+    thread: Any  # Union[ThreadData, List[AppsScriptMessage]] - validated in endpoint
 
 
 class ChatbotQAResponse(BaseModel):

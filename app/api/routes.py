@@ -66,9 +66,58 @@ async def process_thread(request: ProcessThreadRequest):
 @router.post("/api/chatbot-qa", response_model=ChatbotQAResponse)
 async def chatbot_qa(request: ChatbotQARequest):
     try:
-        response = await answer_question(request.question, request.thread)
+        # Convert simple thread array to ThreadData if needed
+        thread_data = request.thread
+        
+        # If thread is a list (from Apps Script), validate and convert to ThreadData
+        if isinstance(thread_data, list):
+            from app.models.schemas import ThreadData, NormalizedMessage, TimelineItem, AppsScriptMessage
+            
+            # Validate as AppsScriptMessage list
+            try:
+                validated_msgs = [AppsScriptMessage(**msg) for msg in thread_data]
+            except Exception as e:
+                raise HTTPException(status_code=422, detail=f"Invalid Apps Script message format: {e}")
+            
+            # Build ThreadData from Apps Script messages
+            participants = set()
+            timeline = []
+            normalized_messages = []
+            thread_id = validated_msgs[0].id if validated_msgs else "chatbot-thread"
+            
+            for msg in validated_msgs:
+                # Extract participants using correct field names
+                if msg.from_:
+                    participants.add(msg.from_)
+                if msg.to:
+                    participants.update(msg.to)
+                
+                # Build timeline item
+                timeline.append(TimelineItem(
+                    id=msg.id,
+                    date=msg.date or '',
+                    subject=msg.subject
+                ))
+                
+                # Build normalized message - use last_message as clean_body
+                clean_body = msg.last_message or msg.snippet or ''
+                normalized_messages.append(NormalizedMessage(
+                    id=msg.id,
+                    clean_body=clean_body
+                ))
+            
+            thread_data = ThreadData(
+                thread_id=thread_id,
+                participants=list(participants),
+                timeline=timeline,
+                normalized_messages=normalized_messages
+            )
+        
+        response = await answer_question(request.question, thread_data)
         return response
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
