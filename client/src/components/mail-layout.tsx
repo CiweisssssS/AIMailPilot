@@ -120,8 +120,8 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Sidebar - Gmail Navigation */}
-      <aside className="w-44 border-r border-border bg-sidebar flex flex-col">
-        <div className="p-4 border-b border-sidebar-border">
+      <aside className="w-52 border-r border-border bg-card flex flex-col">
+        <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
               <Mail className="w-5 h-5 text-primary" />
@@ -147,7 +147,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
           </div>
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border space-y-2">
+        <div className="p-4 border-t border-border space-y-2">
           <button className="w-full text-left text-sm px-3 py-2 rounded-lg hover-elevate flex items-center gap-2" data-testid="button-settings">
             <Settings className="w-4 h-4" />
             <span>Settings</span>
@@ -168,7 +168,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       </aside>
 
       {/* Middle Panel - Email List */}
-      <main className="w-96 border-r border-border flex flex-col bg-background">
+      <main className="flex-1 border-r border-border flex flex-col bg-card">
         <header className="h-14 border-b border-border px-4 flex items-center gap-2">
           <input 
             type="search" 
@@ -196,7 +196,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       </main>
 
       {/* Right Sidebar - AIMailPilot Panel */}
-      <aside className="w-96 flex flex-col bg-background overflow-hidden">
+      <aside className="w-[400px] flex flex-col bg-background overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6">
           {renderLayer()}
         </div>
@@ -218,8 +218,8 @@ function NavItem({ icon: Icon, label, count, active }: NavItemProps) {
       className={`
         w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors
         ${active 
-          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
-          : "text-sidebar-foreground hover-elevate"
+          ? "bg-accent text-foreground font-medium" 
+          : "text-foreground hover-elevate"
         }
       `}
       data-testid={`nav-${label.toLowerCase()}`}
