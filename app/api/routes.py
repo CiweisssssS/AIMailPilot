@@ -222,11 +222,12 @@ async def summarize_text(request: SummarizeRequest):
 
 @router.post("/api/extract-tasks", response_model=ExtractTasksResponse)
 async def extract_tasks_from_text(request: ExtractTasksRequest):
-    """Extract tasks using MiniLM + NER + Flan-T5 with rule-based fallback"""
+    """Extract tasks using GPT-4o-mini with rule-based fallback"""
     try:
+        subject = getattr(request, 'subject', '')
         tasks = await extract_tasks([{
             'id': 'temp',
-            'subject': request.subject if hasattr(request, 'subject') else '',
+            'subject': subject,
             'clean_body': request.text,
             'body': request.text,
             'to': [],
@@ -281,6 +282,57 @@ async def prioritize_email(request: PrioritizeRequest):
         )
         
         return PrioritizeResponse(priority=priority)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/triage")
+async def triage_emails(request: dict):
+    """
+    Analyze multiple Gmail emails and return priorities, summaries, and tasks
+    Frontend expects: { priorities: Priority[], summaries: string[], tasks: Task[][] }
+    """
+    try:
+        from app.models.schemas import Priority
+        
+        messages = request.get('messages', [])
+        if not messages:
+            return {"priorities": [], "summaries": [], "tasks": []}
+        
+        priorities = []
+        summaries = []
+        tasks_list = []
+        
+        for msg in messages:
+            # Convert to format expected by services
+            msg_dict = {
+                'id': msg.get('id', 'unknown'),
+                'from_': msg.get('from_', 'unknown'),
+                'subject': msg.get('subject', ''),
+                'clean_body': msg.get('clean_body', msg.get('body', '')),
+                'body': msg.get('body', ''),
+                'to': msg.get('to', []),
+                'cc': msg.get('cc', [])
+            }
+            
+            # Summarize
+            summary = await summarize_thread([msg_dict])
+            summaries.append(summary)
+            
+            # Extract tasks
+            tasks = await extract_tasks([msg_dict])
+            tasks_list.append(tasks)
+            
+            # Calculate priority
+            priority = await calculate_priority([msg_dict], tasks, [])
+            priorities.append(priority.dict())
+        
+        return {
+            "priorities": priorities,
+            "summaries": summaries,
+            "tasks": tasks_list
+        }
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

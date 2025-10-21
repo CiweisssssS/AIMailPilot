@@ -19,6 +19,10 @@ externalPort = 80
 localPort = 8000
 externalPort = 8000
 
+[[ports]]
+localPort = 41019
+externalPort = 3000
+
 [env]
 PORT = "5000"
 
@@ -42,3 +46,6 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[agent]
+integrations = ["google-mail:1.0.0"]

@@ -1,8 +1,20 @@
-# AI Email Assistant - Gmail Workspace Add-on
+# AI Email Assistant - Web Application & Gmail Add-on
 
 ## Overview
 
-An AI-powered email assistant designed as a Gmail Workspace Add-on with a Python FastAPI backend and Google Apps Script frontend. The system provides inbox-level intelligence through a **5-layer sidebar interface** that analyzes multiple emails using **delta fetch + "Read = Processed" strategy**. Analysis uses **GPT-4o-mini** with a **hybrid rule-based + LLM architecture** for intelligent email prioritization, summarization, and task extraction.
+An AI-powered email assistant with **dual deployment modes**:
+1. **Web Application** (Current): React + Tailwind frontend with Gmail OAuth integration for rapid testing and iteration
+2. **Gmail Add-on** (Future): Google Apps Script sidebar interface for production deployment
+
+The system analyzes Gmail emails using **GPT-4o-mini** with a **hybrid rule-based + LLM architecture** for intelligent priority classification (P1/P2/P3), one-sentence summaries, and structured task extraction in `[verb + object + owner + due]` format.
+
+**Recent Changes (Oct 21, 2025)**:
+- Pivoted to Web Application for faster testing workflow vs. Apps Script deployment
+- Integrated Replit Gmail connector for OAuth authentication
+- Enhanced GPT-4o-mini prompts with clear P1/P2/P3 classification criteria
+- Enforced task extraction format `[verb + object + owner + due]` with examples
+- Created `/triage` endpoint for batch email analysis
+- Built React frontend matching design guidelines (Material Design 3 + Linear-inspired hierarchy)
 
 ## User Preferences
 

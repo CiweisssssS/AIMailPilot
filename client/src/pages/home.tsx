@@ -1,354 +1,329 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Loader2, Mail, AlertCircle, CheckCircle2, Clock, Inbox, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, MessageSquare, CheckCircle2, AlertCircle, Calendar, User } from "lucide-react";
-import { processThreadRequestSchema, type ProcessThreadRequest, type ProcessThreadResponse, type ChatbotQAResponse, type ThreadResponse } from "@shared/schema";
-import { format } from "date-fns";
+
+interface Email {
+  id: string;
+  subject: string;
+  from_: string;
+  to: string[];
+  date: string;
+  snippet: string;
+  body: string;
+}
+
+interface Task {
+  title: string;
+  owner: string;
+  due: string | null;
+  type: string;
+}
+
+interface AnalyzedEmail extends Email {
+  priority: {
+    label: string;
+    score: number;
+    reasons: string[];
+  };
+  summary: string;
+  tasks: Task[];
+}
 
 export default function Home() {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
   const { toast } = useToast();
-  const [result, setResult] = useState<ProcessThreadResponse | null>(null);
-  const [question, setQuestion] = useState("");
 
-  const form = useForm<ProcessThreadRequest>({
-    resolver: zodResolver(processThreadRequestSchema),
-    defaultValues: {
-      user_id: "demo_user",
-      personalized_keywords: [],
-      messages: [],
+  const fetchEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/fetch-gmail-emails?maxResults=5");
+      if (!response.ok) throw new Error("Failed to fetch emails");
+      return response.json();
     },
-  });
+    onSuccess: async (data) => {
+      if (data.success && data.emails?.length > 0) {
+        setIsAnalyzing(true);
+        
+        const analyzeResponse = await fetch("/api/analyze-emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emails: data.emails })
+        });
 
-  const processMutation = useMutation({
-    mutationFn: async (data: ProcessThreadRequest) => {
-      const response = await fetch("http://localhost:8000/api/process-thread", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to process thread");
-      return response.json() as Promise<ProcessThreadResponse>;
+        if (!analyzeResponse.ok) throw new Error("Failed to analyze emails");
+        
+        const analyzed = await analyzeResponse.json();
+        const emailsWithAnalysis = data.emails.map((email: Email, index: number) => ({
+          ...email,
+          priority: analyzed.priorities?.[index] || { label: "P3", score: 0.25, reasons: ["Classification unavailable"] },
+          summary: analyzed.summaries?.[index] || "Summary unavailable",
+          tasks: analyzed.tasks?.[index] || []
+        }));
+
+        setAnalyzedEmails(emailsWithAnalysis);
+        setIsAnalyzing(false);
+        
+        toast({
+          title: "Analysis complete",
+          description: `Analyzed ${data.emails.length} emails from your inbox`,
+        });
+      } else {
+        toast({
+          title: "No emails found",
+          description: "Your inbox appears to be empty",
+          variant: "destructive"
+        });
+      }
     },
-    onSuccess: (data) => {
-      setResult(data);
+    onError: (error: Error) => {
+      setIsAnalyzing(false);
       toast({
-        title: "Thread processed successfully",
-        description: `Priority: ${data.priority.label} (Score: ${data.priority.score.toFixed(2)})`,
+        title: "Error",
+        description: error.message || "Failed to fetch or analyze emails",
+        variant: "destructive"
       });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error processing thread",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const qaMutation = useMutation({
-    mutationFn: async ({ question, thread }: { question: string; thread: ThreadResponse }) => {
-      const response = await fetch("http://localhost:8000/api/chatbot-qa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, thread }),
-      });
-      if (!response.ok) throw new Error("Failed to get answer");
-      return response.json() as Promise<ChatbotQAResponse>;
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Answer received",
-        description: `Sources: ${data.sources.join(", ")}`,
-      });
-    },
-  });
-
-  const onSubmit = (data: ProcessThreadRequest) => {
-    processMutation.mutate(data);
-  };
-
-  const loadSampleData = () => {
-    form.setValue("messages", [
-      {
-        id: "msg_001",
-        thread_id: "thread_demo",
-        date: "2025-10-01T10:45:00Z",
-        from: "alice@company.com",
-        to: ["you@company.com"],
-        cc: ["team@company.com"],
-        subject: "Project Kickoff - Action Required",
-        body: "Hi team,\n\nPlease finalize the presentation slides by Thursday EOD. Bob will own the meeting agenda.\n\nBest regards,\nAlice",
-      },
-      {
-        id: "msg_002",
-        thread_id: "thread_demo",
-        date: "2025-10-01T15:30:00Z",
-        from: "bob@company.com",
-        to: ["you@company.com"],
-        cc: [],
-        subject: "Re: Project Kickoff - Action Required",
-        body: "Action items assigned:\n- Alice: Create timeline\n- You: Prepare metrics dashboard\n\nMeeting scheduled for Friday at 2pm in Conference Room A.",
-      },
-    ]);
-    form.setValue("personalized_keywords", [
-      { term: "metrics", weight: 1.5, scope: "subject|body" },
-    ]);
-  };
-
-  const askQuestion = () => {
-    if (question && result?.thread) {
-      qaMutation.mutate({ question, thread: result.thread });
     }
-  };
+  });
 
-  const getPriorityColor = (label: string) => {
+  const getPriorityConfig = (label: string) => {
     switch (label) {
-      case "P1": return "bg-red-500";
-      case "P2": return "bg-yellow-500";
-      case "P3": return "bg-green-500";
-      default: return "bg-gray-500";
+      case "P1":
+        return {
+          variant: "destructive" as const,
+          icon: AlertCircle,
+          text: "P1 Urgent",
+          description: "Requires immediate action",
+          bgClass: "bg-destructive/10 border-l-4 border-destructive"
+        };
+      case "P2":
+        return {
+          variant: "secondary" as const,
+          icon: Clock,
+          text: "P2 To-do",
+          description: "Needs attention",
+          bgClass: "bg-yellow-500/10 border-l-4 border-yellow-500"
+        };
+      default:
+        return {
+          variant: "outline" as const,
+          icon: CheckCircle2,
+          text: "P3 FYI",
+          description: "For information",
+          bgClass: "bg-muted/30 border-l-4 border-muted-foreground/30"
+        };
     }
   };
+
+  if (analyzedEmails.length === 0 && !fetchEmailsMutation.isPending && !isAnalyzing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-purple-500/5 flex items-center justify-center p-6">
+        <Card className="w-full max-w-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
+            <CardTitle className="text-3xl font-bold">AI Email Intelligence</CardTitle>
+            <CardDescription className="text-base">
+              Analyze your Gmail inbox with GPT-4o-mini for priority classification, summaries, and task extraction
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+              <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-sm">Priority Detection</h3>
+                <p className="text-xs text-muted-foreground">P1/P2/P3 classification</p>
+              </div>
+              <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <Mail className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-sm">Smart Summaries</h3>
+                <p className="text-xs text-muted-foreground">One-sentence overviews</p>
+              </div>
+              <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-sm">Task Extraction</h3>
+                <p className="text-xs text-muted-foreground">[verb + object + owner + due]</p>
+              </div>
+            </div>
+            
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={() => fetchEmailsMutation.mutate()}
+              disabled={fetchEmailsMutation.isPending}
+              data-testid="button-analyze-inbox"
+            >
+              {fetchEmailsMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Connecting to Gmail...
+                </>
+              ) : (
+                <>
+                  <Inbox className="mr-2 h-5 w-5" />
+                  Analyze My Inbox
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isAnalyzing) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <div className="text-center">
+                <h3 className="font-semibold">Analyzing emails...</h3>
+                <p className="text-sm text-muted-foreground">GPT-4o-mini is processing your inbox</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">AI Email Assistant</h1>
-          <p className="text-muted-foreground">
-            Process email threads with AI-powered summarization, task extraction, and priority scoring
-          </p>
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <h1 className="font-bold text-xl">Email Intelligence</h1>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setAnalyzedEmails([]);
+              fetchEmailsMutation.mutate();
+            }}
+            data-testid="button-new-analysis"
+          >
+            <Inbox className="mr-2 h-4 w-4" />
+            New Analysis
+          </Button>
         </div>
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="w-5 h-5" />
-                  Email Thread Input
-                </CardTitle>
-                <CardDescription>
-                  Paste your email thread data as JSON or load sample data
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="user_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>User ID</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-user-id" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+      <main className="container max-w-5xl px-6 py-8 space-y-6">
+        {analyzedEmails.map((email) => {
+          const priorityConfig = getPriorityConfig(email.priority.label);
+          const PriorityIcon = priorityConfig.icon;
 
-                    <FormField
-                      control={form.control}
-                      name="messages"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Messages (JSON)</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              value={JSON.stringify(field.value, null, 2)}
-                              onChange={(e) => {
-                                try {
-                                  field.onChange(JSON.parse(e.target.value));
-                                } catch {
-                                  // Invalid JSON, ignore
-                                }
-                              }}
-                              placeholder="Paste email thread JSON here..."
-                              className="font-mono text-sm min-h-[300px]"
-                              data-testid="input-messages"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        disabled={processMutation.isPending}
-                        data-testid="button-process"
-                        className="flex-1"
-                      >
-                        {processMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Process Thread
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={loadSampleData}
-                        data-testid="button-sample"
-                      >
-                        Load Sample
-                      </Button>
+          return (
+            <Card key={email.id} className="overflow-hidden" data-testid={`card-email-${email.id}`}>
+              <div className={`p-6 ${priorityConfig.bgClass}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant={priorityConfig.variant} className="flex items-center gap-1" data-testid={`badge-priority-${email.priority.label}`}>
+                        <PriorityIcon className="h-3 w-3" />
+                        {priorityConfig.text}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {priorityConfig.description}
+                      </span>
                     </div>
-                  </form>
-                </Form>
+                    <h2 className="font-semibold text-lg truncate" data-testid="text-email-subject">{email.subject}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      From: {email.from_} • {new Date(email.date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-primary">{Math.round(email.priority.score * 100)}%</div>
+                    <div className="text-xs text-muted-foreground">Confidence</div>
+                  </div>
+                </div>
+                {email.priority.reasons.length > 0 && (
+                  <div className="mt-3 text-sm text-muted-foreground">
+                    <span className="font-medium">Reason:</span> {email.priority.reasons[0]}
+                  </div>
+                )}
+              </div>
+
+              <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-semibold">Summary</h3>
+                    </div>
+                    <p className="text-sm leading-relaxed" data-testid="text-email-summary">
+                      {email.summary}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="font-semibold">Tasks</h3>
+                      </div>
+                      {email.tasks.length > 0 && (
+                        <Badge variant="secondary" data-testid="badge-task-count">
+                          {email.tasks.length} {email.tasks.length === 1 ? 'task' : 'tasks'}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {email.tasks.length > 0 ? (
+                      <ul className="space-y-2">
+                        {email.tasks.map((task, index) => (
+                          <li 
+                            key={index} 
+                            className="text-sm p-3 rounded-lg bg-muted/50 hover-elevate"
+                            data-testid={`task-item-${index}`}
+                          >
+                            <div className="font-medium mb-1">{task.title}</div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span>Owner: {task.owner}</span>
+                              {task.due && (
+                                <span>Due: {new Date(task.due).toLocaleDateString()}</span>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                {task.type}
+                              </Badge>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground italic p-3 bg-muted/30 rounded-lg">
+                        No actionable tasks detected
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <details className="group">
+                  <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    View full email
+                  </summary>
+                  <div className="mt-3 p-4 bg-muted/30 rounded-lg text-sm max-h-64 overflow-y-auto">
+                    <pre className="whitespace-pre-wrap font-sans">{email.snippet}</pre>
+                  </div>
+                </details>
               </CardContent>
             </Card>
-          </div>
-
-          <div className="space-y-6">
-            {result && (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Priority Classification</span>
-                      <Badge className={getPriorityColor(result.priority.label)} data-testid={`badge-priority-${result.priority.label}`}>
-                        {result.priority.label}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription>
-                      Score: {result.priority.score.toFixed(2)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {result.priority.reasons.map((reason, i) => (
-                        <div key={i} className="flex items-start gap-2 text-sm">
-                          <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                          <span data-testid={`text-reason-${i}`}>{reason}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm" data-testid="text-summary">{result.summary}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5" />
-                      Extracted Tasks ({result.tasks.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {result.tasks.map((task, i) => (
-                        <div
-                          key={i}
-                          className="p-3 rounded-lg border bg-card hover-elevate"
-                          data-testid={`card-task-${i}`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <p className="text-sm font-medium flex-1">{task.title}</p>
-                            <Badge variant="outline" data-testid={`badge-type-${i}`}>
-                              {task.type}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                            {task.owner && (
-                              <div className="flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                <span data-testid={`text-owner-${i}`}>{task.owner}</span>
-                              </div>
-                            )}
-                            {task.due && (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                <span data-testid={`text-due-${i}`}>
-                                  {format(new Date(task.due), "PPp")}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5" />
-                      Ask Questions
-                    </CardTitle>
-                    <CardDescription>
-                      Chat with the AI about this email thread
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex gap-2">
-                        <Input
-                          value={question}
-                          onChange={(e) => setQuestion(e.target.value)}
-                          placeholder="What do I need to deliver?"
-                          onKeyDown={(e) => e.key === "Enter" && askQuestion()}
-                          data-testid="input-question"
-                        />
-                        <Button
-                          onClick={askQuestion}
-                          disabled={qaMutation.isPending || !question}
-                          data-testid="button-ask"
-                        >
-                          {qaMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          Ask
-                        </Button>
-                      </div>
-
-                      {qaMutation.data && (
-                        <div className="p-4 rounded-lg bg-muted" data-testid="card-answer">
-                          <p className="text-sm mb-2">{qaMutation.data.answer}</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {qaMutation.data.sources.map((source, i) => (
-                              <Badge key={i} variant="secondary" data-testid={`badge-source-${i}`}>
-                                {source}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {!result && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center text-muted-foreground">
-                    <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Process an email thread to see results</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
+          );
+        })}
+      </main>
     </div>
   );
 }
