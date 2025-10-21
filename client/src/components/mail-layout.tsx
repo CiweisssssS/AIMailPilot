@@ -120,7 +120,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Sidebar - Gmail Navigation */}
-      <aside className="w-64 border-r border-border bg-sidebar flex flex-col">
+      <aside className="w-48 border-r border-border bg-sidebar flex flex-col">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
