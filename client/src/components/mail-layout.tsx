@@ -22,6 +22,7 @@ interface MailLayoutProps {
   children?: React.ReactNode;
   userEmail?: string;
   onLogout?: () => void;
+  onRefresh?: () => void;
   analyzedEmails?: AnalyzedEmail[];
   summary?: {
     total: number;
@@ -35,7 +36,8 @@ interface MailLayoutProps {
 export default function MailLayout({ 
   children, 
   userEmail, 
-  onLogout, 
+  onLogout,
+  onRefresh,
   analyzedEmails = [], 
   summary = { total: 0, urgent: 0, todo: 0, fyi: 0 },
   isAnalyzing = false 
@@ -76,8 +78,7 @@ export default function MailLayout({
   };
 
   const handleRefresh = () => {
-    // TODO: Implement refresh logic
-    console.log("Refresh clicked");
+    onRefresh?.();
   };
 
   const handleFinishCustomize = () => {

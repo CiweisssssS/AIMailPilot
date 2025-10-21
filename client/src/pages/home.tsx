@@ -6,8 +6,9 @@ import { Loader2, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
-import { useGmailEmails, useAnalyzeEmails } from "@/hooks/use-emails";
+import { useGmailEmails, useAnalyzeEmails, useRefreshEmails } from "@/hooks/use-emails";
 import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import type { GmailEmail, AnalyzedEmail } from "@shared/schema";
 
 interface AuthStatus {
@@ -90,12 +91,16 @@ export default function Home() {
   }
 
   // Fetch Gmail emails
-  const { data: gmailData, isLoading: emailsLoading, error: emailsError } = useGmailEmails(50);
+  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(50);
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
   const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
+  const { toast } = useToast();
   
   // Analyze emails mutation
   const analyzeMutation = useAnalyzeEmails();
+  
+  // Refresh mutation
+  const refreshMutation = useRefreshEmails();
 
   // Auto-analyze emails when they are loaded
   useEffect(() => {
@@ -112,6 +117,25 @@ export default function Home() {
     setSelectedEmailId(email.id);
   };
 
+  const handleRefresh = async () => {
+    try {
+      // Clear analyzed emails to trigger re-analysis
+      setAnalyzedEmails([]);
+      // Refetch emails
+      await refetch();
+      toast({
+        title: "Refreshed",
+        description: "Emails refreshed successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh emails",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Calculate summary statistics
   const summary = analyzedEmails.length > 0 ? {
     total: analyzedEmails.length,
@@ -125,6 +149,7 @@ export default function Home() {
     <MailLayout 
       userEmail={authStatus.user?.email}
       onLogout={() => logoutMutation.mutate()}
+      onRefresh={handleRefresh}
       analyzedEmails={analyzedEmails}
       summary={summary}
       isAnalyzing={analyzeMutation.isPending}
