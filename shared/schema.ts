@@ -72,6 +72,57 @@ export const chatbotQAResponseSchema = z.object({
   sources: z.array(z.string()),
 });
 
+// Gmail API schemas
+export const gmailEmailSchema = z.object({
+  id: z.string(),
+  threadId: z.string(),
+  subject: z.string(),
+  from_: z.string(),
+  to: z.array(z.string()),
+  date: z.string(),
+  snippet: z.string(),
+  body: z.string(),
+  clean_body: z.string(),
+});
+
+export const fetchGmailResponseSchema = z.object({
+  success: z.boolean(),
+  emails: z.array(gmailEmailSchema),
+});
+
+// Triage (batch analysis) schemas
+export const triageMessageSchema = z.object({
+  id: z.string(),
+  threadId: z.string(),
+  subject: z.string(),
+  from_: z.string(),
+  to: z.array(z.string()),
+  date: z.string(),
+  body: z.string(),
+});
+
+export const analyzedEmailSchema = z.object({
+  id: z.string(),
+  threadId: z.string(),
+  subject: z.string(),
+  from_: z.string(),
+  snippet: z.string(),
+  date: z.string(),
+  summary: z.string(),
+  priority: prioritySchema,
+  tasks: z.array(taskSchema),
+});
+
+export const triageResponseSchema = z.object({
+  analyzed_emails: z.array(analyzedEmailSchema),
+  summary: z.object({
+    total: z.number(),
+    urgent: z.number(),
+    todo: z.number(),
+    fyi: z.number(),
+  }),
+});
+
 export type EmailMessage = z.infer<typeof emailMessageSchema>;
 export type Keyword = z.infer<typeof keywordSchema>;
 export type ProcessThreadRequest = z.infer<typeof processThreadRequestSchema>;
@@ -83,3 +134,8 @@ export type Priority = z.infer<typeof prioritySchema>;
 export type ProcessThreadResponse = z.infer<typeof processThreadResponseSchema>;
 export type ChatbotQARequest = z.infer<typeof chatbotQARequestSchema>;
 export type ChatbotQAResponse = z.infer<typeof chatbotQAResponseSchema>;
+export type GmailEmail = z.infer<typeof gmailEmailSchema>;
+export type FetchGmailResponse = z.infer<typeof fetchGmailResponseSchema>;
+export type TriageMessage = z.infer<typeof triageMessageSchema>;
+export type AnalyzedEmail = z.infer<typeof analyzedEmailSchema>;
+export type TriageResponse = z.infer<typeof triageResponseSchema>;
