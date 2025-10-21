@@ -1,11 +1,42 @@
 import { ArrowLeft, Mail, Calendar, Bookmark, CheckSquare } from "lucide-react";
 import type { AnalyzedEmail } from "@shared/schema";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
   analyzedEmails: AnalyzedEmail[];
   onBack: () => void;
   onChatbotClick: () => void;
+}
+
+// Format date to MM/DD/YYYY HH:mm (24-hour)
+function formatDeadline(dateStr: string | null | undefined): string {
+  if (!dateStr || dateStr === "TBD" || dateStr === "null") {
+    return "Deadline: TBD";
+  }
+  
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return "Deadline: TBD";
+    }
+    
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `Time: ${month}/${day}/${year}, ${hours}:${minutes}`;
+  } catch (e) {
+    return "Deadline: TBD";
+  }
+}
+
+// Remove brackets from task title
+function cleanTaskTitle(title: string): string {
+  return title.replace(/^\[|\]$/g, '').trim();
 }
 
 export default function CategoryDetail({ category, analyzedEmails, onBack, onChatbotClick }: CategoryDetailProps) {
@@ -93,36 +124,68 @@ interface EmailItemProps {
 }
 
 function EmailItem({ email }: EmailItemProps) {
+  const { toast } = useToast();
+  const [isFlagged, setIsFlagged] = useState(false);
+  
   const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
-  const taskDisplay = hasTask ? email.task_extracted : email.subject;
+  const taskDisplay = hasTask ? cleanTaskTitle(email.task_extracted!) : email.subject;
+  
+  // Get deadline from first task if available
+  const deadline = email.tasks && email.tasks.length > 0 ? email.tasks[0].due : null;
+  const formattedDeadline = formatDeadline(deadline);
+  
+  const handleFlag = () => {
+    setIsFlagged(!isFlagged);
+    toast({
+      title: isFlagged ? "Unflagged" : "Flagged",
+      description: isFlagged ? "Email removed from flagged" : "Email added to flagged",
+    });
+  };
+  
+  const handleAddToCalendar = () => {
+    toast({
+      title: "Add to Calendar",
+      description: "Calendar integration coming soon!",
+    });
+  };
   
   return (
     <div className="p-4 border-l-4 border-primary/30 bg-card rounded-r-lg">
       <div className="flex items-start gap-3 mb-3">
-        <button className="mt-1 p-1 hover:bg-primary/10 rounded" data-testid={`checkbox-done-${email.id}`}>
+        <button 
+          className="mt-1 p-1 hover:bg-primary/10 rounded transition-colors" 
+          data-testid={`checkbox-done-${email.id}`}
+          onClick={() => toast({ title: "Task completed", description: "Mark as done feature coming soon!" })}
+        >
           <CheckSquare className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="flex-1">
           <h3 className="font-semibold text-foreground mb-2">
-            {hasTask ? "Task: " : "Subject: "}{taskDisplay}
+            {hasTask ? "" : "Subject: "}{taskDisplay}
           </h3>
           <p className="text-sm text-muted-foreground mb-2">
-            Summary: {email.summary}
+            Preview: {email.snippet || email.summary}
           </p>
-          <p className="text-xs text-muted-foreground">
-            From: {email.from}
+          <p className="text-xs text-muted-foreground mb-1">
+            {formattedDeadline}
           </p>
         </div>
-        <button className="p-1 hover:bg-primary/10 rounded" data-testid={`button-flag-${email.id}`}>
-          <Bookmark className="w-5 h-5 text-primary" />
+        <button 
+          className="p-1 hover:bg-primary/10 rounded transition-colors" 
+          data-testid={`button-flag-${email.id}`}
+          onClick={handleFlag}
+        >
+          <Bookmark className={`w-5 h-5 ${isFlagged ? 'fill-primary text-primary' : 'text-primary'}`} />
         </button>
       </div>
-      {hasTask && (
-        <button className="text-sm text-primary hover:underline flex items-center gap-2" data-testid={`button-add-to-calendar-${email.id}`}>
-          <Calendar className="w-4 h-4" />
-          Add to Calendar
-        </button>
-      )}
+      <button 
+        onClick={handleAddToCalendar}
+        className="text-sm bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors" 
+        data-testid={`button-add-to-calendar-${email.id}`}
+      >
+        <Calendar className="w-4 h-4" />
+        Add to Calendar
+      </button>
     </div>
   );
 }

@@ -1,11 +1,41 @@
 import { Mail, Calendar, Bookmark, RefreshCw } from "lucide-react";
 import type { AnalyzedEmail } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface TaskScheduleProps {
   analyzedEmails: AnalyzedEmail[];
   onFlaggedClick: () => void;
   onRefreshClick: () => void;
   onInboxReminderClick?: () => void;
+}
+
+// Format date to MM/DD/YYYY HH:mm (24-hour)
+function formatDeadline(dateStr: string | null | undefined): string {
+  if (!dateStr || dateStr === "TBD" || dateStr === "null") {
+    return "Deadline: TBD";
+  }
+  
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return "Deadline: TBD";
+    }
+    
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${month}/${day}/${year}, ${hours}:${minutes}`;
+  } catch (e) {
+    return "Deadline: TBD";
+  }
+}
+
+// Remove brackets from task title
+function cleanTaskTitle(title: string): string {
+  return title.replace(/^\[|\]$/g, '').trim();
 }
 
 export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
@@ -140,24 +170,41 @@ interface TimelineItemProps {
 }
 
 function TimelineItem({ email }: TimelineItemProps) {
+  const { toast } = useToast();
+  
   // Handle null/empty task_extracted by falling back to subject
   const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
-  const displayTitle = hasTask ? email.task_extracted : email.subject;
+  const displayTitle = hasTask ? cleanTaskTitle(email.task_extracted!) : email.subject;
+  
+  // Get deadline from first task if available
+  const deadline = email.tasks && email.tasks.length > 0 ? email.tasks[0].due : null;
+  const formattedDeadline = formatDeadline(deadline);
+  
+  const handleAddToCalendar = () => {
+    toast({
+      title: "Add to Calendar",
+      description: "Calendar integration coming soon!",
+    });
+  };
   
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-card transition-colors">
       <div className="flex-1">
         <p className="text-sm font-medium text-foreground mb-1">
-          {hasTask ? "Task: " : "Subject: "}{displayTitle}
+          {displayTitle}
         </p>
         <p className="text-xs text-muted-foreground mb-1">
           {email.summary}
         </p>
         <p className="text-xs text-muted-foreground">
-          From: {email.from}
+          {formattedDeadline}
         </p>
       </div>
-      <button className="p-2 hover:bg-primary/10 rounded-lg" data-testid={`button-add-calendar-${email.id}`}>
+      <button 
+        onClick={handleAddToCalendar}
+        className="p-2 hover:bg-primary/10 rounded-lg transition-colors" 
+        data-testid={`button-add-calendar-${email.id}`}
+      >
         <Calendar className="w-5 h-5 text-primary" />
       </button>
     </div>

@@ -1,11 +1,41 @@
 import { ArrowLeft, Mail, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { AnalyzedEmail } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface FlaggedMailsProps {
   analyzedEmails: AnalyzedEmail[];
   onBack: () => void;
   onChatbotClick: () => void;
+}
+
+// Format date to MM/DD/YYYY HH:mm (24-hour)
+function formatDeadline(dateStr: string | null | undefined): string {
+  if (!dateStr || dateStr === "TBD" || dateStr === "null") {
+    return "Deadline: TBD";
+  }
+  
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return "Deadline: TBD";
+    }
+    
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${month}/${day}/${year}, ${hours}:${minutes}`;
+  } catch (e) {
+    return "Deadline: TBD";
+  }
+}
+
+// Remove brackets from task title
+function cleanTaskTitle(title: string): string {
+  return title.replace(/^\[|\]$/g, '').trim();
 }
 
 export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
@@ -70,29 +100,47 @@ interface FlaggedItemProps {
 }
 
 function FlaggedItem({ email }: FlaggedItemProps) {
+  const { toast } = useToast();
+  
   const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
-  const taskDisplay = hasTask ? email.task_extracted : email.subject;
+  const taskDisplay = hasTask ? cleanTaskTitle(email.task_extracted!) : email.subject;
+  
+  // Get deadline from first task if available
+  const deadline = email.tasks && email.tasks.length > 0 ? email.tasks[0].due : null;
+  const formattedDeadline = formatDeadline(deadline);
+  
+  const handleOpenMail = () => {
+    toast({
+      title: "Open in Gmail",
+      description: "Opening email in Gmail...",
+    });
+    // In future: window.open(`https://mail.google.com/mail/u/0/#inbox/${email.id}`, '_blank');
+  };
   
   return (
     <div className="p-4 border-l-4 border-primary/30 bg-card rounded-r-lg space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h3 className="font-semibold text-foreground mb-2">
-            {hasTask ? "Task: " : "Subject: "}{taskDisplay}
+            {taskDisplay}
           </h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            Summary: {email.summary}
+          <p className="text-sm text-muted-foreground mb-2">
+            {email.summary}
           </p>
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap mb-2">
             <div className="text-xs text-muted-foreground">
               Category: <Badge variant="secondary" className="ml-1">{email.priority.label}</Badge>
             </div>
             <div className="text-xs text-muted-foreground">
-              From: {email.from}
+              {formattedDeadline}
             </div>
           </div>
         </div>
-        <button className="p-1 hover:bg-primary/10 rounded" data-testid={`button-open-mail-${email.id}`}>
+        <button 
+          onClick={handleOpenMail}
+          className="p-1 hover:bg-primary/10 rounded transition-colors" 
+          data-testid={`button-open-mail-${email.id}`}
+        >
           <ExternalLink className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
