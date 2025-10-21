@@ -42,7 +42,13 @@ async def summarize_text(subject: str, text: str, max_length: int = 80) -> Dict[
         }])
         
         if summary and len(summary.strip()) > 5:
-            logger.info(f"GPT-4o-mini summary generated: {len(summary)} chars")
+            # Ensure summary is max 15 words
+            words = summary.strip().split()
+            if len(words) > 15:
+                summary = ' '.join(words[:15]) + '...'
+                logger.info(f"Summary truncated to 15 words")
+            
+            logger.info(f"GPT-4o-mini summary generated: {len(summary)} chars, {len(words)} words")
             return {
                 "summary": summary,
                 "confidence": 0.95  # High confidence for LLM output

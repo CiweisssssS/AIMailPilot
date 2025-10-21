@@ -1,4 +1,4 @@
-SUMMARY_PROMPT = """Summarize the email thread in ≤3 sentences. Include dates, owners, and concrete deliverables if present."""
+SUMMARY_PROMPT = """Summarize the email in EXACTLY 15 words or fewer. Be concise and focus on key action, deadline, or deliverable."""
 
 EXTRACTION_PROMPT = """You are a task extraction system. Extract actionable tasks from emails and format them EXACTLY as: [verb + object + owner + due].
 
