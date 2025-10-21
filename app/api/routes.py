@@ -318,7 +318,8 @@ async def triage_emails(request: dict):
                     'clean_body': msg.get('clean_body', msg.get('body', '')),
                     'body': msg.get('body', ''),
                     'to': msg.get('to', []),
-                    'cc': msg.get('cc', [])
+                    'cc': msg.get('cc', []),
+                    'date': msg.get('date', '')  # CRITICAL: Pass email date for deadline normalization
                 }
                 
                 # Process all three operations in parallel for each email
@@ -363,6 +364,8 @@ async def triage_emails(request: dict):
             msg = messages[i]
             priority = result['priority']
             
+            logger.info(f"Email {i}: subject={msg.get('subject', 'N/A')}, tasks_count={len(result.get('tasks', []))}")
+            
             # Count by priority level
             if 'P1' in priority['label']:
                 urgent_count += 1
@@ -375,6 +378,7 @@ async def triage_emails(request: dict):
             task_extracted = None
             if result['tasks'] and len(result['tasks']) > 0:
                 first_task = result['tasks'][0]
+                logger.info(f"  First task: {first_task}")
                 # Tasks are Pydantic objects, not dicts - access attribute directly
                 if hasattr(first_task, 'title'):
                     title = first_task.title

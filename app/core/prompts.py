@@ -38,27 +38,55 @@ Body (trimmed): Newsletter: Q4 product updates and policy changes."""
 # Legacy prompt (deprecated - use get_summary_system_prompt instead)
 SUMMARY_PROMPT = """Summarize the email in EXACTLY 15 words or fewer. Be concise and focus on key action, deadline, or deliverable."""
 
-EXTRACTION_PROMPT = """You are a task extraction system. Extract actionable tasks from emails and format them EXACTLY as: [verb + object + owner + due].
+EXTRACTION_PROMPT = """You are a task extraction system. Extract actionable tasks from emails.
 
 **Format Requirements:**
-- title: MUST follow pattern "[VERB + OBJECT + OWNER + DUE]"
+- title: MUST follow pattern "[VERB + OBJECT + OWNER]" (NO deadline in title!)
   - VERB: Action word (Submit, Review, Complete, Send, Schedule, Approve, etc.)
   - OBJECT: What needs to be done (report, proposal, meeting, etc.)
   - OWNER: Who is responsible (use name/email if mentioned, otherwise "team")
-  - DUE: When it's due (use specific date if mentioned, otherwise "TBD")
+- due: Extract deadline as natural text (e.g., "Friday", "EOD today", "tomorrow 3pm", "by Oct 25", "next week")
+  - If NO deadline mentioned, use null
+  - DO NOT convert to ISO format - just extract the deadline text as-is
+- owner: Person's name or email
+- type: "deadline" (hard deadline), "meeting" (calendar event), "action" (to-do)
 
 **Examples:**
-- "Submit Q4 report by Alice by Friday" → title: "[Submit Q4 report Alice Friday]"
-- "Please review the proposal" → title: "[Review proposal team TBD]"
-- "Schedule meeting with Bob before EOD" → title: "[Schedule meeting team EOD today]"
-- "John needs to approve budget by tomorrow" → title: "[Approve budget John tomorrow]"
+- "Submit Q4 report by Alice by Friday" → 
+  {
+    "title": "[Submit Q4 report Alice]",
+    "owner": "Alice",
+    "due": "Friday",
+    "type": "deadline"
+  }
+- "Please review the proposal" → 
+  {
+    "title": "[Review proposal team]",
+    "owner": "team",
+    "due": null,
+    "type": "action"
+  }
+- "Schedule meeting with Bob before EOD" → 
+  {
+    "title": "[Schedule meeting team]",
+    "owner": "team",
+    "due": "EOD today",
+    "type": "meeting"
+  }
+- "John needs to approve budget by tomorrow 3pm" → 
+  {
+    "title": "[Approve budget John]",
+    "owner": "John",
+    "due": "tomorrow 3pm",
+    "type": "deadline"
+  }
 
 **Return JSON array:**
 [
   {
-    "title": "[VERB OBJECT OWNER DUE]",
+    "title": "[VERB OBJECT OWNER]",
     "owner": "name or email",
-    "due": "ISO date or null",
+    "due": "deadline text or null",
     "source_message_id": "msg_id",
     "type": "deadline" | "meeting" | "action"
   }
