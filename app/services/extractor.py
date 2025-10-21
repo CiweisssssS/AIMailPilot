@@ -83,8 +83,19 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
         # Use LLM provider's extract_tasks
         tasks_data = await llm_provider.extract_tasks(messages)
         
-        # Get reference datetime for normalization
+        # Get reference datetime from email date or use current time as fallback
         ref_datetime = datetime.now(ZoneInfo("UTC"))
+        if messages and messages[0].get('date'):
+            try:
+                from dateutil import parser as date_parser
+                email_date = date_parser.parse(messages[0]['date'])
+                if email_date.tzinfo is None:
+                    email_date = email_date.replace(tzinfo=ZoneInfo("UTC"))
+                ref_datetime = email_date
+                logger.info(f"Using email date as reference: {ref_datetime}")
+            except Exception as e:
+                logger.warning(f"Failed to parse email date, using current time: {e}")
+                ref_datetime = datetime.now(ZoneInfo("UTC"))
         
         # Convert to Task objects with normalized deadlines
         tasks = []

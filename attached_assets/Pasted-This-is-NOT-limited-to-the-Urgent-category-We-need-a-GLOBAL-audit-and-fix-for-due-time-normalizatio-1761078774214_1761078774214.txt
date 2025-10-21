@@ -1,0 +1,94 @@
+This is NOT limited to the Urgent category. We need a GLOBAL audit and fix for due-time normalization and rendering across ALL views.
+
+SYMPTOMS
+- Some cards (not only Urgent) show an ISO datetime suffix in the title (e.g., "2023-10-25T16:00:00").
+- Year incorrect (shows 2023 while current emails are 2025).
+- Even when body says “by 4pm today”, the card still shows “Deadline: TBD”.
+- Overview vs category vs timeline do not display the same summary/due.
+
+ROOT CAUSE (likely)
+- Multiple sources of `due` and `summary` (legacy fields, recomputation on route).
+- UI rendering raw Date/ISO instead of formatted string.
+- `normalize_deadline()` using wrong reference datetime (not the email Date header) or wrong timezone.
+- Title templating concatenates `title + raw due`.
+
+ACTION PLAN — GLOBAL FIX
+
+A) Single Source of Truth (backend payload)
+- Backend response for every item MUST include:
+  {
+    "id": "<stable id>",
+    "title": "<task title without due>",
+    "summary": "<one-sentence summary>",
+    "due": "Mon DD, YYYY, HH:mm" | "TBD",
+    "due_source": "normalized" | "manual" | "tbd",
+    "tz": "<IANA tz>"
+  }
+- ALL views (overview cards, category lists P1/P2/P3, detail panels, timeline, Saved-for-Later, search results) must consume THESE FIELDS directly. DO NOT recompute due/summary in the route or component.
+
+B) Strict Formatting Util (frontend)
+- Implement and use a single util everywhere: `formatDue(due: string): string`
+  - If `due === "TBD"` → return "TBD"
+  - Else assume backend already formatted as "Mon DD, YYYY, HH:mm"; render AS-IS.
+- Ban raw Date/ISO rendering in UI (grep for `T` or `.toISOString()` usage in render paths).
+- Title rule: Title contains ONLY task text (verb + object [+ owner]). Never append due into title.
+
+C) Normalization (server-side only)
+- `normalize_deadline(text, ref_dt, tz)` rules (already agreed):
+  - Only normalize if clearly resolvable:
+    * Explicit date+time
+    * Relative day + explicit time (e.g., “tomorrow 12:00”)
+    * Day-only / explicit date without time → that day **23:59**
+    * EOD/COB → **today 23:59**
+    * With timezone in text (“5pm PT”) → convert to user local tz
+  - Ambiguous phrases (“next week”, “ASAP”, “by tomorrow” w/o time, ranges) → **TBD**
+  - Return either "Mon DD, YYYY, HH:mm" or "TBD"
+- IMPORTANT: `ref_dt` = the email’s **Date header** (not server boot time). Year must come from this header (we're in 2025).
+- `due_source`: "normalized" if from NLP rules, "manual" after user sets via picker, "tbd" if unresolved.
+
+D) Timeline & All Views Consistency
+- Timeline buckets: Today / This Week / This Month / Later + pinned “Tasks Pending Deadline Confirmation”.
+- Sorting by parsed `due` (convert from "Mon DD, YYYY, HH:mm" using the same parser everywhere). If `TBD` → stays in pinned section.
+- The same `summary` text must appear identically in:
+  - Overview
+  - Category lists (P1/P2/P3)
+  - Detail panel
+  - Timeline
+- Remove any legacy `preview_text` or per-route re-summarization.
+
+E) Backfill/Migration
+- If there is cached data, run a one-time migration:
+  - Strip any ISO suffix that was concatenated into title.
+  - Recompute `due` using `normalize_deadline()` with the email Date header as `ref_dt`.
+  - Store back as "Mon DD, YYYY, HH:mm" or "TBD".
+- Add a feature flag `USE_NORMALIZED_DUE_V2` (default ON) to avoid regressions.
+
+F) Tests & Guards
+1) Unit tests for `normalize_deadline()`:
+   - "by 4pm today" with ref_dt = Oct 21, 2025 → "Oct 21, 2025, 16:00"
+   - "by October 10" → "Oct 10, 2025, 23:59"
+   - "by Friday" → next Friday, 23:59
+   - "by EOD" → today, 23:59
+   - Ambiguous: "next week"/"ASAP"/"by tomorrow" (no time)/"Oct 3–5" → "TBD"
+2) Component snapshots:
+   - Overview card, Category card, Detail panel, Timeline item all render the SAME `summary` and `due`.
+   - Title does NOT contain an ISO string or due text.
+3) String-format guard:
+   - A test that fails if any rendered string contains pattern `/\d{4}-\d{2}-\d{2}T\d{2}:/` (ISO leak).
+4) Year regression test:
+   - Given ref_dt in 2025, final due never shows 2023.
+
+G) Acceptance (with my provided test email “by 4pm today”)
+- Overview summary: “Yuling needs to review the updated pitch deck and share feedback by 4pm today.”
+- Category card:
+  - Title: “Review pitch deck Yuling”
+  - Summary: same as overview
+  - Deadline: “Oct 21, 2025, 16:00” (NOT TBD)
+- Timeline: item placed under **Today** at 16:00.
+- Console log (debug build): `ref_dt` parsed from the email Date header, tz conversions applied.
+
+Please apply globally and share screenshots for:
+1) Overview card
+2) Category card (Urgent/To-Do/FYI)
+3) Timeline item
+…all showing the SAME summary and a correctly formatted due: "Mon DD, YYYY, HH:mm".

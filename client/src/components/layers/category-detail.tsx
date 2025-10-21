@@ -11,28 +11,14 @@ interface CategoryDetailProps {
   onChatbotClick: () => void;
 }
 
-// Format date to MM/DD/YYYY HH:mm (24-hour)
+// Format deadline - backend returns "Mon DD, YYYY, HH:mm" or "TBD"
 function formatDeadline(dateStr: string | null | undefined): string {
   if (!dateStr || dateStr === "TBD" || dateStr === "null") {
     return "Deadline: TBD";
   }
   
-  try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      return "Deadline: TBD";
-    }
-    
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    
-    return `Time: ${month}/${day}/${year}, ${hours}:${minutes}`;
-  } catch (e) {
-    return "Deadline: TBD";
-  }
+  // Backend already returns formatted string "Mon DD, YYYY, HH:mm" - use it directly
+  return `Deadline: ${dateStr}`;
 }
 
 // Remove brackets from task title

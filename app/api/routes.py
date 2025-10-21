@@ -369,15 +369,23 @@ async def triage_emails(request: dict):
             else:
                 fyi_count += 1
             
-            # Extract first task as task_extracted string
+            # Extract first task as task_extracted string (clean title without ISO dates)
             task_extracted = None
             if result['tasks'] and len(result['tasks']) > 0:
                 first_task = result['tasks'][0]
                 # Tasks are Pydantic objects, not dicts - access attribute directly
                 if hasattr(first_task, 'title'):
-                    task_extracted = first_task.title
+                    title = first_task.title
+                    # Remove ISO date suffixes like "2023-10-25T16:00:00"
+                    import re
+                    title = re.sub(r'\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*$', '', title)
+                    task_extracted = title.strip()
                 elif isinstance(first_task, dict):
-                    task_extracted = first_task.get('title', None)
+                    title = first_task.get('title', None)
+                    if title:
+                        import re
+                        title = re.sub(r'\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*$', '', title)
+                        task_extracted = title.strip()
             
             # Safe snippet handling
             snippet = msg.get('snippet', '') or ''
