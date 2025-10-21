@@ -33,7 +33,9 @@ export default function Home() {
   const { toast } = useToast();
 
   // Fetch Gmail emails (only if authenticated)
-  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(50);
+  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(50, {
+    enabled: authStatus?.authenticated === true,
+  });
   
   // Mutations
   const logoutMutation = useMutation({
@@ -41,6 +43,9 @@ export default function Home() {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
+      // Clear all data on logout
+      setAnalyzedEmails([]);
+      setSelectedEmailId(undefined);
       refetchAuth();
     }
   });
@@ -55,6 +60,14 @@ export default function Home() {
         onSuccess: (data) => {
           setAnalyzedEmails(data.analyzed_emails);
         },
+        onError: (error) => {
+          console.error("Analysis failed:", error);
+          toast({
+            title: "Analysis Failed",
+            description: "Failed to analyze emails. You can try refreshing.",
+            variant: "destructive",
+          });
+        },
       });
     }
   }, [gmailData?.emails, authStatus?.authenticated]);
@@ -66,13 +79,27 @@ export default function Home() {
 
   const handleRefresh = async () => {
     try {
+      // Clear analyzed emails first
       setAnalyzedEmails([]);
-      await refetch();
+      
+      // Refetch emails from Gmail
+      const result = await refetch();
+      
+      // Re-analyze the emails (even if they're the same from cache)
+      if (result.data?.emails && result.data.emails.length > 0) {
+        await analyzeMutation.mutateAsync(result.data.emails, {
+          onSuccess: (data) => {
+            setAnalyzedEmails(data.analyzed_emails);
+          },
+        });
+      }
+      
       toast({
         title: "Refreshed",
-        description: "Emails refreshed successfully",
+        description: "Emails refreshed and analyzed successfully",
       });
     } catch (error) {
+      console.error("Refresh error:", error);
       toast({
         title: "Error",
         description: "Failed to refresh emails",

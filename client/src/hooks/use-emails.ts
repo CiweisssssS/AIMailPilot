@@ -3,11 +3,12 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { FetchGmailResponse, TriageResponse, GmailEmail } from "@shared/schema";
 
 // Fetch Gmail emails
-export function useGmailEmails(maxResults = 50) {
+export function useGmailEmails(maxResults = 50, options?: { enabled?: boolean }) {
   return useQuery<FetchGmailResponse>({
     queryKey: ["/api/fetch-gmail-emails", maxResults],
     refetchInterval: 60000, // Refetch every 60 seconds
     retry: 1,
+    enabled: options?.enabled ?? true, // Default to enabled if not specified
   });
 }
 

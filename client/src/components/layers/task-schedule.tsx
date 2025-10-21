@@ -9,6 +9,12 @@ interface TaskScheduleProps {
 }
 
 export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
+  // Group all emails by priority (not just those with tasks)
+  // This ensures high-priority emails are visible even without extracted tasks
+  const urgentEmails = analyzedEmails.filter(e => e.priority.label === "P1 - Urgent");
+  const todoEmails = analyzedEmails.filter(e => e.priority.label === "P2 - To-do");
+  const fyiEmails = analyzedEmails.filter(e => e.priority.label === "P3 - FYI");
+
   return (
     <div className="relative h-full">
       {/* Header */}
@@ -21,7 +27,7 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
           Good morning, user!
         </h2>
         <p className="text-foreground/80">
-          You have 21 unread emails.
+          You have {analyzedEmails.length} analyzed email{analyzedEmails.length !== 1 ? 's' : ''}.
         </p>
       </div>
 
@@ -46,59 +52,66 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
 
       {/* Timeline */}
       <div className="space-y-6">
-        {/* Today Section */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-3 h-3 rounded-full bg-primary" />
-            <h3 className="text-lg font-semibold text-primary">Today</h3>
+        {/* Urgent Emails */}
+        {urgentEmails.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-3 h-3 rounded-full bg-primary" />
+              <h3 className="text-lg font-semibold text-primary">Urgent</h3>
+            </div>
+            <div className="ml-6 border-l-2 border-border pl-6 space-y-4">
+              {urgentEmails.map((email) => (
+                <TimelineItem
+                  key={email.id}
+                  email={email}
+                />
+              ))}
+            </div>
           </div>
-          <div className="ml-6 border-l-2 border-border pl-6 space-y-4">
-            <TimelineItem
-              time="Oct 5, 10:00 AM"
-              subject="Team Sync Meeting - Agenda Attached"
-            />
-            <TimelineItem
-              time="Oct 5, 9:00 PM"
-              subject="Contract Signature Required"
-            />
-          </div>
-        </div>
+        )}
 
-        {/* This Week Section */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-3 h-3 rounded-full bg-primary/60" />
-            <h3 className="text-lg font-semibold text-primary/80">This Week</h3>
+        {/* To-Do Emails */}
+        {todoEmails.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-3 h-3 rounded-full bg-primary/60" />
+              <h3 className="text-lg font-semibold text-primary/80">To-Do</h3>
+            </div>
+            <div className="ml-6 border-l-2 border-border pl-6 space-y-4">
+              {todoEmails.map((email) => (
+                <TimelineItem
+                  key={email.id}
+                  email={email}
+                />
+              ))}
+            </div>
           </div>
-          <div className="ml-6 border-l-2 border-border pl-6 space-y-4">
-            <TimelineItem
-              time="Oct 8, 1:00 PM"
-              subject="Budget Review with Finance Team"
-            />
-            <TimelineItem
-              time="Oct 9, 9:30 AM"
-              subject="Product Demo with GlobalTech"
-            />
-          </div>
-        </div>
+        )}
 
-        {/* In One Month Section */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-3 h-3 rounded-full bg-primary/40" />
-            <h3 className="text-lg font-semibold text-primary/60">In one month</h3>
+        {/* FYI Emails */}
+        {fyiEmails.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-3 h-3 rounded-full bg-primary/40" />
+              <h3 className="text-lg font-semibold text-primary/60">FYI</h3>
+            </div>
+            <div className="ml-6 border-l-2 border-border pl-6 space-y-4">
+              {fyiEmails.map((email) => (
+                <TimelineItem
+                  key={email.id}
+                  email={email}
+                />
+              ))}
+            </div>
           </div>
-          <div className="ml-6 border-l-2 border-border pl-6 space-y-4">
-            <TimelineItem
-              time="Oct 14, 3:00 PM"
-              subject="Q4 Strategy Planning Session"
-            />
-            <TimelineItem
-              time="Oct 28, 1:00 PM"
-              subject="Budget Review with Finance Team"
-            />
+        )}
+
+        {/* No emails message */}
+        {analyzedEmails.length === 0 && (
+          <div className="text-center text-muted-foreground p-8">
+            No analyzed emails yet
           </div>
-        </div>
+        )}
       </div>
 
       {/* Floating Action Buttons */}
@@ -123,18 +136,28 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
 }
 
 interface TimelineItemProps {
-  time: string;
-  subject: string;
+  email: AnalyzedEmail;
 }
 
-function TimelineItem({ time, subject }: TimelineItemProps) {
+function TimelineItem({ email }: TimelineItemProps) {
+  // Handle null/empty task_extracted by falling back to subject
+  const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
+  const displayTitle = hasTask ? email.task_extracted : email.subject;
+  
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-card transition-colors">
       <div className="flex-1">
-        <p className="text-sm font-medium text-foreground mb-1">Time: {time}</p>
-        <p className="text-sm text-foreground">Subject: {subject}</p>
+        <p className="text-sm font-medium text-foreground mb-1">
+          {hasTask ? "Task: " : "Subject: "}{displayTitle}
+        </p>
+        <p className="text-xs text-muted-foreground mb-1">
+          {email.summary}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          From: {email.from}
+        </p>
       </div>
-      <button className="p-2 hover:bg-primary/10 rounded-lg" data-testid="button-add-calendar">
+      <button className="p-2 hover:bg-primary/10 rounded-lg" data-testid={`button-add-calendar-${email.id}`}>
         <Calendar className="w-5 h-5 text-primary" />
       </button>
     </div>

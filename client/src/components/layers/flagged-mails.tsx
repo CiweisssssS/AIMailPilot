@@ -9,6 +9,9 @@ interface FlaggedMailsProps {
 }
 
 export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
+  // For now, treat P1 Urgent emails as "flagged" since we don't have explicit flagging yet
+  const flaggedEmails = analyzedEmails.filter(email => email.priority.label === "P1 - Urgent");
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -29,23 +32,25 @@ export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }:
       {/* Title */}
       <div className="bg-accent rounded-2xl p-6 mb-6">
         <h2 className="text-2xl font-bold text-primary mb-2">Flagged Mails</h2>
-        <p className="text-foreground/80">You have 2 flagged mails now.</p>
+        <p className="text-foreground/80">
+          You have {flaggedEmails.length} flagged mail{flaggedEmails.length !== 1 ? 's' : ''} now.
+        </p>
       </div>
 
       {/* Flagged Items */}
       <div className="flex-1 space-y-4 overflow-y-auto">
-        <FlaggedItem
-          task="Project Alpha - Final Report Due"
-          summary="Please review the attached report before Friday's meeting..."
-          category="To-do"
-          flaggedDate="Oct 3, 2025"
-        />
-        <FlaggedItem
-          task="Client Feedback Summary"
-          summary="Attached are the key points from yesterday's client call..."
-          category="FYI"
-          flaggedDate="Sep 29, 2025"
-        />
+        {flaggedEmails.length === 0 ? (
+          <div className="text-center text-muted-foreground p-8">
+            No flagged emails at the moment
+          </div>
+        ) : (
+          flaggedEmails.map((email) => (
+            <FlaggedItem
+              key={email.id}
+              email={email}
+            />
+          ))
+        )}
       </div>
 
       {/* Chatbot Button */}
@@ -61,29 +66,33 @@ export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }:
 }
 
 interface FlaggedItemProps {
-  task: string;
-  summary: string;
-  category: string;
-  flaggedDate: string;
+  email: AnalyzedEmail;
 }
 
-function FlaggedItem({ task, summary, category, flaggedDate }: FlaggedItemProps) {
+function FlaggedItem({ email }: FlaggedItemProps) {
+  const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
+  const taskDisplay = hasTask ? email.task_extracted : email.subject;
+  
   return (
     <div className="p-4 border-l-4 border-primary/30 bg-card rounded-r-lg space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <h3 className="font-semibold text-foreground mb-2">Task: {task}</h3>
-          <p className="text-sm text-muted-foreground mb-3">Summary: {summary}</p>
+          <h3 className="font-semibold text-foreground mb-2">
+            {hasTask ? "Task: " : "Subject: "}{taskDisplay}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            Summary: {email.summary}
+          </p>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="text-xs text-muted-foreground">
-              Category: <Badge variant="secondary" className="ml-1">{category}</Badge>
+              Category: <Badge variant="secondary" className="ml-1">{email.priority.label}</Badge>
             </div>
             <div className="text-xs text-muted-foreground">
-              Flagged on: {flaggedDate}
+              From: {email.from}
             </div>
           </div>
         </div>
-        <button className="p-1 hover:bg-primary/10 rounded" data-testid="button-open-mail">
+        <button className="p-1 hover:bg-primary/10 rounded" data-testid={`button-open-mail-${email.id}`}>
           <ExternalLink className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>

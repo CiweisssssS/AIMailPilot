@@ -9,20 +9,28 @@ interface CategoryDetailProps {
 }
 
 export default function CategoryDetail({ category, analyzedEmails, onBack, onChatbotClick }: CategoryDetailProps) {
+  // Filter emails by category
+  const filteredEmails = analyzedEmails.filter(email => {
+    if (category === "urgent") return email.priority.label === "P1 - Urgent";
+    if (category === "todo") return email.priority.label === "P2 - To-do";
+    if (category === "fyi") return email.priority.label === "P3 - FYI";
+    return false;
+  });
+
   const categoryConfig = {
     urgent: {
       title: "Urgent Mails",
-      subtitle: "You have 2 urgent mails now.",
+      subtitle: `You have ${filteredEmails.length} urgent mail${filteredEmails.length !== 1 ? 's' : ''} now.`,
       bgClass: "bg-accent"
     },
     todo: {
       title: "To-Do Mails",
-      subtitle: "You have 2 to-do mails now.",
+      subtitle: `You have ${filteredEmails.length} to-do mail${filteredEmails.length !== 1 ? 's' : ''} now.`,
       bgClass: "bg-accent"
     },
     fyi: {
       title: "FYI Mails",
-      subtitle: "You have 2 FYI mails now.",
+      subtitle: `You have ${filteredEmails.length} FYI mail${filteredEmails.length !== 1 ? 's' : ''} now.`,
       bgClass: "bg-accent"
     }
   };
@@ -54,16 +62,18 @@ export default function CategoryDetail({ category, analyzedEmails, onBack, onCha
 
       {/* Email Items */}
       <div className="flex-1 space-y-4 overflow-y-auto">
-        <EmailItem
-          task="Contract Signature Required"
-          summary="Please review and sign the updated contract before the end of the day."
-          time="Oct 5, 9:00 PM"
-        />
-        <EmailItem
-          task="Marketing Report Draft - Feedback Needed"
-          summary="The draft for Q3 marketing performance is attached. Please share your comments ASAP."
-          time=""
-        />
+        {filteredEmails.length === 0 ? (
+          <div className="text-center text-muted-foreground p-8">
+            No {category} emails at the moment
+          </div>
+        ) : (
+          filteredEmails.map((email) => (
+            <EmailItem
+              key={email.id}
+              email={email}
+            />
+          ))
+        )}
       </div>
 
       {/* Chatbot Button */}
@@ -79,29 +89,36 @@ export default function CategoryDetail({ category, analyzedEmails, onBack, onCha
 }
 
 interface EmailItemProps {
-  task: string;
-  summary: string;
-  time: string;
+  email: AnalyzedEmail;
 }
 
-function EmailItem({ task, summary, time }: EmailItemProps) {
+function EmailItem({ email }: EmailItemProps) {
+  const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
+  const taskDisplay = hasTask ? email.task_extracted : email.subject;
+  
   return (
     <div className="p-4 border-l-4 border-primary/30 bg-card rounded-r-lg">
       <div className="flex items-start gap-3 mb-3">
-        <button className="mt-1 p-1 hover:bg-primary/10 rounded" data-testid="checkbox-done">
+        <button className="mt-1 p-1 hover:bg-primary/10 rounded" data-testid={`checkbox-done-${email.id}`}>
           <CheckSquare className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="flex-1">
-          <h3 className="font-semibold text-foreground mb-2">Task: {task}</h3>
-          <p className="text-sm text-muted-foreground mb-3">Summary: {summary}</p>
-          {time && <p className="text-sm text-muted-foreground">Time: {time}</p>}
+          <h3 className="font-semibold text-foreground mb-2">
+            {hasTask ? "Task: " : "Subject: "}{taskDisplay}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-2">
+            Summary: {email.summary}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            From: {email.from}
+          </p>
         </div>
-        <button className="p-1 hover:bg-primary/10 rounded" data-testid="button-flag">
+        <button className="p-1 hover:bg-primary/10 rounded" data-testid={`button-flag-${email.id}`}>
           <Bookmark className="w-5 h-5 text-primary" />
         </button>
       </div>
-      {time && (
-        <button className="text-sm text-primary hover:underline flex items-center gap-2" data-testid="button-add-to-calendar">
+      {hasTask && (
+        <button className="text-sm text-primary hover:underline flex items-center gap-2" data-testid={`button-add-to-calendar-${email.id}`}>
           <Calendar className="w-4 h-4" />
           Add to Calendar
         </button>
