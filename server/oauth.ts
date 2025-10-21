@@ -10,11 +10,26 @@ const SCOPES = [
 function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/auth/google/callback`;
+  
+  // Construct redirect URI with proper https:// prefix for Replit
+  let redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  if (!redirectUri) {
+    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+    if (replitDomain) {
+      // REPLIT_DEV_DOMAIN format: username-projectname.replit.dev
+      redirectUri = `https://${replitDomain}/auth/google/callback`;
+    } else {
+      redirectUri = 'http://localhost:5000/auth/google/callback';
+    }
+  }
 
   if (!clientId || !clientSecret) {
     throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
   }
+
+  console.log("OAuth2 Client Configuration:");
+  console.log("- Client ID:", clientId.substring(0, 20) + "...");
+  console.log("- Redirect URI:", redirectUri);
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
@@ -29,13 +44,78 @@ export async function handleGoogleAuth(req: Request, res: Response) {
       prompt: "consent" // Force to get refresh token
     });
 
+    console.log("Redirecting to Google OAuth URL...");
     res.redirect(authUrl);
   } catch (error: any) {
     console.error("Error initiating Google OAuth:", error);
-    res.status(500).json({ 
-      error: "Failed to initiate OAuth",
-      message: error.message 
-    });
+    
+    // Return HTML page with error details for better UX
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>OAuth Configuration Error</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              max-width: 600px;
+              margin: 100px auto;
+              padding: 20px;
+              background: #f5f5f5;
+            }
+            .error-box {
+              background: white;
+              border-left: 4px solid #ef4444;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            h1 { color: #ef4444; margin-top: 0; }
+            code {
+              background: #f3f4f6;
+              padding: 2px 6px;
+              border-radius: 4px;
+              font-size: 0.9em;
+            }
+            .instructions {
+              margin-top: 20px;
+              padding: 15px;
+              background: #fef3c7;
+              border-radius: 6px;
+            }
+            a {
+              color: #2563eb;
+              text-decoration: none;
+            }
+            a:hover {
+              text-decoration: underline;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="error-box">
+            <h1>⚠️ OAuth Configuration Error</h1>
+            <p><strong>Error:</strong> ${error.message}</p>
+            
+            <div class="instructions">
+              <h3>📋 Setup Required</h3>
+              <p>Please configure Google OAuth credentials:</p>
+              <ol>
+                <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                <li>Create OAuth 2.0 credentials (Web application)</li>
+                <li>Add this redirect URI:<br><code>${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/google/callback` : 'Your Replit URL + /auth/google/callback'}</code></li>
+                <li>Copy Client ID and Secret to Replit Secrets</li>
+                <li>Enable Gmail API in the project</li>
+              </ol>
+            </div>
+            
+            <p style="margin-top: 20px;">
+              <a href="/">← Back to Home</a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `);
   }
 }
 

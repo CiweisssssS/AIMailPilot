@@ -221,9 +221,18 @@ export default function Home() {
               </Button>
             </div>
 
-            <p className="text-xs text-center text-muted-foreground">
-              We'll request read-only access to your Gmail to fetch and analyze your inbox emails
-            </p>
+            <div className="text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                We'll request read-only access to your Gmail to fetch and analyze your inbox emails
+              </p>
+              <a 
+                href="/setup-help" 
+                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                data-testid="link-setup-help"
+              >
+                Need help setting up OAuth? View setup guide →
+              </a>
+            </div>
           </CardContent>
         </Card>
       </div>
