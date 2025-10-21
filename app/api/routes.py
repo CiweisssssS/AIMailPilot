@@ -290,7 +290,7 @@ async def prioritize_email(request: PrioritizeRequest):
 @router.post("/triage")
 async def triage_emails(request: dict):
     """
-    Analyze multiple Gmail emails and return priorities, summaries, and tasks
+    Analyze multiple Gmail emails in parallel and return priorities, summaries, and tasks
     Frontend expects: { priorities: Priority[], summaries: string[], tasks: Task[][] }
     """
     try:
@@ -300,33 +300,56 @@ async def triage_emails(request: dict):
         if not messages:
             return {"priorities": [], "summaries": [], "tasks": []}
         
-        priorities = []
-        summaries = []
-        tasks_list = []
+        # Parallel processing function for a single email
+        async def analyze_single_email(msg):
+            try:
+                # Convert to format expected by services
+                msg_dict = {
+                    'id': msg.get('id', 'unknown'),
+                    'from_': msg.get('from_', 'unknown'),
+                    'subject': msg.get('subject', ''),
+                    'clean_body': msg.get('clean_body', msg.get('body', '')),
+                    'body': msg.get('body', ''),
+                    'to': msg.get('to', []),
+                    'cc': msg.get('cc', [])
+                }
+                
+                # Process all three operations in parallel for each email
+                summary_task = summarize_thread([msg_dict])
+                tasks_task = extract_tasks([msg_dict])
+                
+                # Wait for both to complete
+                summary, tasks = await asyncio.gather(summary_task, tasks_task)
+                
+                # Calculate priority (needs tasks result)
+                priority = await calculate_priority([msg_dict], tasks, [])
+                
+                return {
+                    'summary': summary,
+                    'tasks': tasks,
+                    'priority': priority.dict()
+                }
+            except Exception as e:
+                # Fallback for failed analysis
+                return {
+                    'summary': f"Error analyzing email: {str(e)[:100]}",
+                    'tasks': [],
+                    'priority': {'label': 'P3 - FYI', 'score': 0.0, 'reasons': ['Analysis failed']}
+                }
         
-        for msg in messages:
-            # Convert to format expected by services
-            msg_dict = {
-                'id': msg.get('id', 'unknown'),
-                'from_': msg.get('from_', 'unknown'),
-                'subject': msg.get('subject', ''),
-                'clean_body': msg.get('clean_body', msg.get('body', '')),
-                'body': msg.get('body', ''),
-                'to': msg.get('to', []),
-                'cc': msg.get('cc', [])
-            }
-            
-            # Summarize
-            summary = await summarize_thread([msg_dict])
-            summaries.append(summary)
-            
-            # Extract tasks
-            tasks = await extract_tasks([msg_dict])
-            tasks_list.append(tasks)
-            
-            # Calculate priority
-            priority = await calculate_priority([msg_dict], tasks, [])
-            priorities.append(priority.dict())
+        # Process all emails in parallel with batching for better performance
+        batch_size = 5  # Process 5 emails at a time to avoid overwhelming the API
+        all_results = []
+        
+        for i in range(0, len(messages), batch_size):
+            batch = messages[i:i + batch_size]
+            batch_results = await asyncio.gather(*[analyze_single_email(msg) for msg in batch])
+            all_results.extend(batch_results)
+        
+        # Separate results into individual lists
+        priorities = [r['priority'] for r in all_results]
+        summaries = [r['summary'] for r in all_results]
+        tasks_list = [r['tasks'] for r in all_results]
         
         return {
             "priorities": priorities,

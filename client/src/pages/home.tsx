@@ -32,8 +32,8 @@ export default function Home() {
   const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
   const { toast } = useToast();
 
-  // Fetch Gmail emails (only if authenticated)
-  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(50, {
+  // Fetch Gmail emails (only if authenticated) - reduced to 15 for faster analysis
+  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(15, {
     enabled: authStatus?.authenticated === true,
   });
   
@@ -56,11 +56,28 @@ export default function Home() {
   // Auto-analyze emails when they are loaded (only if authenticated)
   useEffect(() => {
     if (authStatus?.authenticated && gmailData?.emails && gmailData.emails.length > 0 && analyzedEmails.length === 0 && !analyzeMutation.isPending) {
+      console.log(`Starting analysis for ${gmailData.emails.length} emails...`);
+      
+      // Set a timeout to detect stuck analysis
+      const timeoutId = setTimeout(() => {
+        if (analyzeMutation.isPending) {
+          console.error("Analysis timeout - request taking too long");
+          toast({
+            title: "Analysis Timeout",
+            description: "Analysis is taking longer than expected. Please try refreshing with fewer emails.",
+            variant: "destructive",
+          });
+        }
+      }, 30000); // 30 second timeout
+      
       analyzeMutation.mutate(gmailData.emails, {
         onSuccess: (data) => {
+          clearTimeout(timeoutId);
+          console.log(`Analysis complete: ${data.analyzed_emails.length} emails analyzed`);
           setAnalyzedEmails(data.analyzed_emails);
         },
         onError: (error) => {
+          clearTimeout(timeoutId);
           console.error("Analysis failed:", error);
           toast({
             title: "Analysis Failed",
