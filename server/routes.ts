@@ -12,9 +12,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/status", handleAuthStatus);
   app.post("/api/auth/logout", handleLogout);
   
-  app.get("/api/fetch-gmail-emails", async (req, res) => {
+  app.get("/api/fetch-gmail-emails/:maxResults?", async (req, res) => {
     try {
-      const maxResults = parseInt(req.query.maxResults as string) || 10;
+      const maxResults = parseInt(req.params.maxResults || "10") || 10;
       const emails = await fetchLatestEmails(req, maxResults);
       
       res.json({
