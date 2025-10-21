@@ -1,15 +1,15 @@
-# AI Email Intelligence Web App - Design Guidelines
+# AIMailPilot - Gmail Smart Email Assistant - Design Guidelines
 
 ## Design Approach
-**Selected Approach:** Design System - Material Design 3 with Linear-inspired Information Hierarchy
+**Selected Approach:** Material Design 3 with Gmail-inspired Information Architecture
 
-**Justification:** As a productivity analysis tool, the interface prioritizes:
-- Rapid information scanning and decision-making
-- Clear visual hierarchy for priority-based content
-- Efficient two-step workflow (input → results)
-- Professional aesthetic that builds trust in AI capabilities
+**Justification:** As a Gmail-integrated productivity tool, the interface requires:
+- Familiar Gmail-like navigation patterns for instant user recognition
+- Dense information display across three panels
+- Seamless AI insights integration without disrupting email workflow
+- Professional elegance through sophisticated purple theming
 
-**Primary References:** Linear's data density + Material Design's elevation system + Notion's clean typography
+**Primary References:** Gmail's three-pane layout + Linear's typography hierarchy + Notion's card aesthetics
 
 ---
 
@@ -18,182 +18,230 @@
 ### A. Color Palette
 
 **Light Mode:**
-- Primary: 220 95% 50% (Analyze CTA, interactive elements)
-- Surface: 0 0% 100% (Main background)
-- Surface Elevated: 0 0% 98% (Cards, elevated panels)
-- Border: 220 15% 88% (Dividers, inputs)
-- Text Primary: 220 20% 15%
-- Text Secondary: 220 15% 45%
-- P1 Urgent: 0 85% 58% (Red badge, urgent tasks)
-- P2 Todo: 35 90% 55% (Yellow/amber badge)
-- P3 FYI: 220 10% 50% (Gray badge)
-- Success Accent: 140 65% 42% (Completion states)
+- Primary Purple: 285 47% 30% (Deep purple #5B2C6F - headers, CTAs, active states)
+- Purple Accent: 285 40% 65% (Interactive elements, links)
+- Card Background Lavender: 285 45% 94% (#E8D9F0 - elevated cards)
+- Card Background Lilac: 285 35% 88% (#D4BAE0 - secondary cards)
+- Surface White: 0 0% 100% (Main background)
+- Border Subtle: 285 15% 85% (Dividers, panel separators)
+- Text Primary: 285 25% 20% (Deep charcoal-purple)
+- Text Secondary: 285 12% 50% (Muted purple-gray)
+- AI Insight Badge: 160 60% 45% (Teal accent for AI features)
+- Priority Urgent: 0 80% 58%
+- Priority Important: 35 85% 55%
+- Priority Normal: 285 12% 60%
 
 **Dark Mode:**
-- Primary: 220 95% 65%
-- Surface: 220 15% 10%
-- Surface Elevated: 220 15% 14%
-- Border: 220 10% 25%
-- Text Primary: 220 10% 95%
-- Text Secondary: 220 8% 70%
-- P1 Urgent: 0 75% 68%
-- P2 Todo: 35 80% 65%
-- P3 FYI: 220 8% 60%
-- Success Accent: 140 55% 52%
+- Primary Purple: 285 50% 70%
+- Purple Accent: 285 45% 75%
+- Card Background: 285 25% 18%
+- Card Background Secondary: 285 20% 22%
+- Surface: 285 18% 12%
+- Border: 285 12% 30%
+- Text Primary: 285 8% 95%
+- Text Secondary: 285 10% 70%
+- AI Insight Badge: 160 50% 55%
 
 ### B. Typography
-**Font Stack:** 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
+**Font Stack:** 'Inter', 'Roboto', -apple-system, system-ui
 
 **Hierarchy:**
-- Page Title: 32px/700 (font-bold text-[32px])
-- Section Heading: 20px/600 (font-semibold text-xl)
-- Card Title: 16px/600 (font-semibold text-base)
-- Body Text: 15px/400 (font-normal text-[15px])
-- Task Item: 14px/500 (font-medium text-sm)
-- Metadata/Labels: 13px/500 (font-medium text-[13px])
-- Caption: 12px/400 (font-normal text-xs)
+- App Title: 24px/700 (Panel headers)
+- Email Subject: 18px/600 (Email list items)
+- Section Heading: 16px/600 (AI panel sections)
+- Body Text: 15px/400 (Email content, summaries)
+- List Item: 14px/500 (Sender names, metadata)
+- Label/Badge: 13px/600 (Tags, categories)
+- Caption: 12px/400 (Timestamps, counts)
 
 ### C. Layout System
-**Spacing Primitives:** Tailwind units of 2, 4, 6, 8, 12, 16 (balanced spacing for readability)
+**Spacing Primitives:** Tailwind units of 2, 4, 6, 8, 12
 
-**Container Strategy:**
-- Input Screen: max-w-3xl centered (optimal for text input)
-- Results Screen: max-w-5xl centered (accommodates summary + tasks side-by-side on desktop)
-- Section Padding: py-12 desktop, py-8 mobile
-- Card Internal: p-6 desktop, p-4 mobile
-- Card Gaps: gap-6 between major sections
+**Three-Column Desktop Layout:**
+- Left Panel (Navigation): 240px fixed width, collapsible to 64px (icon-only)
+- Middle Panel (Email List): 380px fixed width, scrollable
+- Right Panel (AI Analysis): Flexible remaining space (min 480px)
+- Panel separators: 1px border-r with subtle shadow
 
-**Responsive Grid:**
-- Desktop (lg:): Two-column layout for summary + tasks
-- Tablet/Mobile: Single column stack
+**Mobile Strategy:**
+- Tab navigation switching between Inbox/Email/AI panels
+- Floating action button for quick AI analysis
+- Bottom navigation bar with 3 tabs
+
+**Container Padding:**
+- Panel internal: p-4
+- Card internal: p-6
+- List items: px-4 py-3
 
 ---
 
 ## Component Library
 
-### 1. Input Screen (Pre-Analysis)
+### 1. Left Navigation Panel
 
-**Hero Section:**
-- Centered layout with max-w-2xl
-- Page title with gradient text effect: "Analyze Your Emails"
-- Subtitle: text-secondary explaining the workflow
-- No large hero image - simple gradient background (220 95% 50% to 260 90% 55%)
+**Header Section:**
+- App logo + "AIMailPilot" title in Primary Purple
+- Gradient background: subtle vertical gradient (285 50% 98% to white)
+- "Compose" button: Full-width, bg-primary-purple text-white, rounded-xl, font-semibold with plus icon
 
-**Email Input Card:**
-- Large elevated card: bg-surface-elevated shadow-lg rounded-2xl p-8
-- Textarea: min-h-[320px] w-full rounded-xl border-2 focus:border-primary transition
-- Placeholder text: "Paste your email content here..."
-- Character counter: bottom-right corner, text-xs text-secondary "0 / 50,000 characters"
+**Navigation Menu:**
+- Icon + Label list items (Inbox, Starred, Sent, Drafts, etc.)
+- Active state: bg-card-lavender with left border-l-4 border-primary-purple
+- Hover state: bg-card-lavender/50
+- Icon color: Primary purple for active, text-secondary for inactive
+- Unread count badges: Small circular badges in AI teal color
 
-**Primary CTA:**
-- "Analyze Email" button: Large, full-width or centered
-- bg-primary text-white rounded-xl px-8 py-4 text-base font-semibold
-- Hover state: brightness increase + subtle scale (scale-[1.02])
-- Loading state: Spinner with "Analyzing..." text
+**Labels Section:**
+- Collapsible "Labels" header with chevron
+- Color-coded label dots (8px circles) + label names
+- Add label button at bottom
 
-**Supporting Elements:**
-- Feature icons below input: 3-column grid showing "Smart Summaries", "Priority Detection", "Task Extraction" with Heroicons
-- Each feature: Icon (w-10 h-10) + label (text-sm font-medium) + description (text-xs text-secondary)
+**AI Features Section:**
+- "Smart Summaries" with sparkle icon
+- "Task Extraction" with checklist icon
+- "Priority Scoring" with gauge icon
+- Divider line above this section
 
-### 2. Results Screen
+### 2. Middle Panel - Email List
 
-**Header Bar:**
-- Sticky top navigation: h-16 bg-surface border-b flex items-center px-6
-- "New Analysis" button: outline variant, rounded-lg
-- Email preview snippet: truncated subject/sender in text-sm text-secondary
+**Search & Filter Bar:**
+- Search input: rounded-full with search icon, bg-card-lavender
+- Filter chips row: "All", "Unread", "Important" with active state in primary purple
+- Sort dropdown: "Newest first" with chevron
 
-**Priority Indicator - Hero Component:**
-- Full-width attention card at top: bg-gradient-to-r based on priority
-  - P1: from-error/10 to-error/5, left border-l-4 border-error
-  - P2: from-warning/10 to-warning/5, left border-l-4 border-warning
-  - P3: from-gray/10 to-gray/5, left border-l-4 border-gray
-- Large priority badge: Pill shape with icon + label
-  - P1: "🔥 Urgent - Action Required" 
-  - P2: "⏰ To-Do - Needs Attention"
-  - P3: "ℹ️ FYI - For Information"
-- Confidence score: Circular progress indicator (72px diameter) showing 0-100%
-- Key reasoning bullets: 2-3 concise points in text-sm
+**Email List Items:**
+- Card-style items: rounded-lg mb-2 p-4 bg-white hover:bg-card-lavender/30
+- Left section: Checkbox + Star icon + Sender avatar (32px circular)
+- Middle section: 
+  - Sender name (font-semibold) + timestamp (text-xs text-secondary) in flex row
+  - Subject line (font-medium, max 1 line truncate)
+  - Preview snippet (text-sm text-secondary, max 2 lines)
+  - AI insight badge: Small pill "3 tasks • P1" in teal with shimmer effect
+- Right section: Priority indicator dot + Attachment icon if present
+- Active/Selected state: bg-card-lilac border-l-4 border-primary-purple
 
-**Layout:** p-6 rounded-2xl mb-8
+**Unread Styling:**
+- Bold sender name and subject
+- Purple dot indicator (6px) before sender avatar
 
-### 3. Content Grid (Desktop: 2-column, Mobile: Stack)
+**Loading State:**
+- Skeleton cards with shimmer animation in card-lavender
 
-**Left Column - Summary Card:**
-- bg-surface-elevated rounded-xl p-6 shadow-sm
-- Section title: "Thread Summary" with document icon
-- Summary text: text-[15px] leading-relaxed, structured paragraphs
-- Timeline visualization: Vertical timeline showing message flow (optional for multi-message threads)
-  - Dots + connecting lines (border-l-2) 
-  - Message sender + timestamp per node
-- "View Full Analysis" expandable section if truncated
+### 3. Right Panel - AI Analysis
 
-**Right Column - Task List:**
-- bg-surface-elevated rounded-xl p-6 shadow-sm
-- Section title: "Extracted Tasks" with checkbox list icon
-- Task counter badge: "3 tasks found"
+**Email Display Section:**
+- Email header card: bg-white rounded-xl p-6 mb-4 shadow-sm
+  - Large sender avatar (48px) + name (text-xl font-semibold)
+  - Subject line (text-2xl font-bold text-primary-purple)
+  - Metadata row: timestamp, recipient count, reply chain indicator
+  - Action buttons row: Reply, Forward, Archive (outline style)
+- Email body: Rich text with proper spacing, quoted text indented with border-l-2
 
-**Task Card Components:**
-- Grouped by type with dividers: Deadlines > Meetings > Actions
-- Each task item:
-  - Checkbox: w-5 h-5 rounded border-2 hover:border-primary
-  - Task title: text-sm font-medium, max 2 lines
-  - Due date chip: Inline badge with calendar icon
-    - Overdue: bg-error/10 text-error
-    - Today: bg-warning/10 text-warning  
-    - Future: bg-surface text-secondary
-  - Owner badge (if extracted): Small avatar circle + name, text-xs
-  - Source reference: "From: [Sender]" text-xs text-secondary
-- Hover state: bg-surface-elevated brightness-[0.98]
-- Completed state: Strikethrough + opacity-50
+**AI Insights Panel (Sticky Below Header):**
+- Gradient card: bg-gradient-to-br from-card-lavender to-card-lilac rounded-2xl p-6 shadow-lg
+- "AI Analysis" header with sparkle icon
+- Priority badge hero: Large pill with icon + confidence score (circular progress, 64px)
+  - P1: "🔥 Urgent" with red gradient
+  - P2: "⚠️ Important" with amber gradient
+  - P3: "📋 Normal" with gray gradient
+- Key insights: 3-4 bullet points with checkmark icons, text-sm
 
-**Empty State:** 
-- Icon (checklist with sparkles) + "No tasks detected in this email"
-- Suggestion text: "This appears to be informational only"
+**Smart Summary Card:**
+- bg-white rounded-xl p-6 mb-4
+- "Thread Summary" header with document icon
+- Expandable/collapsible content
+- Summary text: leading-relaxed, structured paragraphs
+- "Show more" link in primary-purple
 
-### 4. Action Footer
-- Sticky bottom bar (mobile) or inline (desktop)
-- Secondary actions: "Export Tasks", "Save Analysis", "Share"
-- Button group: gap-2, outline variants with icons
+**Extracted Tasks Card:**
+- bg-white rounded-xl p-6 mb-4
+- "Action Items" header with checkbox-list icon + count badge
+- Task items grouped by deadline:
+  - Today section (bg-red/5)
+  - This Week section (bg-amber/5)
+  - Later section
+- Each task:
+  - Interactive checkbox (20px, rounded, border-2 hover:border-primary)
+  - Task title (font-medium, max 2 lines)
+  - Due date chip: inline, rounded-full, small
+  - Assignee avatar stack if detected
+  - Source context: "From email line 15" in caption text
+- "Add to Calendar" button per task (text-sm, text-primary-purple)
+
+**Key Entities Card:**
+- bg-white rounded-xl p-6
+- "Detected Information" header
+- Pills grid for: People mentioned, Dates, Locations, Links
+- Each pill: bg-card-lavender rounded-full px-3 py-1.5 with icon
+
+**Suggested Replies Card:**
+- bg-gradient-to-r from-purple/5 to-teal/5 rounded-xl p-6
+- "AI Suggested Replies" header with magic-wand icon
+- 3 response options as cards:
+  - Tone badge: "Professional", "Friendly", "Brief"
+  - Preview text (2 lines)
+  - "Use This Reply" button (outline, primary-purple)
+
+### 4. Mobile Layout
+
+**Bottom Tab Navigation:**
+- 3 tabs: Inbox icon, Email icon, AI Analysis icon
+- Active tab: Primary purple with label, inactive: gray icon only
+- Tab indicator line at top
+
+**Floating Action Button:**
+- Fixed bottom-right, circular 56px
+- bg-primary-purple with white icon
+- "Analyze with AI" tooltip on hover
+- Shadow-lg with purple tint
+
+**Mobile Email View:**
+- Full-screen email with sticky header
+- AI insights as collapsible accordion at top
+- Tasks as bottom sheet modal
+- Swipe gestures for archive/delete
 
 ---
 
 ## Interaction Patterns
 
 **Micro-interactions:**
-- Card hover: shadow-sm → shadow-md transition (200ms)
-- Task checkbox: Scale bounce on check (scale-110 → scale-100)
-- Priority badge: Subtle pulse for P1 only
-- Input focus: Border color transition + ring-2 ring-primary/20
+- Email item hover: Slide-in action buttons (reply, archive) from right
+- Checkbox check: Scale bounce + purple fill animation
+- Task completion: Confetti burst + strikethrough with 300ms delay
+- AI badge: Subtle pulse animation on new insights
+- Panel resize: Smooth width transition with drag handle
 
 **Loading States:**
-- Analysis in progress: Progress bar at top + shimmer cards
-- Skeleton loaders: Animated gradient for summary and task cards
-- Optimistic completion: Task strikethrough immediate, sync in background
+- Email list: Wave shimmer animation in card-lavender
+- AI analysis: Typing indicator dots for real-time generation
+- Progress bar at top of AI panel during processing
 
 **Transitions:**
-- Screen change (input → results): Fade + slide-up (400ms ease-out)
-- Card expansion: Height animation (300ms)
+- Panel switching (mobile): Horizontal slide 300ms ease-out
+- Card expansion: Height animation with ease-in-out
+- Email selection: Fade + scale-up 200ms
 
 ---
 
 ## Images
 
-**Input Screen:**
-- Background: Subtle gradient mesh (abstract geometric pattern, very low opacity)
-- No hero image - focus on the input interface
-
-**Results Screen:**
-- No decorative images - prioritize information density
-- All icons via Heroicons (outline for secondary, solid for primary actions)
-- Optional: Small brand mark or logo in top-left corner (max 120px width)
+**No Hero Image** - This is a utility application focused on email workflow. Visual elements limited to:
+- User avatars: Circular, 32px (list) or 48px (detail)
+- Sender/contact avatars with fallback initials on colored backgrounds
+- App logo: Purple gradient icon (48px) with geometric mail envelope design
+- Empty state illustrations: Simple line-art style in purple tones (max 200px) for "No emails selected", "Inbox zero"
+- All icons via Heroicons (solid for active states, outline for inactive)
 
 ---
 
 ## Accessibility & Polish
 
-- Focus indicators: 2px ring-primary ring-offset-2 on keyboard navigation
-- All touch targets: minimum 44x44px via padding
-- Color contrast: ≥4.5:1 for all text
-- Reduced motion: respect prefers-reduced-motion for animations
-- ARIA labels: All icon-only buttons labeled
-- Dark mode toggle: Persistent user preference in top-right corner
+- Focus indicators: 3px ring-primary-purple ring-offset-2
+- Touch targets: Minimum 44px height for all interactive elements
+- Keyboard shortcuts: "/" for search, "c" for compose, arrow navigation in list
+- Screen reader: ARIA labels for all icon buttons, live regions for AI updates
+- Color contrast: All text meets WCAG AAA (7:1) against backgrounds
+- Dark mode toggle: Top-right corner with moon/sun icon, persistent preference
+- Reduced motion: Disable animations, keep functional transitions only
+- Panel resize persistence: Save column widths in localStorage
