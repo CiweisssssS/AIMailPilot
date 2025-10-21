@@ -120,7 +120,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Left Sidebar - Gmail Navigation */}
-      <aside className="w-52 border-r border-border bg-card flex flex-col">
+      <aside className="w-52 border-r border-border bg-background flex flex-col">
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -168,7 +168,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       </aside>
 
       {/* Middle Panel - Email List */}
-      <main className="flex-1 border-r border-border flex flex-col bg-card">
+      <main className="flex-1 border-r border-border flex flex-col bg-background">
         <header className="h-14 border-b border-border px-4 flex items-center gap-2">
           <input 
             type="search" 
