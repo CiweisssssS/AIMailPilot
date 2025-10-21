@@ -1,0 +1,64 @@
+Thanks again for your detailed plan — I’d like to move forward tonight with a more complete version of the Web App.
+
+In addition to your current tasks (Web App setup + GPT-4o-mini optimization),  
+please include the following updates:
+
+---
+
+🎯 **Goal**
+Build a Web Application that:
+1. Allows me to **log in with my Gmail test account** via Google OAuth  
+2. **Fetches the latest few emails** (subject, sender, body) automatically  
+3. Sends them to GPT-4o-mini for processing  
+4. Displays:  
+   - Priority classification (P1/P2/P3)  
+   - One-sentence summary  
+   - Formatted tasks → `[verb + object + owner + due]`  
+   - Deadline  
+
+---
+
+🎨 **Frontend Requirement (Figma UI)**
+Use my Figma design as the visual reference for the Web App UI.  
+Here’s the Dev Mode link:  
+👉 https://www.figma.com/design/p2k7tcgxQzWC2H5EHaS3Iq/Untitled?node-id=0-1&m=dev&t=27DyxvgCAmAln0qZ-1  
+
+Please match the layout, spacing, color palette, and typography exactly.  
+The layers in the Figma correspond to the app sections (Inbox overview, Priority view, Task detail, Chatbot panel).  
+The goal is to achieve a clean and cohesive design that can later be extended into a Chrome extension.
+
+---
+
+⚙️ **Technical Requirements**
+- Frontend: React + Tailwind  
+- Backend: FastAPI (use existing endpoints `/triage` and `/chatbot`)  
+- Authentication: Google OAuth 2.0 (scope: `gmail.readonly`)  
+- Data flow:
+  1. User logs in → Gmail access token stored securely  
+  2. Backend calls Gmail API → retrieves latest emails  
+  3. GPT-4o-mini analyzes → returns structured JSON  
+  4. UI renders priority, summary, tasks, and deadlines  
+
+---
+
+🧠 **Prompt & Model Updates**
+- Refine GPT-4o-mini prompt to ensure:
+  - Correct priority classification (P1 / P2 / P3)
+  - Accurate task extraction with `[verb + object + owner + due]`
+  - One concise summary sentence
+  - A clear deadline (if detected)
+- Return results in structured JSON for easy rendering
+
+---
+
+✅ **Expected Result**
+Within the Web App:
+- I can log in with my Gmail test account  
+- Automatically fetch recent emails  
+- Click “Analyze” → instantly see:
+  - Priority classification  
+  - Summary sentence  
+  - Structured task list  
+  - Deadline  
+
+Once this version works correctly, we’ll migrate the same structure to the Apps Script add-on or build it into a Chrome extension later.
