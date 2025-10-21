@@ -72,7 +72,7 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
       </div>
 
       {/* Chronological Timeline */}
-      <div className="space-y-6 pb-24">
+      <div className="space-y-8 pb-24">
         {/* TBD Tasks - Pinned at Top */}
         {groupedTasks.tbd.length > 0 && (
           <TimelineBucket
@@ -173,15 +173,15 @@ function TimelineBucket({ title, tasks, bucket, color }: TimelineBucketProps) {
   }[color];
 
   return (
-    <div>
+    <div className="mb-8">
       {/* Bucket Header */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-6">
         <div className={`w-3 h-3 rounded-full ${nodeColor}`} />
-        <h3 className={`text-lg font-semibold ${titleColor}`}>{title}</h3>
+        <h3 className={`text-xl font-bold ${titleColor}`}>{title}</h3>
       </div>
 
       {/* Timeline Items */}
-      <div className="ml-6 border-l-2 border-border pl-6 space-y-3">
+      <div className="ml-6 border-l-2 border-border pl-6 space-y-6">
         {tasks.map((task, index) => (
           <TimelineItem
             key={`${task.email.id}-${task.taskIndex}`}
@@ -212,12 +212,30 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
     ? task.email.task_extracted.replace(/^\[|\]$/g, '').trim()
     : task.email.subject;
 
-  // Get priority badge color
-  const priorityColor = {
-    P1: "bg-destructive/10 text-destructive",
-    P2: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-500",
-    P3: "bg-muted text-muted-foreground"
-  }[task.email.priority.label] || "bg-muted text-muted-foreground";
+  // Format time display: "Time: Oct 5, 10:00 AM"
+  const formatTimeDisplay = (dueString: string | null) => {
+    if (!dueString || dueString === "TBD") return "TBD";
+    
+    try {
+      // Parse "Mon DD, YYYY, HH:mm" format
+      const parts = dueString.split(', ');
+      if (parts.length >= 3) {
+        const monthDay = parts[0]; // "Oct 27"
+        const year = parts[1]; // "2025"
+        const time = parts[2]; // "10:00"
+        
+        // Convert 24h to 12h format
+        const [hours, minutes] = time.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        
+        return `${monthDay}, ${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+      }
+    } catch (e) {
+      // Fallback to original
+    }
+    return dueString;
+  };
 
   const handleAddToCalendar = () => {
     if (isTBD) {
@@ -275,37 +293,31 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
 
   return (
     <div 
-      className={`rounded-lg p-4 ${isTBD ? 'bg-destructive/5 border-2 border-destructive/20' : 'bg-card hover:bg-accent/50'} transition-colors`}
+      className="relative"
       data-testid={`timeline-item-${task.email.id}-${task.taskIndex}`}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1">
-          {/* Time & Priority */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-foreground flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {deadline.displayText}
-            </span>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          {/* Time Line */}
+          <div className="text-sm text-muted-foreground mb-1">
+            Time: {formatTimeDisplay(task.due)}
             {showOverdueBadge && (
-              <Badge variant="destructive" className="text-xs px-2 py-0">
+              <Badge variant="destructive" className="text-xs px-2 py-0 ml-2">
                 Overdue
               </Badge>
             )}
-            <Badge className={`text-xs px-2 py-0 ${priorityColor}`}>
-              {task.email.priority.label}
-            </Badge>
           </div>
 
-          {/* Subject */}
-          <p className="text-sm font-semibold text-foreground mb-1 line-clamp-1">
-            Subject: {taskTitle}
-          </p>
+          {/* Task Line */}
+          <div className="text-sm font-semibold text-foreground line-clamp-2 leading-relaxed">
+            Task: {taskTitle}
+          </div>
 
           {/* TBD Warning */}
           {isTBD && !isEditingDeadline && (
             <div className="flex items-center gap-2 text-destructive text-xs mt-2">
               <AlertCircle className="w-4 h-4" />
-              <span>Deadline: TBD — please set manually</span>
+              <span>Please set deadline manually</span>
               <Button
                 size="sm"
                 variant="outline"
@@ -351,11 +363,11 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
           )}
         </div>
 
-        {/* Calendar Button */}
+        {/* Calendar Icon */}
         <button 
           onClick={handleAddToCalendar}
           disabled={isTBD}
-          className={`p-2 rounded-lg transition-colors ${
+          className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
             isTBD 
               ? 'opacity-30 cursor-not-allowed' 
               : 'hover:bg-primary/10 cursor-pointer'

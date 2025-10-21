@@ -1,0 +1,73 @@
+We need to optimize the Task & Schedule UI layout — the current rendering (see Screenshot #1) is truncating and visually inconsistent with the intended design (see Screenshot #2).
+
+======================================
+Observed Issues (Current Screenshot #1)
+======================================
+1. **Content Clipping / Truncation**
+   - The task text (subject line) is partially cut off (“Subject: Review pitch deck…”).
+   - Important task details are hidden, forcing the user to guess the full content.
+
+2. **Labeling Inconsistency**
+   - The label currently uses “Subject:” but our target design uses “Task:” for clarity and alignment with the overall system vocabulary.
+   - This should be updated globally in this section.
+
+3. **Layout Compression**
+   - Cards appear visually dense, with minimal vertical spacing and padding.
+   - The text area is too narrow, causing premature ellipsis even when space is available.
+   - The card container does not adapt flexibly to text height.
+
+4. **Readability**
+   - Line height and font weight hierarchy are not visually balanced.
+   - The visual rhythm between time and task text is broken — time is cramped too close to the first line.
+
+======================================
+Expected Outcome (Target = Screenshot #2)
+======================================
+Reference: the provided Screenshot #2 represents the expected visual structure and spacing.  
+
+Key visual + functional requirements:
+
+✅ **Task Label**
+- Use label “Task:” instead of “Subject:”.
+- Ensure the task title (e.g., “Review updated pitch deck – Agenda Attached”) is fully visible without truncation.
+- Implement smart wrapping: allow 2–3 lines max before ellipsis.
+
+✅ **Time Line Display**
+- Each item starts with:
+  - “Time:” followed by date and hour in “Mon DD, HH:mm” format (24h).
+  - Example: “Time: Oct 5, 10:00 AM”
+- Time line bullet aligns vertically through all cards (see Screenshot #2).
+
+✅ **Card Layout**
+- Increase vertical spacing between timeline dots (~12–16px).
+- Maintain consistent padding inside each card (at least 12px top/bottom, 16px left/right).
+- Card width auto-adjusts to accommodate full text up to two lines.
+- If wrapping occurs, ensure time and task lines remain aligned (no indentation shifts).
+
+✅ **Typography**
+- Font hierarchy:
+  - Time line label: smaller, gray (#6B6B6B)
+  - Task title: medium-bold, primary text (#2E2E2E)
+  - Section headings (e.g., “Today”, “This Week”, “This Month”): larger and bold with extra top margin.
+- Ellipsis only triggers after 2–3 lines, not single-line truncation.
+
+✅ **Section Titles & Timeline**
+- Maintain “Today”, “This Week”, “This Month”, “Later” sections, separated with clear spacing (see Screenshot #2).
+- Vertical timeline line and nodes must stay visually aligned with each card block.
+- Node colors: darker for active (today), lighter for later tasks.
+
+✅ **Responsive Behavior**
+- The card must resize smoothly on smaller windows (no clipping).
+- Test with both short and long subject lines — all text should be visible up to two lines.
+
+======================================
+Acceptance Criteria
+======================================
+- All task cards show the **full task title** up to 2 lines (no cutoff like Screenshot #1).
+- “Subject:” is replaced globally with “Task:”.
+- Time label uses consistent “Time: Mon DD, HH:mm” format.
+- Timeline bullets vertically aligned across sections.
+- Each section header (“Today”, “This Week”, etc.) spaced clearly with consistent typography.
+- Layout visually matches Screenshot #2 reference — same hierarchy, spacing, and alignment.
+
+Please adjust card sizing, padding, and typography to achieve the design fidelity shown in Screenshot #2.
