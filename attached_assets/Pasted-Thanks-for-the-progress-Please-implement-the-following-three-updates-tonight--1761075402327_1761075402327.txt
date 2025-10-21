@@ -1,0 +1,127 @@
+Thanks for the progress! Please implement the following three updates tonight.
+
+====================================================
+1) Deadline Parsing & Normalization (STRICT RULES)
+====================================================
+Goal: Normalize all detected deadlines to the format "Mon DD, YYYY, HH:mm" (24h).  
+Example: Aug 12, 2025, 12:59  
+Use local timezone.
+
+Normalize ONLY when the expression clearly defines a specific date or time.
+
+✅ Normalize these cases:
+
+- Explicit date + time:
+  "by Oct 3, 5pm" → Oct 03, 2023, 17:00
+
+- Explicit date w/o time:
+  "by October 10" → Oct 10, 2023, 23:59 (default EOD)
+
+- Day-only or weekday:
+  "by Friday" → next upcoming Friday, 23:59
+
+- EOD/COB synonyms:
+  "by EOD", "by end of day", "COB" → today, 23:59
+
+- Relative day + explicit time:
+  "tomorrow noon" → tomorrow, 12:00  
+  "tomorrow morning" → tomorrow, 09:00  
+  "tomorrow evening" → tomorrow, 18:00
+
+- Time zone embedded:
+  If phrase includes a zone (e.g., “5pm PT”), convert to the user’s local timezone before formatting.
+
+❌ DO NOT normalize ambiguous or non-specific phrases — instead, mark as TBD:
+
+- “next week”, “early next week”, “later this month”, “this quarter”
+- “ASAP”, “immediately”, “at your earliest convenience”
+- “by tomorrow” (without a specific time)
+- date ranges like “Oct 3–5”
+- vague expressions with “around”, “sometime”, “roughly”
+
+All such cases → return `"TBD"` and trigger the UX described in section 2.
+
+Implementation details:
+- Keep detection via GPT-4o-mini, but final normalization is server-side.
+- Implement `normalize_deadline(text, ref_datetime, tz)` util.
+- Always return final string "Mon DD, YYYY, HH:mm" or "TBD".
+- Include unit tests for all cases above.
+
+====================================================
+2) Handling Missing or Ambiguous Deadlines (TBD UX)
+====================================================
+Current behavior only shows "TBD". We need REQUIRED manual entry.
+
+UI changes:
+- For tasks with due="TBD":
+  - Card shows red warning style with:
+    "Deadline: TBD — please set manually"
+  - “Add to Calendar” is disabled.
+  - Clicking the deadline area opens a date–time picker.
+
+- Date–time picker saves as "Mon DD, YYYY, HH:mm".
+
+API:
+- Implement/confirm `PATCH /tasks/:id` with payload:
+  { "due": "Mon DD, YYYY, HH:mm" }
+- After success:
+  - Remove red warning
+  - Enable “Add to Calendar”
+  - Re-sort task by due date
+  - (Optional) Trigger re-evaluation of priority
+
+Timeline integration:
+- All TBD tasks appear in a pinned group:
+  "Tasks Pending Deadline Confirmation"  
+  (red/orange tone, “Set deadline” button)
+
+Acceptance:
+- TBD card shows warning + disabled calendar.
+- After user sets a date → warning clears + card repositions in timeline.
+
+====================================================
+3) Task & Schedule (Timeline) — follow reference image
+====================================================
+Replace the current “group by priority” layout with a chronological timeline that uses time buckets:
+
+Buckets (in order):
+1) Today — due today  
+2) This Week — due within the current ISO week but not today  
+3) This Month — due within the month but not this week  
+4) Later — due beyond this month  
+
+Pinned at top:
+- "Tasks Pending Deadline Confirmation" (all due="TBD")
+
+Sorting:
+- Within each bucket → ascending by due datetime.
+- Overdue tasks (due < now) → pinned at top of “Today” with small “Overdue” badge.
+
+Displayed fields per item:
+- Time: Mon DD, HH:mm (or “Today, HH:mm” if due today)
+- Subject (bold, single line, ellipsis)
+- Optional small badge for priority (P1 red / P2 amber / P3 gray), but DO NOT group by priority.
+- Calendar icon (disabled when TBD).
+
+Empty/Edge states:
+- Hide empty buckets.
+- Skeletons on first load; error toast on failures.
+
+The final UX must visually match the reference image you provided (`40452ddd-01d0-4141-8165-fed6a483317c.png`) — equivalent to the Figma Dev Mode design — including:
+- Vertical timeline line on the left with circular nodes
+- Section headings (“Today”, “This Week”, “This Month”, “Later”)
+- Rounded cards, soft shadows, gradient backgrounds per theme
+
+====================================================
+4) Tech Notes / Guards
+====================================================
+- Keep model = gpt-4o-mini; temperature = 0.2; output = JSON only.
+- Do not substring-trim summaries (use word-based limits).
+- Use unified time format "Mon DD, YYYY, HH:mm" everywhere.
+- Local timezone aware; pass tz from frontend if needed.
+- Unit tests for `normalize_deadline()` covering:
+  EOD/COB, tomorrow (noon/morning/evening), weekday, explicit date/time, ranges, ASAP, and ambiguous cases.
+- Acceptance screenshots:
+  (a) TBD task before/after user sets deadline  
+  (b) Full timeline showing Today / This Week / This Month / Later  
+  (c) Pinned “Tasks Pending Deadline Confirmation” at top

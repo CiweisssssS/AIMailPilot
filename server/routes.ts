@@ -43,6 +43,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH endpoint for updating task deadlines
+  // NOTE: Current architecture limitation - tasks are not persisted in database.
+  // Tasks are generated on-the-fly from email analysis and stored in frontend React Query cache.
+  // Manual deadline updates via this endpoint are validated server-side but stored client-side only.
+  // Updates will be lost on page refresh or re-analysis. For persistent storage, tasks would need
+  // to be moved to the database (e.g., PostgreSQL with Drizzle ORM).
+  app.patch("/api/tasks/:emailId/:taskIndex", async (req, res) => {
+    try {
+      const { emailId, taskIndex } = req.params;
+      const { due } = req.body;
+      
+      if (!due || typeof due !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request: due date required"
+        });
+      }
+      
+      // Validate deadline format: "Mon DD, YYYY, HH:mm" or "TBD"
+      const deadlinePattern = /^([A-Z][a-z]{2} \d{2}, \d{4}, \d{2}:\d{2}|TBD)$/;
+      if (!deadlinePattern.test(due)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid deadline format. Expected 'Mon DD, YYYY, HH:mm' or 'TBD'"
+        });
+      }
+      
+      // Return success - frontend will update its React Query cache
+      // TODO: Add database persistence for task deadline overrides
+      res.json({
+        success: true,
+        emailId,
+        taskIndex: parseInt(taskIndex),
+        due
+      });
+    } catch (error: any) {
+      console.error("Error updating task deadline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to update task deadline"
+      });
+    }
+  });
+
   app.post("/api/analyze-emails", async (req, res) => {
     try {
       const { emails } = req.body;

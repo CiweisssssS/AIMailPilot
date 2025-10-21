@@ -1,0 +1,265 @@
+"""
+Deadline Normalization Utility
+
+Normalizes deadline expressions to "Mon DD, YYYY, HH:mm" format or "TBD"
+Follows strict rules for what should be normalized vs. marked as ambiguous.
+"""
+
+import re
+from datetime import datetime, timedelta
+from typing import Optional
+import logging
+from zoneinfo import ZoneInfo
+
+logger = logging.getLogger(__name__)
+
+
+def normalize_deadline(
+    text: str,
+    ref_datetime: Optional[datetime] = None,
+    tz: str = "UTC"
+) -> str:
+    """
+    Normalize deadline text to "Mon DD, YYYY, HH:mm" format or "TBD"
+    
+    Args:
+        text: Raw deadline text (e.g., "by EOD", "Friday 5pm", "Oct 3, 5pm")
+        ref_datetime: Reference datetime for relative dates (defaults to now)
+        tz: Timezone string (e.g., "America/Los_Angeles", "UTC")
+    
+    Returns:
+        Normalized deadline string in format "Mon DD, YYYY, HH:mm" or "TBD"
+    
+    Examples:
+        >>> normalize_deadline("by Oct 3, 5pm", ref_datetime, "UTC")
+        "Oct 03, 2023, 17:00"
+        
+        >>> normalize_deadline("by EOD")
+        "Oct 21, 2023, 23:59"
+        
+        >>> normalize_deadline("next week")
+        "TBD"
+    """
+    if not text or not isinstance(text, str):
+        return "TBD"
+    
+    # Get reference datetime with timezone
+    if ref_datetime is None:
+        try:
+            timezone = ZoneInfo(tz)
+        except Exception:
+            timezone = ZoneInfo("UTC")
+        ref_datetime = datetime.now(timezone)
+    elif ref_datetime.tzinfo is None:
+        try:
+            timezone = ZoneInfo(tz)
+            ref_datetime = ref_datetime.replace(tzinfo=timezone)
+        except Exception:
+            ref_datetime = ref_datetime.replace(tzinfo=ZoneInfo("UTC"))
+    
+    text = text.strip().lower()
+    
+    # Check for ambiguous expressions - return TBD immediately
+    ambiguous_patterns = [
+        r'\bnext\s+week\b',
+        r'\bearly\s+next\s+week\b',
+        r'\blater\s+this\s+month\b',
+        r'\bthis\s+quarter\b',
+        r'\basap\b',
+        r'\bimmediately\b',
+        r'\bat\s+your\s+earliest\s+convenience\b',
+        r'\baround\b',
+        r'\bsometime\b',
+        r'\broughly\b',
+        r'\d+[-–]\d+',  # date ranges like "Oct 3-5" or "3–5"
+        r'\bby\s+tomorrow\b(?!\s+(morning|afternoon|evening|noon|\d))',  # "by tomorrow" without time
+    ]
+    
+    for pattern in ambiguous_patterns:
+        if re.search(pattern, text):
+            logger.debug(f"Ambiguous deadline detected: '{text}' matches pattern '{pattern}'")
+            return "TBD"
+    
+    # Check for "today" with explicit time BEFORE EOD patterns
+    # Pattern: "today 3pm", "today at 15:00", etc.
+    today_time_match = re.search(
+        r'\btoday\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+        text
+    )
+    if today_time_match:
+        hour = int(today_time_match.group(1))
+        minute = int(today_time_match.group(2)) if today_time_match.group(2) else 0
+        modifier = today_time_match.group(3)
+        
+        if modifier == "pm" and hour < 12:
+            hour += 12
+        elif modifier == "am" and hour == 12:
+            hour = 0
+        
+        deadline = ref_datetime.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        return format_deadline(deadline)
+    
+    # EOD/COB synonyms - today at 23:59 (only if no explicit time)
+    eod_patterns = [
+        r'\beod\b', r'\bend\s+of\s+day\b', r'\bcob\b', 
+        r'\bclose\s+of\s+business\b', r'\btonight\b'
+    ]
+    # Only match "today" if it's standalone (no time follows)
+    if re.search(r'\btoday\b(?!\s+\d)', text):
+        deadline = ref_datetime.replace(hour=23, minute=59, second=0, microsecond=0)
+        return format_deadline(deadline)
+    
+    for pattern in eod_patterns:
+        if re.search(pattern, text):
+            deadline = ref_datetime.replace(hour=23, minute=59, second=0, microsecond=0)
+            return format_deadline(deadline)
+    
+    # Tomorrow with specific time
+    tomorrow_time_match = re.search(
+        r'\btomorrow\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|noon|morning|afternoon|evening)?',
+        text
+    )
+    if tomorrow_time_match:
+        hour = int(tomorrow_time_match.group(1))
+        minute = int(tomorrow_time_match.group(2)) if tomorrow_time_match.group(2) else 0
+        modifier = tomorrow_time_match.group(3)
+        
+        if modifier == "pm" and hour < 12:
+            hour += 12
+        elif modifier == "am" and hour == 12:
+            hour = 0
+        
+        tomorrow = ref_datetime + timedelta(days=1)
+        deadline = tomorrow.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        return format_deadline(deadline)
+    
+    # Tomorrow with time-of-day (morning/noon/evening)
+    tomorrow_tod_match = re.search(r'\btomorrow\s+(morning|noon|afternoon|evening)\b', text)
+    if tomorrow_tod_match:
+        tod = tomorrow_tod_match.group(1)
+        hour = {
+            'morning': 9,
+            'noon': 12,
+            'afternoon': 15,
+            'evening': 18
+        }.get(tod, 12)
+        
+        tomorrow = ref_datetime + timedelta(days=1)
+        deadline = tomorrow.replace(hour=hour, minute=0, second=0, microsecond=0)
+        return format_deadline(deadline)
+    
+    # Explicit date with time: "Oct 3, 5pm", "October 10, 17:00", "by Oct 3, 5pm"
+    # Pattern: Month DD, HH:mm or Month DD, HH am/pm
+    date_time_match = re.search(
+        r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:,?\s+|,\s+)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+        text
+    )
+    if date_time_match:
+        month_abbr = date_time_match.group(1)
+        day = int(date_time_match.group(2))
+        hour = int(date_time_match.group(3))
+        minute = int(date_time_match.group(4)) if date_time_match.group(4) else 0
+        am_pm = date_time_match.group(5)
+        
+        if am_pm == "pm" and hour < 12:
+            hour += 12
+        elif am_pm == "am" and hour == 12:
+            hour = 0
+        
+        month = {
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        }.get(month_abbr, ref_datetime.month)
+        
+        # Determine year - if month/day is in the past, use next year
+        year = ref_datetime.year
+        try:
+            deadline = ref_datetime.replace(year=year, month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
+            if deadline < ref_datetime:
+                deadline = deadline.replace(year=year + 1)
+        except ValueError:
+            return "TBD"
+        
+        return format_deadline(deadline)
+    
+    # Explicit date without time: "by October 10", "Oct 15"
+    date_only_match = re.search(
+        r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})\b',
+        text
+    )
+    if date_only_match:
+        month_abbr = date_only_match.group(1)
+        day = int(date_only_match.group(2))
+        
+        month = {
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        }.get(month_abbr, ref_datetime.month)
+        
+        # Default to EOD (23:59)
+        year = ref_datetime.year
+        try:
+            deadline = ref_datetime.replace(year=year, month=month, day=day, hour=23, minute=59, second=0, microsecond=0)
+            if deadline < ref_datetime:
+                deadline = deadline.replace(year=year + 1)
+        except ValueError:
+            return "TBD"
+        
+        return format_deadline(deadline)
+    
+    # Weekday: "by Friday", "Friday 5pm", "next Friday"
+    weekday_match = re.search(
+        r'(?:by\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?',
+        text
+    )
+    if weekday_match:
+        target_weekday = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6
+        }.get(weekday_match.group(1))
+        
+        if target_weekday is not None:
+            current_weekday = ref_datetime.weekday()
+            days_ahead = (target_weekday - current_weekday) % 7
+            
+            # If today is the target weekday and it's still early, use today
+            # Otherwise use next occurrence
+            if days_ahead == 0:
+                days_ahead = 7
+            
+            target_date = ref_datetime + timedelta(days=days_ahead)
+            
+            # Check if time is specified
+            if weekday_match.group(2):
+                hour = int(weekday_match.group(2))
+                minute = int(weekday_match.group(3)) if weekday_match.group(3) else 0
+                am_pm = weekday_match.group(4)
+                
+                if am_pm == "pm" and hour < 12:
+                    hour += 12
+                elif am_pm == "am" and hour == 12:
+                    hour = 0
+                
+                deadline = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            else:
+                # No time specified - default to EOD
+                deadline = target_date.replace(hour=23, minute=59, second=0, microsecond=0)
+            
+            return format_deadline(deadline)
+    
+    # If no pattern matched, return TBD
+    logger.debug(f"No pattern matched for deadline: '{text}'")
+    return "TBD"
+
+
+def format_deadline(dt: datetime) -> str:
+    """
+    Format datetime to "Mon DD, YYYY, HH:mm"
+    
+    Args:
+        dt: datetime object
+    
+    Returns:
+        Formatted string like "Oct 21, 2023, 17:00"
+    """
+    return dt.strftime("%b %d, %Y, %H:%M")
