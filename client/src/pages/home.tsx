@@ -3,11 +3,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
-import { useGmailEmails, useAnalyzeEmails, useRefreshEmails } from "@/hooks/use-emails";
+import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { GmailEmail, AnalyzedEmail } from "@shared/schema";
@@ -30,8 +30,10 @@ export default function Home() {
 
   // State hooks
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
-  const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
   const { toast } = useToast();
+  
+  // Get analyzed emails from React Query cache
+  const { data: analyzedEmails = [] } = useAnalyzedEmails();
 
   // Fetch Gmail emails (only if authenticated) - reduced to 15 for faster analysis
   const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(15, {
@@ -45,7 +47,7 @@ export default function Home() {
     },
     onSuccess: () => {
       // Clear all data on logout
-      setAnalyzedEmails([]);
+      queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, []);
       setSelectedEmailId(undefined);
       refetchAuth();
     }
@@ -75,7 +77,6 @@ export default function Home() {
         onSuccess: (data) => {
           clearTimeout(timeoutId);
           console.log(`Analysis complete: ${data.analyzed_emails.length} emails analyzed`);
-          setAnalyzedEmails(data.analyzed_emails);
         },
         onError: (error) => {
           clearTimeout(timeoutId);
@@ -107,18 +108,14 @@ export default function Home() {
   const handleRefresh = async () => {
     try {
       // Clear analyzed emails first
-      setAnalyzedEmails([]);
+      queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, []);
       
       // Refetch emails from Gmail
       const result = await refetch();
       
       // Re-analyze the emails (even if they're the same from cache)
       if (result.data?.emails && result.data.emails.length > 0) {
-        await analyzeMutation.mutateAsync(result.data.emails, {
-          onSuccess: (data) => {
-            setAnalyzedEmails(data.analyzed_emails);
-          },
-        });
+        await analyzeMutation.mutateAsync(result.data.emails);
       }
       
       toast({

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
 
 interface TaskScheduleProps {
   analyzedEmails: AnalyzedEmail[];
@@ -239,24 +240,21 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
       
       await apiRequest("PATCH", `/api/tasks/${task.email.id}/${task.taskIndex}`, { due: formatted });
 
-      // Update local cache
-      queryClient.setQueryData(['/api/analyze-emails'], (oldData: any) => {
+      // Update React Query cache
+      queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, (oldData: AnalyzedEmail[] | undefined) => {
         if (!oldData) return oldData;
         
-        return {
-          ...oldData,
-          analyzed_emails: oldData.analyzed_emails.map((email: any) => {
-            if (email.id === task.email.id) {
-              const updatedTasks = [...email.tasks];
-              updatedTasks[task.taskIndex] = {
-                ...updatedTasks[task.taskIndex],
-                due: formatted
-              };
-              return { ...email, tasks: updatedTasks };
-            }
-            return email;
-          })
-        };
+        return oldData.map((email) => {
+          if (email.id === task.email.id) {
+            const updatedTasks = [...email.tasks];
+            updatedTasks[task.taskIndex] = {
+              ...updatedTasks[task.taskIndex],
+              due: formatted
+            };
+            return { ...email, tasks: updatedTasks };
+          }
+          return email;
+        });
       });
 
       setIsEditingDeadline(false);

@@ -1,6 +1,9 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { FetchGmailResponse, TriageResponse, GmailEmail } from "@shared/schema";
+import type { FetchGmailResponse, TriageResponse, GmailEmail, AnalyzedEmail } from "@shared/schema";
+
+// Cache key for analyzed emails
+export const ANALYZED_EMAILS_CACHE_KEY = ["/api/analyzed-emails"];
 
 // Fetch Gmail emails
 export function useGmailEmails(maxResults = 50, options?: { enabled?: boolean }) {
@@ -12,6 +15,15 @@ export function useGmailEmails(maxResults = 50, options?: { enabled?: boolean })
   });
 }
 
+// Get analyzed emails from cache
+export function useAnalyzedEmails() {
+  return useQuery<AnalyzedEmail[]>({
+    queryKey: ANALYZED_EMAILS_CACHE_KEY,
+    initialData: [],
+    staleTime: Infinity, // Don't auto-refetch, only update via mutations
+  });
+}
+
 // Analyze emails with AI
 export function useAnalyzeEmails() {
   return useMutation({
@@ -20,8 +32,10 @@ export function useAnalyzeEmails() {
       const data = await response.json();
       return data as TriageResponse;
     },
-    onSuccess: () => {
-      // Invalidate and refetch
+    onSuccess: (data) => {
+      // Store analyzed emails in cache
+      queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, data.analyzed_emails);
+      // Invalidate and refetch Gmail emails
       queryClient.invalidateQueries({ queryKey: ["/api/fetch-gmail-emails"] });
     },
   });
