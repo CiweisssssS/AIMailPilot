@@ -14,7 +14,7 @@ class LLMProvider:
         self.use_mock = not self.api_key or self.provider == "mock"
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _call_openai(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
+    async def _call_openai(self, messages: List[Dict[str, str]], temperature: float = 0.7, response_format: Optional[Dict[str, str]] = None) -> str:
         if self.use_mock:
             return self._mock_response(messages)
         
@@ -23,18 +23,24 @@ class LLMProvider:
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
+                payload = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": 500
+                }
+                
+                # Add response_format if specified (for JSON mode)
+                if response_format:
+                    payload["response_format"] = response_format
+                
                 response = await client.post(
                     "https://api.openai.com/v1/chat/completions",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json"
                     },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "temperature": temperature,
-                        "max_tokens": 500
-                    }
+                    json=payload
                 )
                 response.raise_for_status()
                 result = response.json()
@@ -45,6 +51,14 @@ class LLMProvider:
             except Exception as e:
                 logger.error(f"OpenAI API call failed: {e}")
                 raise
+    
+    async def call_with_json_mode(self, messages: List[Dict[str, str]], temperature: float = 0.2) -> str:
+        """Call OpenAI with JSON response format enforced"""
+        return await self._call_openai(
+            messages=messages,
+            temperature=temperature,
+            response_format={"type": "json_object"}
+        )
     
     def _mock_response(self, messages: List[Dict[str, str]]) -> str:
         last_msg = messages[-1]["content"].lower()

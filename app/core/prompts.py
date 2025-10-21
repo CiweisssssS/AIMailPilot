@@ -1,3 +1,41 @@
+def get_summary_system_prompt(max_words: int = 20) -> str:
+    """Generate summary system prompt with configurable word limit"""
+    return f"""You are an email summarizer. Return ONE sentence that captures the actor (sender), the required action and object, and the deadline if present. Use active voice. Exclude greetings and niceties. Keep it under {max_words} words for English; never break words. If a deadline exists (e.g., EOD/COB/tomorrow/Fri 5pm), include it as text (deadline normalization is handled downstream). Output JSON only: {{"summary": "..."}}."""
+
+SUMMARY_FEW_SHOT_EXAMPLES = [
+    {
+        "role": "user",
+        "content": """Subject: Deck Review Needed by EOD
+From: Rebecca
+Body (trimmed): Could you please review the updated pitch deck and share feedback by the end of today?"""
+    },
+    {
+        "role": "assistant",
+        "content": """{"summary": "Rebecca needs you to review the updated pitch deck and share your feedback by EOD."}"""
+    },
+    {
+        "role": "user",
+        "content": """Subject: Banner Design Review
+From: Tyler
+Body (trimmed): When you have time this week, please look at the new banner designs."""
+    },
+    {
+        "role": "assistant",
+        "content": """{"summary": "Tyler asks you to review the new banner designs this week."}"""
+    },
+    {
+        "role": "user",
+        "content": """Subject: Q4 Product Updates
+From: Product Team
+Body (trimmed): Newsletter: Q4 product updates and policy changes."""
+    },
+    {
+        "role": "assistant",
+        "content": """{"summary": "The product team shares Q4 updates and policy changes."}"""
+    }
+]
+
+# Legacy prompt (deprecated - use get_summary_system_prompt instead)
 SUMMARY_PROMPT = """Summarize the email in EXACTLY 15 words or fewer. Be concise and focus on key action, deadline, or deliverable."""
 
 EXTRACTION_PROMPT = """You are a task extraction system. Extract actionable tasks from emails and format them EXACTLY as: [verb + object + owner + due].

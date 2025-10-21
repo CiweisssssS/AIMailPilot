@@ -1,0 +1,67 @@
+Hi Replit 👋
+
+Our summaries are low quality and currently get hard-truncated at 15 characters.  
+Please update the summarization module with the following STRICT requirements.
+
+GOAL
+- Produce ONE sentence capturing ACTOR + ACTION + OBJECT + DEADLINE (if any).
+- Length control is by WORDS (not characters).
+
+LENGTH RULE
+- English: single sentence, <= 20 words (configurable via env SUMMARY_MAX_WORDS=20).
+- Never cut in the middle of a word.
+- If the first attempt exceeds the limit, ASK the model to shorten while preserving actor + action + deadline; do not substring-trim.
+
+CONTENT RULE
+- Active voice. Start with the actor (sender’s first name if available; otherwise “They”).
+- Must include the requested action and object.
+- If a deadline is present (EOD/tomorrow/etc.), include the normalized deadline phrase.
+- Exclude greetings, sign-offs, and background details.
+- No vague filler (“kindly”, “thanks”, “hope you’re well”, etc.).
+
+MODEL SETTINGS
+- model: gpt-4o-mini
+- temperature: 0.2
+- response_format: {"type":"json_object"}
+
+SYSTEM PROMPT (use verbatim):
+"You are an email summarizer. Return ONE sentence that captures the actor (sender), the required action and object, and the deadline if present. Use active voice. Exclude greetings and niceties. Keep it under ${SUMMARY_MAX_WORDS} words for English; never break words. If a deadline exists (e.g., EOD/COB/tomorrow/Fri 5pm), include it as text (deadline normalization is handled downstream). Output JSON only: {\"summary\": \"...\"}."
+
+USER TEMPLATE:
+Subject: <SUBJECT>
+From: <SENDER_NAME>
+Body (trimmed): <EMAIL_TEXT>
+
+Return JSON only.
+
+BACKEND GUARDS
+- Parse the model JSON; count words in summary.
+- If > SUMMARY_MAX_WORDS or doesn’t contain an action verb, retry once with the user message:
+  "Shorten to <= ${SUMMARY_MAX_WORDS} words. Keep actor + action + deadline intact. Return JSON only."
+- Unit tests: ensure no mid-word truncation; ensure period at end.
+
+EXAMPLES (few-shot; include before the user message)
+
+#1 (Expected P1)
+Email: "Could you please review the updated pitch deck and share feedback by the end of today?"
+Sender: Rebecca
+Expected:
+{"summary": "Rebecca needs you to review the updated pitch deck and share your feedback by EOD."}
+
+#2 (P2, no deadline)
+Email: "When you have time this week, please look at the new banner designs."
+Sender: Tyler
+Expected:
+{"summary": "Tyler asks you to review the new banner designs this week."}
+
+#3 (FYI)
+Email: "Newsletter: Q4 product updates and policy changes."
+Sender: Product Team
+Expected:
+{"summary": "The product team shares Q4 updates and policy changes."}
+
+ACCEPTANCE
+- The sample email “Deck Review Needed by EOD” must produce:
+  {"summary": "Rebecca needs you to review the updated pitch deck and share your feedback by EOD."}
+- No character-based cutoffs; word-based limit enforced.
+- Works for English now; leave a hook to support Chinese (<=28 chars) later via lang detect.
