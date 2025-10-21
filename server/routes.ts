@@ -2,13 +2,20 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { fetchLatestEmails } from "./gmail";
+import { handleGoogleAuth, handleGoogleCallback, handleAuthStatus, handleLogout } from "./oauth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // OAuth routes
+  app.get("/auth/google", handleGoogleAuth);
+  app.get("/auth/google/callback", handleGoogleCallback);
+  app.get("/api/auth/status", handleAuthStatus);
+  app.post("/api/auth/logout", handleLogout);
   
   app.get("/api/fetch-gmail-emails", async (req, res) => {
     try {
       const maxResults = parseInt(req.query.maxResults as string) || 10;
-      const emails = await fetchLatestEmails(maxResults);
+      const emails = await fetchLatestEmails(req, maxResults);
       
       res.json({
         success: true,
@@ -26,7 +33,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error fetching Gmail emails:", error);
-      res.status(500).json({
+      
+      // Return 401 if not authenticated, 500 for other errors
+      const statusCode = error.message?.includes('Not authenticated') ? 401 : 500;
+      res.status(statusCode).json({
         success: false,
         error: error.message || "Failed to fetch emails"
       });

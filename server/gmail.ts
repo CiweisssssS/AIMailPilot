@@ -1,47 +1,45 @@
 import { google } from 'googleapis';
+import type { Request } from 'express';
 
-let connectionSettings: any;
+function getOAuth2Client() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/auth/google/callback`;
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!clientId || !clientSecret) {
+    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-mail',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Gmail not connected');
-  }
-  return accessToken;
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-export async function getUncachableGmailClient() {
-  const accessToken = await getAccessToken();
+async function getGmailClient(req: Request) {
+  const tokens = req.session.googleTokens;
+  
+  if (!tokens || !tokens.access_token) {
+    throw new Error('Not authenticated. Please login with Google first.');
+  }
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: accessToken
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expiry_date: tokens.expiry_date
+  });
+
+  // Auto-refresh token if expired
+  oauth2Client.on('tokens', (newTokens) => {
+    if (newTokens.access_token) {
+      req.session.googleTokens = {
+        access_token: newTokens.access_token,
+        refresh_token: newTokens.refresh_token || tokens.refresh_token,
+        expiry_date: newTokens.expiry_date || undefined
+      };
+      
+      req.session.save((err) => {
+        if (err) console.error('Error saving refreshed tokens:', err);
+      });
+    }
   });
 
   return google.gmail({ version: 'v1', auth: oauth2Client });
@@ -58,9 +56,9 @@ export interface GmailMessage {
   body: string;
 }
 
-export async function fetchLatestEmails(maxResults: number = 10): Promise<GmailMessage[]> {
+export async function fetchLatestEmails(req: Request, maxResults: number = 10): Promise<GmailMessage[]> {
   try {
-    const gmail = await getUncachableGmailClient();
+    const gmail = await getGmailClient(req);
     
     // Fetch message list
     const response = await gmail.users.messages.list({

@@ -10,7 +10,10 @@ The system analyzes Gmail emails using **GPT-4o-mini** with a **hybrid rule-base
 
 **Recent Changes (Oct 21, 2025)**:
 - Pivoted to Web Application for faster testing workflow vs. Apps Script deployment
-- Integrated Replit Gmail connector for OAuth authentication
+- **Implemented custom Google OAuth 2.0 flow** replacing Replit connector to obtain `gmail.readonly` scope
+- Added Express session management with secure token storage and automatic refresh
+- Created authentication routes: `/auth/google`, `/auth/google/callback`, `/api/auth/status`, `/api/auth/logout`
+- Enhanced frontend with login/logout UI and authentication state management
 - Enhanced GPT-4o-mini prompts with clear P1/P2/P3 classification criteria
 - Enforced task extraction format `[verb + object + owner + due]` with examples
 - Created `/triage` endpoint for batch email analysis
@@ -22,7 +25,34 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
+### Frontend Architecture (Web App)
+
+**Framework**: React 18 + TypeScript with Vite build system
+
+**State Management**: 
+- TanStack Query v5 for server state and cache management
+- React hooks (useState) for local UI state
+- Authentication state managed via `/api/auth/status` endpoint
+
+**Routing**: Wouter for client-side routing (currently single-page app)
+
+**Authentication Flow**:
+1. Check authentication status on mount via `/api/auth/status`
+2. Show login screen with "Sign in with Google" button if unauthenticated
+3. Redirect to `/auth/google` → Google OAuth consent → callback to `/auth/google/callback`
+4. Store tokens in Express session, redirect to home page
+5. Display user email in header with logout button when authenticated
+
+**UI Components**: Shadcn UI (Radix primitives) + Tailwind CSS for styling
+
+**Key Features**:
+- Real-time authentication state checking
+- Automatic email fetching and AI analysis workflow
+- Priority-based email display (P1/P2/P3 with visual hierarchy)
+- Task extraction display with owner and due date
+- Responsive design optimized for desktop and mobile
+
+### Frontend Architecture (Gmail Add-on - Future)
 
 **Framework**: Google Apps Script with Gmail Add-on Cards UI framework
 
@@ -69,14 +99,29 @@ Preferred communication style: Simple, everyday language.
 
 ### API Design
 
-**Core Endpoints**:
-- `POST /api/process-thread`: Complete thread analysis pipeline (normalize → summarize → extract → prioritize)
+**Authentication Endpoints** (Express.js):
+- `GET /auth/google`: Initiates OAuth flow, redirects to Google consent screen
+- `GET /auth/google/callback`: Handles OAuth callback, exchanges code for tokens, stores in session
+- `GET /api/auth/status`: Returns authentication status and user info from session
+- `POST /api/auth/logout`: Destroys session and clears cookies
+
+**Email Processing Endpoints** (Express.js):
+- `GET /api/fetch-gmail-emails`: Fetches emails from Gmail API using session tokens (returns 401 if not authenticated)
+- `POST /api/analyze-emails`: Proxies to Python backend `/triage` endpoint for AI analysis
+
+**Analysis Endpoints** (FastAPI/Python):
+- `POST /triage`: Complete batch email analysis pipeline (normalize → summarize → extract → prioritize)
+- `POST /api/process-thread`: Single thread analysis (legacy, for Gmail Add-on)
 - `POST /api/chatbot-qa`: Conversational Q&A grounded in thread context
 - `POST /api/update-user-settings`: Manage personalized keyword weights
-- `POST /api/batch-analyze`: Batch processing for inbox-level analysis
 - `GET /healthz`, `GET /version`: Service health monitoring
 
 **Data Models**: Pydantic schemas with Zod validation on frontend, ensuring type safety across stack
+
+**Session Management**: 
+- Express-session with in-memory store (development only - **production requires Redis/persistent store**)
+- Secure HTTP-only cookies with 7-day expiration
+- Automatic token refresh via Google OAuth2 client event handlers
 
 ### Database Strategy
 
@@ -115,7 +160,10 @@ Preferred communication style: Simple, everyday language.
 
 **OpenAI API** (GPT-4o-mini): Primary AI engine for summarization, task extraction, and hybrid prioritization. API key stored in environment variables (OPENAI_API_KEY). Fallback mechanisms ensure system continues operating if API quota is exceeded or service is unavailable.
 
-**Gmail API**: Advanced service enabled in Apps Script for email thread retrieval and metadata access.
+**Gmail API**: 
+- Web App: Custom OAuth 2.0 flow with `gmail.readonly`, `userinfo.email`, `userinfo.profile` scopes
+- Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET from Google Cloud Console
+- Add-on (future): Advanced service enabled in Apps Script for email thread retrieval and metadata access
 
 ### Key Python Libraries
 
