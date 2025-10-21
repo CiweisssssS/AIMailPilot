@@ -196,7 +196,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       </main>
 
       {/* Right Sidebar - AIMailPilot Panel */}
-      <aside className="flex-1 flex flex-col bg-background overflow-hidden">
+      <aside className="w-96 flex flex-col bg-background overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6">
           {renderLayer()}
         </div>
