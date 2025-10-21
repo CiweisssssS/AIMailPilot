@@ -24,7 +24,9 @@ from app.services.prioritizer import calculate_priority
 from app.services.qa import answer_question
 from app.services.user_settings import update_user_settings, get_user_keywords
 import asyncio
+import logging
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
