@@ -81,11 +81,18 @@ def normalize_deadline(
             return "TBD"
     
     # Check for "today" with explicit time BEFORE EOD patterns
-    # Pattern: "today 3pm", "today at 15:00", etc.
+    # Pattern 1: "today 3pm", "today at 15:00", etc. (today first)
     today_time_match = re.search(
         r'\btoday\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
         text
     )
+    # Pattern 2: "3pm today", "4pm today", "by 4pm today" (time first)
+    if not today_time_match:
+        today_time_match = re.search(
+            r'(?:by\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s+today\b',
+            text
+        )
+    
     if today_time_match:
         hour = int(today_time_match.group(1))
         minute = int(today_time_match.group(2)) if today_time_match.group(2) else 0
@@ -97,6 +104,7 @@ def normalize_deadline(
             hour = 0
         
         deadline = ref_datetime.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        logger.info(f"Matched time + today: text='{text}' -> {format_deadline(deadline)}")
         return format_deadline(deadline)
     
     # EOD/COB synonyms - today at 23:59 (only if no explicit time)
@@ -115,10 +123,18 @@ def normalize_deadline(
             return format_deadline(deadline)
     
     # Tomorrow with specific time
+    # Pattern 1: "tomorrow 3pm" (tomorrow first)
     tomorrow_time_match = re.search(
         r'\btomorrow\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|noon|morning|afternoon|evening)?',
         text
     )
+    # Pattern 2: "3pm tomorrow", "by 4pm tomorrow" (time first)
+    if not tomorrow_time_match:
+        tomorrow_time_match = re.search(
+            r'(?:by\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s+tomorrow\b',
+            text
+        )
+    
     if tomorrow_time_match:
         hour = int(tomorrow_time_match.group(1))
         minute = int(tomorrow_time_match.group(2)) if tomorrow_time_match.group(2) else 0
@@ -208,15 +224,39 @@ def normalize_deadline(
         return format_deadline(deadline)
     
     # Weekday: "by Friday", "Friday 5pm", "next Friday"
+    # Pattern 1: "Friday 5pm" (weekday first)
     weekday_match = re.search(
         r'(?:by\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?',
         text
     )
+    # Pattern 2: "5pm Friday", "by 4pm Friday" (time first)
+    if not weekday_match:
+        weekday_match = re.search(
+            r'(?:by\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+            text
+        )
+        # If matched, reorder groups to match the expected format
+        # Group 1 becomes the weekday, groups 2-4 become time components
+        if weekday_match:
+            # Extract values
+            hour_val = weekday_match.group(1)
+            minute_val = weekday_match.group(2)
+            am_pm_val = weekday_match.group(3)
+            weekday_val = weekday_match.group(4)
+            # Create a mock match object with reordered groups
+            class MockMatch:
+                def __init__(self, weekday, hour, minute, am_pm):
+                    self._groups = (weekday, hour, minute, am_pm)
+                def group(self, n):
+                    return self._groups[n-1] if 1 <= n <= len(self._groups) else None
+            weekday_match = MockMatch(weekday_val, hour_val, minute_val, am_pm_val)
+    
     if weekday_match:
+        weekday_name = weekday_match.group(1)
         target_weekday = {
             'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
             'friday': 4, 'saturday': 5, 'sunday': 6
-        }.get(weekday_match.group(1))
+        }.get(weekday_name) if weekday_name else None
         
         if target_weekday is not None:
             current_weekday = ref_datetime.weekday()
@@ -230,9 +270,11 @@ def normalize_deadline(
             target_date = ref_datetime + timedelta(days=days_ahead)
             
             # Check if time is specified
-            if weekday_match.group(2):
-                hour = int(weekday_match.group(2))
-                minute = int(weekday_match.group(3)) if weekday_match.group(3) else 0
+            hour_str = weekday_match.group(2)
+            if hour_str:
+                hour = int(hour_str)
+                minute_str = weekday_match.group(3)
+                minute = int(minute_str) if minute_str else 0
                 am_pm = weekday_match.group(4)
                 
                 if am_pm == "pm" and hour < 12:
