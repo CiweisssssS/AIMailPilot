@@ -1,15 +1,15 @@
-# AI Email Assistant - Gmail Sidebar Add-on Design Guidelines
+# AI Email Intelligence Web App - Design Guidelines
 
 ## Design Approach
-**Selected Approach:** Utility-Focused Design System (Google Workspace Integration)
+**Selected Approach:** Design System - Material Design 3 with Linear-inspired Information Hierarchy
 
-**Justification:** As a Gmail Workspace Add-on, this interface must:
-- Integrate seamlessly with Google Workspace visual language (Material Design 3)
-- Maximize information density in a constrained sidebar width (360px max)
-- Prioritize scanning efficiency and quick decision-making
-- Maintain consistency with Gmail's existing UI patterns
+**Justification:** As a productivity analysis tool, the interface prioritizes:
+- Rapid information scanning and decision-making
+- Clear visual hierarchy for priority-based content
+- Efficient two-step workflow (input → results)
+- Professional aesthetic that builds trust in AI capabilities
 
-**Primary Reference:** Google Workspace Add-ons (Calendar, Keep, Tasks) + Linear's information hierarchy
+**Primary References:** Linear's data density + Material Design's elevation system + Notion's clean typography
 
 ---
 
@@ -18,157 +18,182 @@
 ### A. Color Palette
 
 **Light Mode:**
-- Primary: 220 95% 50% (Google Blue - for priority P1, CTAs)
-- Surface: 0 0% 100% (White backgrounds)
-- Surface Variant: 220 20% 97% (Card backgrounds)
-- Border: 220 15% 88% (Dividers, card outlines)
+- Primary: 220 95% 50% (Analyze CTA, interactive elements)
+- Surface: 0 0% 100% (Main background)
+- Surface Elevated: 0 0% 98% (Cards, elevated panels)
+- Border: 220 15% 88% (Dividers, inputs)
 - Text Primary: 220 20% 15%
 - Text Secondary: 220 15% 45%
-- Success: 140 65% 42% (Task completion, P3 labels)
-- Warning: 35 90% 55% (P2 labels)
-- Error: 0 85% 58% (P1 urgent labels)
+- P1 Urgent: 0 85% 58% (Red badge, urgent tasks)
+- P2 Todo: 35 90% 55% (Yellow/amber badge)
+- P3 FYI: 220 10% 50% (Gray badge)
+- Success Accent: 140 65% 42% (Completion states)
 
 **Dark Mode:**
 - Primary: 220 95% 65%
-- Surface: 220 15% 12%
-- Surface Variant: 220 15% 16%
+- Surface: 220 15% 10%
+- Surface Elevated: 220 15% 14%
 - Border: 220 10% 25%
 - Text Primary: 220 10% 95%
 - Text Secondary: 220 8% 70%
-- Success: 140 55% 52%
-- Warning: 35 80% 65%
-- Error: 0 75% 68%
+- P1 Urgent: 0 75% 68%
+- P2 Todo: 35 80% 65%
+- P3 FYI: 220 8% 60%
+- Success Accent: 140 55% 52%
 
 ### B. Typography
-**Font Stack:** 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
+**Font Stack:** 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 
 **Hierarchy:**
-- Heading (Section titles): 14px/600 (font-semibold text-sm)
-- Body (Content): 13px/400 (font-normal text-[13px])
-- Caption (Metadata): 12px/400 (font-normal text-xs)
-- Label (Tags, badges): 11px/500 (font-medium text-[11px])
+- Page Title: 32px/700 (font-bold text-[32px])
+- Section Heading: 20px/600 (font-semibold text-xl)
+- Card Title: 16px/600 (font-semibold text-base)
+- Body Text: 15px/400 (font-normal text-[15px])
+- Task Item: 14px/500 (font-medium text-sm)
+- Metadata/Labels: 13px/500 (font-medium text-[13px])
+- Caption: 12px/400 (font-normal text-xs)
 
 ### C. Layout System
-**Spacing Primitives:** Tailwind units of 1, 2, 3, 4, 6, 8 (tight spacing for sidebar density)
+**Spacing Primitives:** Tailwind units of 2, 4, 6, 8, 12, 16 (balanced spacing for readability)
 
-**Container:**
-- Width: w-[360px] fixed (Gmail sidebar standard)
-- Padding: px-4 (16px horizontal)
-- Section spacing: space-y-4 between major sections
-- Card internal padding: p-3 or p-4
+**Container Strategy:**
+- Input Screen: max-w-3xl centered (optimal for text input)
+- Results Screen: max-w-5xl centered (accommodates summary + tasks side-by-side on desktop)
+- Section Padding: py-12 desktop, py-8 mobile
+- Card Internal: p-6 desktop, p-4 mobile
+- Card Gaps: gap-6 between major sections
 
-**Vertical Rhythm:**
-- Header: h-14 sticky top
-- Content sections: py-3 consistent padding
-- List items: py-2.5 for comfortable tap targets
+**Responsive Grid:**
+- Desktop (lg:): Two-column layout for summary + tasks
+- Tablet/Mobile: Single column stack
 
 ---
 
 ## Component Library
 
-### 1. Header Section
-**Layout:** Sticky top bar with context awareness
-- Thread subject (truncated, tooltip on hover): text-sm font-semibold
-- Participant count badge: text-xs bg-surface-variant rounded-full px-2 py-0.5
-- Refresh/settings icon buttons: w-8 h-8 hover:bg-surface-variant rounded
+### 1. Input Screen (Pre-Analysis)
 
-### 2. Priority Indicator Card
-**Visual Treatment:** Bold, top-positioned card with icon + label
-- P1 Urgent: Red left border (border-l-4), red badge with flame icon
-- P2 To-do: Amber left border, yellow badge with clock icon  
-- P3 FYI: Green left border, green badge with info icon
-- Score display: Circular progress indicator (0-100%) with percentage text
-- Reasons list: text-xs text-secondary with bullet points
+**Hero Section:**
+- Centered layout with max-w-2xl
+- Page title with gradient text effect: "Analyze Your Emails"
+- Subtitle: text-secondary explaining the workflow
+- No large hero image - simple gradient background (220 95% 50% to 260 90% 55%)
 
-**Layout:** bg-surface-variant rounded-lg p-3 mb-4
+**Email Input Card:**
+- Large elevated card: bg-surface-elevated shadow-lg rounded-2xl p-8
+- Textarea: min-h-[320px] w-full rounded-xl border-2 focus:border-primary transition
+- Placeholder text: "Paste your email content here..."
+- Character counter: bottom-right corner, text-xs text-secondary "0 / 50,000 characters"
 
-### 3. Summary Card
-**Component:** Expandable card with gradient fade
-- Title: "Thread Summary" text-sm font-semibold text-secondary mb-2
-- Content: text-[13px] leading-relaxed, max 3 lines initially
-- Expand button: "Read more" text-xs text-primary if truncated
-- Timeline indicator: Dot + line visual showing message flow (vertical timeline with 2px connecting lines)
+**Primary CTA:**
+- "Analyze Email" button: Large, full-width or centered
+- bg-primary text-white rounded-xl px-8 py-4 text-base font-semibold
+- Hover state: brightness increase + subtle scale (scale-[1.02])
+- Loading state: Spinner with "Analyzing..." text
 
-### 4. Tasks List
-**Visual Hierarchy:** Grouped by type (Deadline > Meeting > Action)
+**Supporting Elements:**
+- Feature icons below input: 3-column grid showing "Smart Summaries", "Priority Detection", "Task Extraction" with Heroicons
+- Each feature: Icon (w-10 h-10) + label (text-sm font-medium) + description (text-xs text-secondary)
 
-**Task Card:**
-- Checkbox: w-5 h-5 rounded border-2, checked state with primary fill
-- Title: text-[13px] font-medium, strikethrough when complete
-- Owner chip: bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[11px]
-- Due date: 
-  - Overdue: text-error with alert icon
-  - Today: text-warning with clock icon
-  - Future: text-secondary
-- Type badge: Meeting (calendar icon), Deadline (flag icon), Action (check icon)
-- Source link: text-xs text-primary "→ View in m2" (message ID)
+### 2. Results Screen
 
-**Layout:** Compact cards with hover elevation, space-y-2
+**Header Bar:**
+- Sticky top navigation: h-16 bg-surface border-b flex items-center px-6
+- "New Analysis" button: outline variant, rounded-lg
+- Email preview snippet: truncated subject/sender in text-sm text-secondary
 
-### 5. Chatbot QA Interface
-**Design Pattern:** Minimalist chat embedded at bottom
+**Priority Indicator - Hero Component:**
+- Full-width attention card at top: bg-gradient-to-r based on priority
+  - P1: from-error/10 to-error/5, left border-l-4 border-error
+  - P2: from-warning/10 to-warning/5, left border-l-4 border-warning
+  - P3: from-gray/10 to-gray/5, left border-l-4 border-gray
+- Large priority badge: Pill shape with icon + label
+  - P1: "🔥 Urgent - Action Required" 
+  - P2: "⏰ To-Do - Needs Attention"
+  - P3: "ℹ️ FYI - For Information"
+- Confidence score: Circular progress indicator (72px diameter) showing 0-100%
+- Key reasoning bullets: 2-3 concise points in text-sm
 
-**Input Area:**
-- Sticky bottom position with backdrop blur (backdrop-blur-sm bg-surface/95)
-- Textarea: min-h-10 max-h-24 auto-resize, border-2 focus:border-primary rounded-lg px-3 py-2
-- Submit button: Icon only (paper plane), primary color, w-8 h-8 rounded-full
-- Quick prompts: Chip buttons above input ("What do I need to do?", "When's the meeting?")
+**Layout:** p-6 rounded-2xl mb-8
 
-**Message Bubbles:**
-- User: bg-primary text-white rounded-2xl rounded-br-sm px-3 py-2 ml-auto max-w-[85%]
-- Assistant: bg-surface-variant rounded-2xl rounded-bl-sm px-3 py-2 mr-auto max-w-[85%]
-- Source citations: text-xs text-primary underline decoration-dotted "Sources: m1, m2"
-- Timestamp: text-[11px] text-secondary mt-1
+### 3. Content Grid (Desktop: 2-column, Mobile: Stack)
 
-### 6. User Settings Panel
-**Access:** Slide-out panel from right, triggered by gear icon
+**Left Column - Summary Card:**
+- bg-surface-elevated rounded-xl p-6 shadow-sm
+- Section title: "Thread Summary" with document icon
+- Summary text: text-[15px] leading-relaxed, structured paragraphs
+- Timeline visualization: Vertical timeline showing message flow (optional for multi-message threads)
+  - Dots + connecting lines (border-l-2) 
+  - Message sender + timestamp per node
+- "View Full Analysis" expandable section if truncated
 
-**Keyword Management:**
-- Add keyword form: Inline with term input + weight slider (1.0-3.0) + scope dropdown
-- Keyword chips: Removable badges showing term (weight) with X button
-- Scope indicators: Small colored dots (Subject=blue, Body=gray, Sender=purple)
+**Right Column - Task List:**
+- bg-surface-elevated rounded-xl p-6 shadow-sm
+- Section title: "Extracted Tasks" with checkbox list icon
+- Task counter badge: "3 tasks found"
 
-**Layout:** Full-height overlay with bg-surface shadow-2xl p-4
+**Task Card Components:**
+- Grouped by type with dividers: Deadlines > Meetings > Actions
+- Each task item:
+  - Checkbox: w-5 h-5 rounded border-2 hover:border-primary
+  - Task title: text-sm font-medium, max 2 lines
+  - Due date chip: Inline badge with calendar icon
+    - Overdue: bg-error/10 text-error
+    - Today: bg-warning/10 text-warning  
+    - Future: bg-surface text-secondary
+  - Owner badge (if extracted): Small avatar circle + name, text-xs
+  - Source reference: "From: [Sender]" text-xs text-secondary
+- Hover state: bg-surface-elevated brightness-[0.98]
+- Completed state: Strikethrough + opacity-50
+
+**Empty State:** 
+- Icon (checklist with sparkles) + "No tasks detected in this email"
+- Suggestion text: "This appears to be informational only"
+
+### 4. Action Footer
+- Sticky bottom bar (mobile) or inline (desktop)
+- Secondary actions: "Export Tasks", "Save Analysis", "Share"
+- Button group: gap-2, outline variants with icons
 
 ---
 
 ## Interaction Patterns
 
-### Micro-interactions:
-- Card hover: subtle shadow elevation (shadow-sm → shadow-md)
-- Button press: scale-95 transform
-- Task completion: slide-out + fade animation (300ms ease-out)
-- Priority badge pulse: Subtle pulse animation for P1 only (animate-pulse with low opacity)
+**Micro-interactions:**
+- Card hover: shadow-sm → shadow-md transition (200ms)
+- Task checkbox: Scale bounce on check (scale-110 → scale-100)
+- Priority badge: Subtle pulse for P1 only
+- Input focus: Border color transition + ring-2 ring-primary/20
 
-### Loading States:
-- Skeleton screens: animated gradient shimmer for cards during API calls
-- Inline spinners: 16px spinner with primary color for actions
+**Loading States:**
+- Analysis in progress: Progress bar at top + shimmer cards
+- Skeleton loaders: Animated gradient for summary and task cards
+- Optimistic completion: Task strikethrough immediate, sync in background
 
-### Empty States:
-- No tasks: Illustration (simple line icon) + "All clear! No tasks found." text-secondary
-- Chat initial: "Ask me anything about this thread" with example questions
-
----
-
-## Special Considerations
-
-### Accessibility:
-- All interactive elements ≥44px touch target (via padding)
-- Focus indicators: 2px primary ring on keyboard navigation
-- ARIA labels for icon-only buttons
-- Color contrast ≥4.5:1 for all text
-
-### Responsive Adaptation:
-- Fixed 360px width (Gmail constraint)
-- Vertical scroll for content overflow
-- Sticky header and chat input
-
-### Performance:
-- Virtual scrolling for threads with 30+ messages
-- Debounced chatbot input (500ms)
-- Optimistic UI updates for task completion
+**Transitions:**
+- Screen change (input → results): Fade + slide-up (400ms ease-out)
+- Card expansion: Height animation (300ms)
 
 ---
 
 ## Images
-**No hero images** - This is a compact sidebar utility interface where every pixel is functional. All icons use Heroicons (outline style for non-primary actions, solid for primary).
+
+**Input Screen:**
+- Background: Subtle gradient mesh (abstract geometric pattern, very low opacity)
+- No hero image - focus on the input interface
+
+**Results Screen:**
+- No decorative images - prioritize information density
+- All icons via Heroicons (outline for secondary, solid for primary actions)
+- Optional: Small brand mark or logo in top-left corner (max 120px width)
+
+---
+
+## Accessibility & Polish
+
+- Focus indicators: 2px ring-primary ring-offset-2 on keyboard navigation
+- All touch targets: minimum 44x44px via padding
+- Color contrast: ≥4.5:1 for all text
+- Reduced motion: respect prefers-reduced-motion for animations
+- ARIA labels: All icon-only buttons labeled
+- Dark mode toggle: Persistent user preference in top-right corner
