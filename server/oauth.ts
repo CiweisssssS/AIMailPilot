@@ -7,19 +7,27 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.profile"
 ];
 
-function getOAuth2Client() {
+function getOAuth2Client(req: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   
-  // Construct redirect URI with proper https:// prefix for Replit
+  // Construct redirect URI dynamically from the request
   let redirectUri = process.env.GOOGLE_REDIRECT_URI;
   if (!redirectUri) {
-    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-    if (replitDomain) {
-      // REPLIT_DEV_DOMAIN format: username-projectname.replit.dev
-      redirectUri = `https://${replitDomain}/auth/google/callback`;
+    // Get the protocol (http or https) and host from the request
+    const protocol = req.protocol || 'https';
+    const host = req.get('host');
+    
+    if (host) {
+      redirectUri = `${protocol}://${host}/auth/google/callback`;
     } else {
-      redirectUri = 'http://localhost:5000/auth/google/callback';
+      // Fallback to environment variable or localhost
+      const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+      if (replitDomain) {
+        redirectUri = `https://${replitDomain}/auth/google/callback`;
+      } else {
+        redirectUri = 'http://localhost:5000/auth/google/callback';
+      }
     }
   }
 
@@ -27,16 +35,19 @@ function getOAuth2Client() {
     throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
   }
 
-  console.log("OAuth2 Client Configuration:");
+  console.log("=== OAuth2 Client Configuration ===");
   console.log("- Client ID:", clientId.substring(0, 20) + "...");
   console.log("- Redirect URI:", redirectUri);
+  console.log("- Request Host:", req.get('host'));
+  console.log("- Request Protocol:", req.protocol);
+  console.log("====================================");
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
 export async function handleGoogleAuth(req: Request, res: Response) {
   try {
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
@@ -127,7 +138,7 @@ export async function handleGoogleCallback(req: Request, res: Response) {
       return res.status(400).send("Authorization code not provided");
     }
 
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
