@@ -85,6 +85,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/chatbot-qa", async (req, res) => {
+    try {
+      const { question, thread } = req.body;
+      
+      if (!question || !thread) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request: question and thread required"
+        });
+      }
+
+      console.log(`Chatbot question: ${question.substring(0, 100)}...`);
+
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/chatbot-qa`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ question, thread })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`Chatbot response received`);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error in chatbot:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to process chatbot request"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
