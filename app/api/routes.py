@@ -50,7 +50,7 @@ async def process_thread(request: ProcessThreadRequest):
         
         tasks = await extract_tasks(messages_dict)
         
-        priority = calculate_priority(messages_dict, tasks, request.personalized_keywords)
+        priority = await calculate_priority(messages_dict, tasks, request.personalized_keywords)
         
         return ProcessThreadResponse(
             thread=thread,
@@ -169,8 +169,8 @@ async def batch_analyze(request: BatchAnalyzeRequest):
                 # Extract tasks with MiniLM + NER + Flan-T5
                 tasks = await extract_tasks(messages_dict)
                 
-                # Prioritize with MiniLM semantic keyword matching
-                priority = calculate_priority(
+                # Prioritize with hybrid approach (rule-based + GPT-4o-mini)
+                priority = await calculate_priority(
                     messages_dict,
                     tasks,
                     keywords
@@ -268,7 +268,7 @@ async def prioritize_email(request: PrioritizeRequest):
                 type="meeting"
             ))
         
-        priority = calculate_priority(
+        priority = await calculate_priority(
             [{
                 'subject': request.subject,
                 'clean_body': request.body,

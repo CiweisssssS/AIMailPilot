@@ -18,23 +18,33 @@ class LLMProvider:
         if self.use_mock:
             return self._mock_response(messages)
         
+        import logging
+        logger = logging.getLogger(__name__)
+        
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": 500
-                }
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
+            try:
+                response = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": 500
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+            except httpx.HTTPStatusError as e:
+                logger.error(f"OpenAI API error: {e.response.status_code} - {e.response.text}")
+                raise
+            except Exception as e:
+                logger.error(f"OpenAI API call failed: {e}")
+                raise
     
     def _mock_response(self, messages: List[Dict[str, str]]) -> str:
         last_msg = messages[-1]["content"].lower()

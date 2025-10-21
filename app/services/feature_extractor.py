@@ -71,8 +71,13 @@ def extract_features(messages: List[Dict[str, Any]]) -> Dict[str, float]:
         sender = msg.get('from_', '').lower()
         senders.append(sender)
         
-        to_field = msg.get('to', '').lower()
-        recipients.append(to_field)
+        to_field = msg.get('to', [])
+        # Handle both list and string formats
+        if isinstance(to_field, list):
+            to_str = ','.join(to_field).lower()
+        else:
+            to_str = str(to_field).lower()
+        recipients.append(to_str)
     
     combined_text = combined_text.lower()
     
@@ -148,10 +153,10 @@ def extract_features(messages: List[Dict[str, Any]]) -> Dict[str, float]:
     
     # 7. Direct recipient (0-1)
     # This would require knowing the user's email, for now use heuristic
-    for to_field in recipients:
-        if to_field and '@' in to_field:
+    for to_str in recipients:
+        if to_str and '@' in to_str:
             # If there's a single recipient, likely direct
-            if to_field.count('@') == 1:
+            if to_str.count('@') == 1 and ',' not in to_str:
                 features["direct_recipient"] = 1.0
                 break
             else:
