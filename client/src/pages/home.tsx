@@ -6,8 +6,9 @@ import { Loader2, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
-import { useGmailEmails } from "@/hooks/use-emails";
-import type { GmailEmail } from "@shared/schema";
+import { useGmailEmails, useAnalyzeEmails } from "@/hooks/use-emails";
+import { useEffect } from "react";
+import type { GmailEmail, AnalyzedEmail } from "@shared/schema";
 
 interface AuthStatus {
   authenticated: boolean;
@@ -91,16 +92,42 @@ export default function Home() {
   // Fetch Gmail emails
   const { data: gmailData, isLoading: emailsLoading, error: emailsError } = useGmailEmails(50);
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
+  const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
+  
+  // Analyze emails mutation
+  const analyzeMutation = useAnalyzeEmails();
+
+  // Auto-analyze emails when they are loaded
+  useEffect(() => {
+    if (gmailData?.emails && gmailData.emails.length > 0 && analyzedEmails.length === 0 && !analyzeMutation.isPending) {
+      analyzeMutation.mutate(gmailData.emails, {
+        onSuccess: (data) => {
+          setAnalyzedEmails(data.analyzed_emails);
+        },
+      });
+    }
+  }, [gmailData?.emails]);
 
   const handleEmailClick = (email: GmailEmail) => {
     setSelectedEmailId(email.id);
   };
+
+  // Calculate summary statistics
+  const summary = analyzedEmails.length > 0 ? {
+    total: analyzedEmails.length,
+    urgent: analyzedEmails.filter(e => e.priority.label === "P1 - Urgent").length,
+    todo: analyzedEmails.filter(e => e.priority.label === "P2 - To-do").length,
+    fyi: analyzedEmails.filter(e => e.priority.label === "P3 - FYI").length,
+  } : { total: 0, urgent: 0, todo: 0, fyi: 0 };
 
   // Show main application with three-column layout
   return (
     <MailLayout 
       userEmail={authStatus.user?.email}
       onLogout={() => logoutMutation.mutate()}
+      analyzedEmails={analyzedEmails}
+      summary={summary}
+      isAnalyzing={analyzeMutation.isPending}
     >
       <EmailList 
         emails={gmailData?.emails || []}

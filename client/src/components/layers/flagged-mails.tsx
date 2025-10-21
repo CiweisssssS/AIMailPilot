@@ -1,12 +1,14 @@
 import { ArrowLeft, Mail, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface FlaggedMailsProps {
+  analyzedEmails: AnalyzedEmail[];
   onBack: () => void;
   onChatbotClick: () => void;
 }
 
-export default function FlaggedMails({ onBack, onChatbotClick }: FlaggedMailsProps) {
+export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}

@@ -1,7 +1,13 @@
 import { Mail, Bookmark, RefreshCw, Plus } from "lucide-react";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface InboxReminderProps {
   unreadCount: number;
+  urgentCount: number;
+  todoCount: number;
+  fyiCount: number;
+  analyzedEmails: AnalyzedEmail[];
+  isAnalyzing?: boolean;
   onCategoryClick: (category: "urgent" | "todo" | "fyi") => void;
   onAddTagsClick: () => void;
   onFlaggedClick: () => void;
@@ -11,12 +17,25 @@ interface InboxReminderProps {
 
 export default function InboxReminder({
   unreadCount,
+  urgentCount,
+  todoCount,
+  fyiCount,
+  analyzedEmails,
+  isAnalyzing = false,
   onCategoryClick,
   onAddTagsClick,
   onFlaggedClick,
   onRefreshClick,
   onTaskScheduleClick
 }: InboxReminderProps) {
+  // Get latest email for each category
+  const urgentEmails = analyzedEmails.filter(e => e.priority.label === "P1 - Urgent");
+  const todoEmails = analyzedEmails.filter(e => e.priority.label === "P2 - To-do");
+  const fyiEmails = analyzedEmails.filter(e => e.priority.label === "P3 - FYI");
+
+  const latestUrgent = urgentEmails[0];
+  const latestTodo = todoEmails[0];
+  const latestFyi = fyiEmails[0];
   return (
     <div className="relative h-full">
       {/* Header */}
@@ -62,14 +81,22 @@ export default function InboxReminder({
         >
           <div className="flex items-start justify-between mb-3">
             <h3 className="text-xl font-bold text-primary">Urgent</h3>
-            <span className="text-5xl font-bold text-primary/60 opacity-70">2</span>
+            <span className="text-5xl font-bold text-primary/60 opacity-70">{urgentCount}</span>
           </div>
-          <p className="text-sm text-foreground font-medium mb-1">
-            Latest: Contract Signature Required
-          </p>
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            "Please review and sign the updated contract before the end of the day."
-          </p>
+          {latestUrgent ? (
+            <>
+              <p className="text-sm text-foreground font-medium mb-1 truncate">
+                Latest: {latestUrgent.subject}
+              </p>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {latestUrgent.summary}
+              </p>
+            </>
+          ) : isAnalyzing ? (
+            <p className="text-sm text-muted-foreground">Analyzing...</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No urgent emails</p>
+          )}
         </button>
 
         {/* To-Do Card */}
@@ -80,14 +107,22 @@ export default function InboxReminder({
         >
           <div className="flex items-start justify-between mb-3">
             <h3 className="text-xl font-bold text-primary">To-Do</h3>
-            <span className="text-5xl font-bold text-primary/60 opacity-60">6</span>
+            <span className="text-5xl font-bold text-primary/60 opacity-60">{todoCount}</span>
           </div>
-          <p className="text-sm text-foreground font-medium mb-1">
-            Latest: Budget review meeting follow-up
-          </p>
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            "Here are the action items assigned to you. Deadline: Oct 10..."
-          </p>
+          {latestTodo ? (
+            <>
+              <p className="text-sm text-foreground font-medium mb-1 truncate">
+                Latest: {latestTodo.subject}
+              </p>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {latestTodo.summary}
+              </p>
+            </>
+          ) : isAnalyzing ? (
+            <p className="text-sm text-muted-foreground">Analyzing...</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No to-do emails</p>
+          )}
         </button>
 
         {/* FYI Card */}
@@ -98,14 +133,22 @@ export default function InboxReminder({
         >
           <div className="flex items-start justify-between mb-3">
             <h3 className="text-xl font-bold text-primary">FYI</h3>
-            <span className="text-5xl font-bold text-primary/60 opacity-50">13</span>
+            <span className="text-5xl font-bold text-primary/60 opacity-50">{fyiCount}</span>
           </div>
-          <p className="text-sm text-foreground font-medium mb-1">
-            Latest: Team offsite photos
-          </p>
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            "Sharing a link to the photos from last week's offsite..."
-          </p>
+          {latestFyi ? (
+            <>
+              <p className="text-sm text-foreground font-medium mb-1 truncate">
+                Latest: {latestFyi.subject}
+              </p>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {latestFyi.summary}
+              </p>
+            </>
+          ) : isAnalyzing ? (
+            <p className="text-sm text-muted-foreground">Analyzing...</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No FYI emails</p>
+          )}
         </button>
 
         {/* Add More Tags Button */}

@@ -7,6 +7,7 @@ import CategoryDetail from "./layers/category-detail";
 import Chatbot from "./layers/chatbot";
 import CustomizePriorities from "./layers/customize-priorities";
 import FlaggedMails from "./layers/flagged-mails";
+import type { AnalyzedEmail } from "@shared/schema";
 
 // Layer types for right panel navigation
 export type Layer = 
@@ -21,9 +22,24 @@ interface MailLayoutProps {
   children?: React.ReactNode;
   userEmail?: string;
   onLogout?: () => void;
+  analyzedEmails?: AnalyzedEmail[];
+  summary?: {
+    total: number;
+    urgent: number;
+    todo: number;
+    fyi: number;
+  };
+  isAnalyzing?: boolean;
 }
 
-export default function MailLayout({ children, userEmail, onLogout }: MailLayoutProps) {
+export default function MailLayout({ 
+  children, 
+  userEmail, 
+  onLogout, 
+  analyzedEmails = [], 
+  summary = { total: 0, urgent: 0, todo: 0, fyi: 0 },
+  isAnalyzing = false 
+}: MailLayoutProps) {
   const [currentLayer, setCurrentLayer] = useState<Layer>({ type: "inbox-reminder" });
 
   // Navigation handlers
@@ -74,7 +90,12 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       case "inbox-reminder":
         return (
           <InboxReminder
-            unreadCount={21}
+            unreadCount={summary.total}
+            urgentCount={summary.urgent}
+            todoCount={summary.todo}
+            fyiCount={summary.fyi}
+            analyzedEmails={analyzedEmails}
+            isAnalyzing={isAnalyzing}
             onCategoryClick={handleCategoryClick}
             onAddTagsClick={handleAddTagsClick}
             onFlaggedClick={handleFlaggedClick}
@@ -85,6 +106,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       case "task-schedule":
         return (
           <TaskSchedule
+            analyzedEmails={analyzedEmails}
             onFlaggedClick={handleFlaggedClick}
             onRefreshClick={handleRefresh}
             onInboxReminderClick={handleInboxReminderSwitch}
@@ -94,6 +116,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
         return (
           <CategoryDetail
             category={currentLayer.category}
+            analyzedEmails={analyzedEmails}
             onBack={handleBack}
             onChatbotClick={handleChatbotClick}
           />
@@ -110,6 +133,7 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
       case "flagged-mails":
         return (
           <FlaggedMails
+            analyzedEmails={analyzedEmails}
             onBack={handleBack}
             onChatbotClick={handleChatbotClick}
           />

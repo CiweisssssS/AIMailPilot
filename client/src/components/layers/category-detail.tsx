@@ -1,12 +1,14 @@
 import { ArrowLeft, Mail, Calendar, Bookmark, CheckSquare } from "lucide-react";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
+  analyzedEmails: AnalyzedEmail[];
   onBack: () => void;
   onChatbotClick: () => void;
 }
 
-export default function CategoryDetail({ category, onBack, onChatbotClick }: CategoryDetailProps) {
+export default function CategoryDetail({ category, analyzedEmails, onBack, onChatbotClick }: CategoryDetailProps) {
   const categoryConfig = {
     urgent: {
       title: "Urgent Mails",

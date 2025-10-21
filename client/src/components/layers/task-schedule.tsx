@@ -1,12 +1,14 @@
 import { Mail, Calendar, Bookmark, RefreshCw } from "lucide-react";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface TaskScheduleProps {
+  analyzedEmails: AnalyzedEmail[];
   onFlaggedClick: () => void;
   onRefreshClick: () => void;
   onInboxReminderClick?: () => void;
 }
 
-export default function TaskSchedule({ onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
+export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
   return (
     <div className="relative h-full">
       {/* Header */}
