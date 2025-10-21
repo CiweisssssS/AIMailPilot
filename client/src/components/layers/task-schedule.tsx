@@ -230,7 +230,12 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
     if (!newDeadline) return;
 
     try {
-      await apiRequest("PATCH", `/api/tasks/${task.email.id}/${task.taskIndex}`, { due: newDeadline });
+      // Convert datetime-local format (YYYY-MM-DDTHH:mm) to "Mon DD, YYYY, HH:mm"
+      const date = new Date(newDeadline);
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const formatted = `${monthNames[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+      
+      await apiRequest("PATCH", `/api/tasks/${task.email.id}/${task.taskIndex}`, { due: formatted });
 
       // Update local cache
       queryClient.setQueryData(['/api/analyze-emails'], (oldData: any) => {
@@ -243,7 +248,7 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
               const updatedTasks = [...email.tasks];
               updatedTasks[task.taskIndex] = {
                 ...updatedTasks[task.taskIndex],
-                due: newDeadline
+                due: formatted
               };
               return { ...email, tasks: updatedTasks };
             }
@@ -319,23 +324,8 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
               <input
                 type="datetime-local"
                 value={newDeadline}
-                onChange={(e) => {
-                  const date = new Date(e.target.value);
-                  if (!isNaN(date.getTime())) {
-                    // Format to "Mon DD, YYYY, HH:mm"
-                    const formatted = date.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "2-digit",
-                      year: "numeric"
-                    }) + ", " + date.toLocaleTimeString("en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false
-                    });
-                    setNewDeadline(formatted);
-                  }
-                }}
-                className="text-xs border rounded px-2 py-1"
+                onChange={(e) => setNewDeadline(e.target.value)}
+                className="text-xs border rounded px-2 py-1 bg-background"
                 data-testid={`input-deadline-${task.email.id}-${task.taskIndex}`}
               />
               <Button
