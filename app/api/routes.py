@@ -370,12 +370,17 @@ async def triage_emails(request: dict):
                 first_task = result['tasks'][0]
                 task_extracted = first_task.get('title', 'Task extracted')
             
+            # Safe snippet handling
+            snippet = msg.get('snippet', '') or ''
+            if snippet and len(snippet) > 100:
+                snippet = snippet[:100]
+            
             analyzed_emails.append({
                 'id': msg.get('id', 'unknown'),
                 'threadId': msg.get('threadId', msg.get('thread_id', '')),
                 'subject': msg.get('subject', ''),
                 'from': msg.get('from_', 'unknown'),
-                'snippet': msg.get('snippet', '')[:100],
+                'snippet': snippet,
                 'date': msg.get('date', ''),
                 'summary': result['summary'],
                 'priority': priority,

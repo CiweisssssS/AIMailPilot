@@ -54,6 +54,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log(`Analyzing ${emails.length} emails...`);
+      console.log('First email sample:', JSON.stringify(emails[0]).substring(0, 200));
+
       const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
       
       const response = await fetch(`${pythonBackendUrl}/triage`, {
@@ -65,10 +68,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!response.ok) {
-        throw new Error(`Python backend error: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText} - ${errorText.substring(0, 200)}`);
       }
 
       const result = await response.json();
+      console.log(`Analysis complete: ${result.analyzed_emails?.length || 0} emails analyzed`);
       res.json(result);
     } catch (error: any) {
       console.error("Error analyzing emails:", error);
