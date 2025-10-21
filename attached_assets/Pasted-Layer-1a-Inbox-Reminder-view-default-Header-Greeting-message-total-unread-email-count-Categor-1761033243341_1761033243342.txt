@@ -1,0 +1,53 @@
+Layer 1a – Inbox Reminder view (default)
+Header: Greeting message + total unread email count
+Category List:
+Urgent / To-Do / FYI + user-defined tags
+Each category shows unread count + latest email preview
+Click category → enter Layer 2
+Option to add more custom tags
+Global Actions:
+Flagged mails
+Refresh
+Layer 1b – Task & Schedule view (switchable)
+Header: Greeting message + total unread email count
+Timeline View:
+Events grouped by time (Overdue / Today / This Week / Later)
+Each event card shows time + subject line
+Event card actions: Add to Calendar / Double click to open related email
+Global Actions:
+Flagged mails
+Bookmark / Prioritize
+Layer 2 – Category Detail view (e.g., Urgent Mails)
+Header: Category title + unread count
+Email List:
+Display emails in the selected category
+Each email shows subject + preview + time
+Email actions: Add to Calendar / Mark as Done / Flag
+Assistant Entry:
+“Talk with our chatbot” button
+Layer 3 – Chatbot View
+ Entry: Accessed from Layer 2 by clicking “Ask Assistant.”
+Simple chat interface with input field for user questions.
+Chatbot capabilities:
+Summarize all items within a selected category (e.g., Urgent, To-Do, FYI).
+Search for emails or tasks by keyword.
+Respond to natural queries such as “Top 3 urgent tasks.”
+Suggest next-step actions (e.g., “Would you like to add this to Calendar?”).
+System displays friendly greetings and example prompts to guide first-time users.
+Layer 4 – Keyword Customization View
+ Entry: Accessed from Layer 1 via “Customize Priorities.”
+List of existing priority tags (e.g., Urgent, To-Do, FYI).
+Each tag displays editable name and allows reordering (Sort).
+“Add more tags” button to create new user-defined categories.
+Edit name for each tag.
+“Finish” button to confirm and save configuration
+Layer 5 – Flagged Mail View
+ Entry: Accessed from Layer 1 (Global Action: “Flagged Mails”).
+Header: “Flagged Mails” + total flagged count.
+Each email card shows:
+Subject line + sender + brief content preview.
+Original category label (e.g., Urgent / To-Do / FYI).
+Flagged timestamp (e.g., “Flagged on Oct 5, 2025”) to remind users of when the item was marked.
+Intended usage:
+Serves as a quick-access hub for emails marked for later action, reference, or archiving.
+Supports use cases such as “to follow up,” “important to keep,” or “review later.”
