@@ -1,10 +1,13 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Sparkles, LogOut } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
+import { useGmailEmails } from "@/hooks/use-emails";
+import type { GmailEmail } from "@shared/schema";
 
 interface AuthStatus {
   authenticated: boolean;
@@ -85,13 +88,27 @@ export default function Home() {
     );
   }
 
+  // Fetch Gmail emails
+  const { data: gmailData, isLoading: emailsLoading, error: emailsError } = useGmailEmails(50);
+  const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
+
+  const handleEmailClick = (email: GmailEmail) => {
+    setSelectedEmailId(email.id);
+  };
+
   // Show main application with three-column layout
   return (
     <MailLayout 
       userEmail={authStatus.user?.email}
       onLogout={() => logoutMutation.mutate()}
     >
-      <EmailList />
+      <EmailList 
+        emails={gmailData?.emails || []}
+        selectedEmailId={selectedEmailId}
+        onEmailClick={handleEmailClick}
+        isLoading={emailsLoading}
+        error={emailsError?.message || null}
+      />
     </MailLayout>
   );
 }

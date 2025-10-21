@@ -1,104 +1,118 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { format, parseISO } from "date-fns";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import type { GmailEmail } from "@shared/schema";
 
 interface EmailListItemProps {
-  sender: string;
-  subject: string;
-  preview: string;
-  time: string;
-  unread?: boolean;
-  avatar?: string;
+  email: GmailEmail;
+  active?: boolean;
+  onClick?: () => void;
 }
 
-export function EmailListItem({ sender, subject, preview, time, unread, avatar }: EmailListItemProps) {
+function EmailListItem({ email, active, onClick }: EmailListItemProps) {
+  const fromName = email.from_.includes("<") 
+    ? email.from_.split("<")[0].trim() 
+    : email.from_;
+  const fromInitial = fromName[0]?.toUpperCase() || "?";
+  
+  let formattedDate = "";
+  try {
+    const date = parseISO(email.date);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24) {
+      formattedDate = format(date, "HH:mm");
+    } else if (diffInHours < 168) {
+      formattedDate = format(date, "EEE");
+    } else {
+      formattedDate = format(date, "MMM d");
+    }
+  } catch (e) {
+    formattedDate = email.date.slice(0, 10);
+  }
+
   return (
-    <button
+    <div
+      onClick={onClick}
       className={`
-        w-full p-4 border-b border-border text-left transition-colors hover:bg-card
-        ${unread ? "bg-card/50" : ""}
+        flex gap-3 px-4 py-3 border-b border-border cursor-pointer hover-elevate transition-colors
+        ${active ? "bg-accent" : ""}
       `}
-      data-testid="email-item"
+      data-testid={`email-item-${email.id}`}
     >
-      <div className="flex items-start gap-3">
-        <Avatar className="w-10 h-10 flex-shrink-0">
-          <AvatarImage src={avatar} />
-          <AvatarFallback className="bg-primary/10 text-primary text-sm">
-            {sender.slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-2 mb-1">
-            <span className={`text-sm truncate ${unread ? "font-semibold" : "font-medium"}`}>
-              {sender}
-            </span>
-            <span className="text-xs text-muted-foreground flex-shrink-0">{time}</span>
-          </div>
-          <p className={`text-sm mb-1 truncate ${unread ? "font-semibold" : ""}`}>
-            {subject}
-          </p>
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {preview}
-          </p>
+      <Avatar className="w-10 h-10 flex-shrink-0">
+        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+          {fromInitial}
+        </AvatarFallback>
+      </Avatar>
+      
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-2 mb-1">
+          <h3 className="font-medium text-sm truncate">{fromName}</h3>
+          <span className="text-xs text-muted-foreground flex-shrink-0">
+            {formattedDate}
+          </span>
         </div>
+        <p className="text-sm font-medium truncate mb-1">{email.subject}</p>
+        <p className="text-xs text-muted-foreground line-clamp-2">
+          {email.snippet}
+        </p>
       </div>
-    </button>
+    </div>
   );
 }
 
-export default function EmailList() {
+interface EmailListProps {
+  emails: GmailEmail[];
+  selectedEmailId?: string;
+  onEmailClick?: (email: GmailEmail) => void;
+  isLoading?: boolean;
+  error?: string | null;
+}
+
+export default function EmailList({ 
+  emails, 
+  selectedEmailId, 
+  onEmailClick,
+  isLoading,
+  error 
+}: EmailListProps) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-sm text-muted-foreground">Loading emails...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <p className="text-sm text-destructive mb-2">Failed to load emails</p>
+        <p className="text-xs text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  if (emails.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <p className="text-sm text-muted-foreground">No emails found</p>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <EmailListItem
-        sender="Google"
-        subject="Google alert: Filo accessed your Google Account data."
-        preview="Your Google Account was just accessed using a link from a Google Apps Script project..."
-        time="11:50 PM"
-        unread
-      />
-      <EmailListItem
-        sender="Replit"
-        subject="Your AIMailPilot project on Replit deployed successfully to https://ai-mail-..."
-        preview="Congratulations! Your deployment is live..."
-        time="10:42 PM"
-        unread
-      />
-      <EmailListItem
-        sender="Replit"
-        subject="Your AIMailPilot deployment on Replit has failed."
-        preview="We encountered an error while deploying your project..."
-        time="10:11 PM"
-        unread
-      />
-      <EmailListItem
-        sender="Yuling Song"
-        subject="Review new email banner designs in Figma by next week."
-        preview="Hi team, please take a look at the new designs..."
-        time="9:09 PM"
-      />
-      <EmailListItem
-        sender="Yuling Song"
-        subject="Rebecca needs your review of the pitch deck by EOD for tomorrow's meeting."
-        preview="Rebecca has shared the pitch deck with you..."
-        time="9:08 PM"
-      />
-      <EmailListItem
-        sender="Yuling Song (via Goog..."
-        subject="Yuling Song shared a Google Script 'V2' with you for editing."
-        preview="You now have edit access to this script..."
-        time="8:01 PM"
-      />
-      <EmailListItem
-        sender="Ted Shelton via Link..."
-        subject="LinkedIn newsletter: HR + IT in the Age of Agents by Ted Shelton."
-        preview="In this edition, Ted discusses the future of work..."
-        time="7:48 PM"
-      />
-      <EmailListItem
-        sender="LinkedIn"
-        subject="Your LinkedIn profile has new activity: 1 invitation, 3 messages, and 25 sea..."
-        preview="You have pending connection requests and unread messages..."
-        time="7:45 PM"
-      />
-    </>
+    <div>
+      {emails.map((email) => (
+        <EmailListItem
+          key={email.id}
+          email={email}
+          active={selectedEmailId === email.id}
+          onClick={() => onEmailClick?.(email)}
+        />
+      ))}
+    </div>
   );
 }
