@@ -119,6 +119,7 @@ function EmailItem({ email }: EmailItemProps) {
   
   // Get deadline from first task if available
   const deadline = email.tasks && email.tasks.length > 0 ? email.tasks[0].due : null;
+  console.log(`Email ${email.id} - Tasks:`, email.tasks, `Deadline:`, deadline);
   const formattedDeadline = formatDeadline(deadline);
   
   const handleFlag = () => {

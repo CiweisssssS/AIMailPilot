@@ -103,12 +103,15 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
             try:
                 # Get raw deadline from LLM
                 raw_due = task_dict.get('due')
+                logger.info(f"Processing task: {task_dict.get('title', 'Unknown')}, raw_due: {raw_due}")
                 
                 # Normalize deadline using strict rules
                 if raw_due:
                     normalized_due = normalize_deadline(str(raw_due), ref_datetime, "UTC")
+                    logger.info(f"Normalized deadline: '{raw_due}' -> '{normalized_due}'")
                 else:
                     normalized_due = "TBD"
+                    logger.info(f"No deadline provided, using TBD")
                 
                 # Ensure all required fields have valid defaults
                 task = Task(
@@ -118,6 +121,7 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
                     source_message_id=task_dict.get('source_message_id') or (messages[0].get('id', 'unknown') if messages else 'unknown'),
                     type=task_dict.get('type') or 'action'
                 )
+                logger.info(f"Created task with due: {task.due}")
                 tasks.append(task)
             except Exception as e:
                 logger.error(f"Failed to create Task object: {e}")

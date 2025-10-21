@@ -396,10 +396,14 @@ async def triage_emails(request: dict):
             tasks_list = []
             for task in result['tasks']:
                 if hasattr(task, 'dict'):
-                    tasks_list.append(task.dict())
+                    task_dict = task.dict()
+                    logger.info(f"Task dict for frontend: {task_dict}")
+                    tasks_list.append(task_dict)
                 elif isinstance(task, dict):
+                    logger.info(f"Task dict (already dict) for frontend: {task}")
                     tasks_list.append(task)
                 else:
+                    logger.info(f"Task (unknown type): {task}")
                     tasks_list.append({'title': str(task)})
             
             analyzed_emails.append({
