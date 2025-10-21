@@ -11,17 +11,17 @@ export default function CategoryDetail({ category, onBack, onChatbotClick }: Cat
     urgent: {
       title: "Urgent Mails",
       subtitle: "You have 2 urgent mails now.",
-      bgClass: "bg-[#D4C4E0]"
+      bgClass: "bg-accent"
     },
     todo: {
       title: "To-Do Mails",
       subtitle: "You have 2 to-do mails now.",
-      bgClass: "bg-[#D4C4E0]"
+      bgClass: "bg-accent"
     },
     fyi: {
       title: "FYI Mails",
       subtitle: "You have 2 FYI mails now.",
-      bgClass: "bg-[#D4C4E0]"
+      bgClass: "bg-accent"
     }
   };
 
@@ -46,8 +46,8 @@ export default function CategoryDetail({ category, onBack, onChatbotClick }: Cat
 
       {/* Category Title */}
       <div className={`${config.bgClass} rounded-2xl p-6 mb-6`}>
-        <h2 className="text-2xl font-bold text-[#5B2C6F] mb-2">{config.title}</h2>
-        <p className="text-[#5B2C6F]/80">{config.subtitle}</p>
+        <h2 className="text-2xl font-bold text-primary mb-2">{config.title}</h2>
+        <p className="text-foreground/80">{config.subtitle}</p>
       </div>
 
       {/* Email Items */}

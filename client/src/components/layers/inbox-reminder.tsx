@@ -36,17 +36,19 @@ export default function InboxReminder({
       {/* Tab Navigation */}
       <div className="flex gap-6 mb-6 border-b border-border">
         <button 
-          className="pb-2 px-1 text-sm font-medium border-b-2 border-primary -mb-px"
+          className="pb-2 px-1 text-sm font-medium border-b-2 border-primary -mb-px flex items-center gap-2"
           data-testid="tab-inbox-reminder"
         >
-          📋 Inbox Reminder
+          <Mail className="w-4 h-4" />
+          Inbox Reminder
         </button>
         <button 
           onClick={onTaskScheduleClick}
-          className="pb-2 px-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="pb-2 px-1 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
           data-testid="tab-task-schedule"
         >
-          ⏰ Task & Schedule
+          <Mail className="w-4 h-4" />
+          Task & Schedule
         </button>
       </div>
 
@@ -55,17 +57,17 @@ export default function InboxReminder({
         {/* Urgent Card */}
         <button
           onClick={() => onCategoryClick("urgent")}
-          className="w-full bg-[#B8A0C7] hover:bg-[#A890B7] rounded-2xl p-5 text-left transition-all hover:shadow-md"
+          className="w-full bg-secondary hover:bg-secondary/80 rounded-2xl p-5 text-left transition-all hover:shadow-md"
           data-testid="card-urgent"
         >
           <div className="flex items-start justify-between mb-3">
-            <h3 className="text-xl font-bold text-[#5B2C6F]">Urgent</h3>
-            <span className="text-5xl font-bold text-[#8B6B9E] opacity-70">2</span>
+            <h3 className="text-xl font-bold text-primary">Urgent</h3>
+            <span className="text-5xl font-bold text-primary/60 opacity-70">2</span>
           </div>
-          <p className="text-sm text-[#5B2C6F] font-medium mb-1">
+          <p className="text-sm text-foreground font-medium mb-1">
             Latest: Contract Signature Required
           </p>
-          <p className="text-sm text-[#5B2C6F]/70 line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-2">
             "Please review and sign the updated contract before the end of the day."
           </p>
         </button>
@@ -73,17 +75,17 @@ export default function InboxReminder({
         {/* To-Do Card */}
         <button
           onClick={() => onCategoryClick("todo")}
-          className="w-full bg-[#D4C4E0] hover:bg-[#C4B4D0] rounded-2xl p-5 text-left transition-all hover:shadow-md"
+          className="w-full bg-accent hover:bg-accent/80 rounded-2xl p-5 text-left transition-all hover:shadow-md"
           data-testid="card-todo"
         >
           <div className="flex items-start justify-between mb-3">
-            <h3 className="text-xl font-bold text-[#5B2C6F]">To-Do</h3>
-            <span className="text-5xl font-bold text-[#8B6B9E] opacity-60">6</span>
+            <h3 className="text-xl font-bold text-primary">To-Do</h3>
+            <span className="text-5xl font-bold text-primary/60 opacity-60">6</span>
           </div>
-          <p className="text-sm text-[#5B2C6F] font-medium mb-1">
+          <p className="text-sm text-foreground font-medium mb-1">
             Latest: Budget review meeting follow-up
           </p>
-          <p className="text-sm text-[#5B2C6F]/70 line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-2">
             "Here are the action items assigned to you. Deadline: Oct 10..."
           </p>
         </button>
@@ -91,17 +93,17 @@ export default function InboxReminder({
         {/* FYI Card */}
         <button
           onClick={() => onCategoryClick("fyi")}
-          className="w-full bg-[#B8A0C7] hover:bg-[#A890B7] rounded-2xl p-5 text-left transition-all hover:shadow-md"
+          className="w-full bg-secondary hover:bg-secondary/80 rounded-2xl p-5 text-left transition-all hover:shadow-md"
           data-testid="card-fyi"
         >
           <div className="flex items-start justify-between mb-3">
-            <h3 className="text-xl font-bold text-[#5B2C6F]">FYI</h3>
-            <span className="text-5xl font-bold text-[#8B6B9E] opacity-50">13</span>
+            <h3 className="text-xl font-bold text-primary">FYI</h3>
+            <span className="text-5xl font-bold text-primary/60 opacity-50">13</span>
           </div>
-          <p className="text-sm text-[#5B2C6F] font-medium mb-1">
+          <p className="text-sm text-foreground font-medium mb-1">
             Latest: Team offsite photos
           </p>
-          <p className="text-sm text-[#5B2C6F]/70 line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-2">
             "Sharing a link to the photos from last week's offsite..."
           </p>
         </button>
@@ -123,17 +125,17 @@ export default function InboxReminder({
       <div className="fixed bottom-8 right-8 flex flex-col gap-3">
         <button
           onClick={onFlaggedClick}
-          className="w-14 h-14 rounded-full bg-[#B8A0C7] hover:bg-[#A890B7] shadow-lg flex items-center justify-center transition-all hover:scale-105"
+          className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg flex items-center justify-center transition-all hover:scale-105"
           data-testid="button-flagged"
         >
-          <Bookmark className="w-6 h-6 text-white" />
+          <Bookmark className="w-6 h-6 text-primary-foreground" />
         </button>
         <button
           onClick={onRefreshClick}
-          className="w-14 h-14 rounded-full bg-[#B8A0C7] hover:bg-[#A890B7] shadow-lg flex items-center justify-center transition-all hover:scale-105"
+          className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg flex items-center justify-center transition-all hover:scale-105"
           data-testid="button-refresh"
         >
-          <RefreshCw className="w-6 h-6 text-white" />
+          <RefreshCw className="w-6 h-6 text-primary-foreground" />
         </button>
       </div>
     </div>

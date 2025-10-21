@@ -8,6 +8,20 @@ interface ChatbotProps {
 export default function Chatbot({ onBack }: ChatbotProps) {
   const [message, setMessage] = useState("");
 
+  const handleSend = () => {
+    if (!message.trim()) return;
+    // TODO: Implement chatbot API call
+    console.log("Sending message:", message);
+    setMessage("");
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -46,12 +60,15 @@ export default function Chatbot({ onBack }: ChatbotProps) {
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
             placeholder="Type your question here."
             className="flex-1 bg-transparent border-0 focus:outline-none text-sm"
             data-testid="input-chatbot"
           />
           <button 
-            className="p-2 rounded-full bg-primary hover:bg-primary/90 transition-colors"
+            onClick={handleSend}
+            disabled={!message.trim()}
+            className="p-2 rounded-full bg-primary hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="button-send"
           >
             <Send className="w-4 h-4 text-primary-foreground" />

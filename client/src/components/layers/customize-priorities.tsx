@@ -33,9 +33,9 @@ export default function CustomizePriorities({ onBack, onFinish }: CustomizePrior
 
       {/* Tag List */}
       <div className="flex-1 space-y-4">
-        <PriorityTag label="Urgent" color="bg-[#B8A0C7]" />
-        <PriorityTag label="To-do" color="bg-[#D4C4E0]" />
-        <PriorityTag label="FYI" color="bg-[#B8A0C7]" />
+        <PriorityTag label="Urgent" color="bg-secondary" />
+        <PriorityTag label="To-do" color="bg-accent" />
+        <PriorityTag label="FYI" color="bg-secondary" />
         
         <button
           className="w-full p-5 rounded-2xl border-2 border-dashed border-border hover:bg-card transition-colors flex items-center justify-center gap-2"
@@ -66,7 +66,7 @@ interface PriorityTagProps {
 function PriorityTag({ label, color }: PriorityTagProps) {
   return (
     <div className="flex items-center gap-3">
-      <div className={`${color} rounded-full px-6 py-3 flex-1 text-[#5B2C6F] font-medium`}>
+      <div className={`${color} rounded-full px-6 py-3 flex-1 text-primary font-medium`}>
         {label}
       </div>
       <button className="p-2 hover:bg-card rounded-lg transition-colors" data-testid={`button-edit-${label.toLowerCase()}`}>

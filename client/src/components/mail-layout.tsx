@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, LogOut } from "lucide-react";
+import { Mail, LogOut, Inbox, CheckSquare, Star, FileText, Send as SendIcon, Archive, Trash, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InboxReminder from "./layers/inbox-reminder";
 import TaskSchedule from "./layers/task-schedule";
@@ -137,19 +137,19 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
         
         <nav className="flex-1 overflow-y-auto p-2">
           <div className="space-y-1">
-            <NavItem icon="📥" label="Inbox" count={21} active />
-            <NavItem icon="✅" label="To-Do" count={6} />
-            <NavItem icon="⭐" label="Starred" />
-            <NavItem icon="📝" label="Draft" />
-            <NavItem icon="📤" label="Sent" />
-            <NavItem icon="📦" label="Archive" />
-            <NavItem icon="🗑️" label="Trash" />
+            <NavItem icon={Inbox} label="Inbox" count={21} active />
+            <NavItem icon={CheckSquare} label="To-Do" count={6} />
+            <NavItem icon={Star} label="Starred" />
+            <NavItem icon={FileText} label="Draft" />
+            <NavItem icon={SendIcon} label="Sent" />
+            <NavItem icon={Archive} label="Archive" />
+            <NavItem icon={Trash} label="Trash" />
           </div>
         </nav>
 
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <button className="w-full text-left text-sm px-3 py-2 rounded-lg hover-elevate flex items-center gap-2" data-testid="button-settings">
-            <span>⚙️</span>
+            <Settings className="w-4 h-4" />
             <span>Settings</span>
           </button>
           {onLogout && (
@@ -206,13 +206,13 @@ export default function MailLayout({ children, userEmail, onLogout }: MailLayout
 }
 
 interface NavItemProps {
-  icon: string;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   count?: number;
   active?: boolean;
 }
 
-function NavItem({ icon, label, count, active }: NavItemProps) {
+function NavItem({ icon: Icon, label, count, active }: NavItemProps) {
   return (
     <button
       className={`
@@ -224,7 +224,7 @@ function NavItem({ icon, label, count, active }: NavItemProps) {
       `}
       data-testid={`nav-${label.toLowerCase()}`}
     >
-      <span>{icon}</span>
+      <Icon className="w-4 h-4" />
       <span className="flex-1 text-left">{label}</span>
       {count !== undefined && (
         <span className={`text-xs ${active ? "text-primary font-semibold" : "text-muted-foreground"}`}>

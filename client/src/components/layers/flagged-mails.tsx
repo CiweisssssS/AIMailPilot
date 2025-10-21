@@ -25,9 +25,9 @@ export default function FlaggedMails({ onBack, onChatbotClick }: FlaggedMailsPro
       </div>
 
       {/* Title */}
-      <div className="bg-[#D4C4E0] rounded-2xl p-6 mb-6">
-        <h2 className="text-2xl font-bold text-[#5B2C6F] mb-2">Flagged Mails</h2>
-        <p className="text-[#5B2C6F]/80">You have 2 flagged mails now.</p>
+      <div className="bg-accent rounded-2xl p-6 mb-6">
+        <h2 className="text-2xl font-bold text-primary mb-2">Flagged Mails</h2>
+        <p className="text-foreground/80">You have 2 flagged mails now.</p>
       </div>
 
       {/* Flagged Items */}

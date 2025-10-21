@@ -27,16 +27,18 @@ export default function TaskSchedule({ onFlaggedClick, onRefreshClick, onInboxRe
       <div className="flex gap-6 mb-6 border-b border-border">
         <button 
           onClick={onInboxReminderClick}
-          className="pb-2 px-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="pb-2 px-1 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
           data-testid="tab-inbox-reminder"
         >
-          📋 Inbox Reminder
+          <Mail className="w-4 h-4" />
+          Inbox Reminder
         </button>
         <button 
-          className="pb-2 px-1 text-sm font-medium border-b-2 border-primary -mb-px"
+          className="pb-2 px-1 text-sm font-medium border-b-2 border-primary -mb-px flex items-center gap-2"
           data-testid="tab-task-schedule"
         >
-          ⏰ Task & Schedule
+          <Calendar className="w-4 h-4" />
+          Task & Schedule
         </button>
       </div>
 
@@ -101,17 +103,17 @@ export default function TaskSchedule({ onFlaggedClick, onRefreshClick, onInboxRe
       <div className="fixed bottom-8 right-8 flex flex-col gap-3">
         <button
           onClick={onFlaggedClick}
-          className="w-14 h-14 rounded-full bg-[#B8A0C7] hover:bg-[#A890B7] shadow-lg flex items-center justify-center transition-all hover:scale-105"
+          className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg flex items-center justify-center transition-all hover:scale-105"
           data-testid="button-flagged"
         >
-          <Bookmark className="w-6 h-6 text-white" />
+          <Bookmark className="w-6 h-6 text-primary-foreground" />
         </button>
         <button
           onClick={onRefreshClick}
-          className="w-14 h-14 rounded-full bg-[#B8A0C7] hover:bg-[#A890B7] shadow-lg flex items-center justify-center transition-all hover:scale-105"
+          className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg flex items-center justify-center transition-all hover:scale-105"
           data-testid="button-refresh"
         >
-          <RefreshCw className="w-6 h-6 text-white" />
+          <RefreshCw className="w-6 h-6 text-primary-foreground" />
         </button>
       </div>
     </div>

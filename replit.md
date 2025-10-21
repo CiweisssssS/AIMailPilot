@@ -18,11 +18,22 @@ The system analyzes Gmail emails using **GPT-4o-mini** with a **hybrid rule-base
   - Secure cookie configuration (httpOnly, sameSite=lax, secure in production)
 - Added Express session management with secure token storage and automatic refresh
 - Created authentication routes: `/auth/google`, `/auth/google/callback`, `/api/auth/status`, `/api/auth/logout`
-- Enhanced frontend with login/logout UI and authentication state management
+- **Implemented complete three-column UI layout**:
+  - Left sidebar: Gmail-style navigation with lucide-react icons (Inbox/To-Do/Starred/Draft/Sent/Archive/Trash)
+  - Center panel: Gmail-style email list with avatar, subject, preview, and time
+  - Right panel: AIMailPilot intelligent assistant with 5-layer navigation system
+- **Built all 5 AIMailPilot layers** matching Figma design specifications:
+  - Layer 1a: Inbox Reminder with Urgent/To-Do/FYI priority cards
+  - Layer 1b: Task & Schedule timeline view (Today/This Week/In one month)
+  - Layer 2: Category Detail view with email list and action buttons
+  - Layer 3: AI Chatbot with message input and send functionality
+  - Layer 4: Customize Priorities for tag management
+  - Layer 5: Flagged Mails view with category labels and timestamps
+- Applied consistent **purple theme** (主紫色 #5B2C6F) using semantic CSS variables
+- Replaced all emoji with lucide-react icons for professional UI consistency
 - Enhanced GPT-4o-mini prompts with clear P1/P2/P3 classification criteria
 - Enforced task extraction format `[verb + object + owner + due]` with examples
 - Created `/triage` endpoint for batch email analysis
-- Built React frontend matching design guidelines (Material Design 3 + Linear-inspired hierarchy)
 
 ## User Preferences
 
@@ -48,14 +59,28 @@ Preferred communication style: Simple, everyday language.
 4. Store tokens in Express session, redirect to home page
 5. Display user email in header with logout button when authenticated
 
-**UI Components**: Shadcn UI (Radix primitives) + Tailwind CSS for styling
+**UI Components**: Shadcn UI (Radix primitives) + Tailwind CSS + Lucide React icons
+
+**Three-Column Layout**:
+- **Left Sidebar** (240px): Gmail navigation with folder icons, unread counts, Settings button
+- **Middle Panel** (384px): Email list with search, category filters (Important/Updates/Promotions), and scrollable email items
+- **Right Panel** (flexible): AIMailPilot assistant with layer-based navigation
+
+**5-Layer Navigation System**:
+1. **Inbox Reminder (Layer 1a)**: Default view with greeting, unread count, tab switcher, Urgent/To-Do/FYI cards showing latest email previews, "add more tags" button, floating bookmark/refresh buttons
+2. **Task & Schedule (Layer 1b)**: Timeline view grouped by Today/This Week/In one month, with calendar icon for adding events
+3. **Category Detail (Layer 2)**: Displays filtered email list for selected category (Urgent/To-Do/FYI), back button, checkbox for completion, flag button, "Add to Calendar" action, chatbot entry button
+4. **AI Chatbot (Layer 3)**: Conversational interface with welcome message, example prompts, message input with Enter key support, send button with validation
+5. **Customize Priorities (Layer 4)**: Tag list editor with sort button, edit icons, "add more tags" button, Finish button
+6. **Flagged Mails (Layer 5)**: Dedicated view for bookmarked emails with category labels, flagged timestamps, chatbot entry button
 
 **Key Features**:
-- Real-time authentication state checking
-- Automatic email fetching and AI analysis workflow
-- Priority-based email display (P1/P2/P3 with visual hierarchy)
-- Task extraction display with owner and due date
-- Responsive design optimized for desktop and mobile
+- Real-time authentication state checking via session cookies
+- Layer-based navigation with state management (back button, tab switching)
+- Priority-based email categorization (P1 Urgent/P2 To-Do/P3 FYI)
+- Floating action buttons for quick access (bookmark, refresh)
+- Responsive design with purple theme (#5B2C6F primary color)
+- Professional lucide-react icons throughout (no emoji)
 
 ### Frontend Architecture (Gmail Add-on - Future)
 
