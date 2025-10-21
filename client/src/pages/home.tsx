@@ -30,6 +30,7 @@ export default function Home() {
 
   // State hooks
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
+  const [selectedTaskId, setSelectedTaskId] = useState<{ emailId: string; taskIndex: number } | undefined>();
   const { toast } = useToast();
   
   // Get analyzed emails from React Query cache
@@ -98,6 +99,14 @@ export default function Home() {
 
   const handleBackToList = () => {
     setSelectedEmailId(undefined);
+    setSelectedTaskId(undefined);
+  };
+
+  const handleTaskClick = (emailId: string, taskIndex: number) => {
+    // Open the email in the middle column
+    setSelectedEmailId(emailId);
+    // Highlight the task card
+    setSelectedTaskId({ emailId, taskIndex });
   };
 
   // Find selected email
@@ -205,6 +214,8 @@ export default function Home() {
       analyzedEmails={analyzedEmails}
       summary={summary}
       isAnalyzing={analyzeMutation.isPending}
+      onTaskClick={handleTaskClick}
+      selectedTaskId={selectedTaskId}
     >
       {selectedEmail ? (
         <EmailDetail 

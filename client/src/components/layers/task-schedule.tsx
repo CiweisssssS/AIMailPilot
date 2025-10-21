@@ -13,6 +13,8 @@ interface TaskScheduleProps {
   onFlaggedClick: () => void;
   onRefreshClick: () => void;
   onInboxReminderClick?: () => void;
+  onTaskClick?: (emailId: string, taskIndex: number) => void;
+  selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
 interface TaskWithEmail {
@@ -21,7 +23,7 @@ interface TaskWithEmail {
   due: string | null;
 }
 
-export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
+export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick, onTaskClick, selectedTaskId }: TaskScheduleProps) {
   // Flatten all tasks with their email context, filter for P1 and P2 only
   const allTasks: TaskWithEmail[] = analyzedEmails
     .filter(email => email.priority?.label === 'P1' || email.priority?.label === 'P2')
@@ -80,6 +82,8 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
             tasks={groupedTasks.tbd}
             bucket="tbd"
             color="destructive"
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         )}
 
@@ -90,6 +94,8 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
             tasks={[...groupedTasks.overdue, ...groupedTasks.today]}
             bucket="today"
             color="primary"
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         )}
 
@@ -100,6 +106,8 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
             tasks={groupedTasks.this_week}
             bucket="this_week"
             color="primary"
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         )}
 
@@ -110,6 +118,8 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
             tasks={groupedTasks.this_month}
             bucket="this_month"
             color="muted"
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         )}
 
@@ -120,6 +130,8 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
             tasks={groupedTasks.later}
             bucket="later"
             color="muted"
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         )}
 
@@ -157,9 +169,11 @@ interface TimelineBucketProps {
   tasks: TaskWithEmail[];
   bucket: TimeBucket;
   color: "primary" | "destructive" | "muted";
+  onTaskClick?: (emailId: string, taskIndex: number) => void;
+  selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
-function TimelineBucket({ title, tasks, bucket, color }: TimelineBucketProps) {
+function TimelineBucket({ title, tasks, bucket, color, onTaskClick, selectedTaskId }: TimelineBucketProps) {
   const nodeColor = {
     primary: "bg-primary",
     destructive: "bg-destructive",
@@ -187,6 +201,8 @@ function TimelineBucket({ title, tasks, bucket, color }: TimelineBucketProps) {
             key={`${task.email.id}-${task.taskIndex}`}
             task={task}
             showOverdueBadge={bucket === "today" && parseDeadline(task.due).bucket === "overdue"}
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         ))}
       </div>
@@ -197,9 +213,11 @@ function TimelineBucket({ title, tasks, bucket, color }: TimelineBucketProps) {
 interface TimelineItemProps {
   task: TaskWithEmail;
   showOverdueBadge?: boolean;
+  onTaskClick?: (emailId: string, taskIndex: number) => void;
+  selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
-function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
+function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTaskId }: TimelineItemProps) {
   const { toast } = useToast();
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [newDeadline, setNewDeadline] = useState("");
@@ -211,6 +229,14 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
   const taskTitle = task.email.task_extracted && task.email.task_extracted !== "None"
     ? task.email.task_extracted.replace(/^\[|\]$/g, '').trim()
     : task.email.subject;
+
+  // Check if this task is selected
+  const isSelected = selectedTaskId?.emailId === task.email.id && selectedTaskId?.taskIndex === task.taskIndex;
+
+  // Handle task click - open email and highlight card
+  const handleClick = () => {
+    onTaskClick?.(task.email.id, task.taskIndex);
+  };
 
   // Format time display: "Time: Oct 5, 10:00 AM"
   const formatTimeDisplay = (dueString: string | null) => {
@@ -293,7 +319,12 @@ function TimelineItem({ task, showOverdueBadge = false }: TimelineItemProps) {
 
   return (
     <div 
-      className="relative"
+      className={`relative rounded-lg p-3 transition-all cursor-pointer ${
+        isSelected 
+          ? 'bg-primary/20 ring-2 ring-primary/30' 
+          : 'hover:bg-accent/30'
+      }`}
+      onClick={handleClick}
       data-testid={`timeline-item-${task.email.id}-${task.taskIndex}`}
     >
       <div className="flex items-start justify-between gap-4">

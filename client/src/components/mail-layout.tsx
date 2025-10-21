@@ -31,6 +31,8 @@ interface MailLayoutProps {
     fyi: number;
   };
   isAnalyzing?: boolean;
+  onTaskClick?: (emailId: string, taskIndex: number) => void;
+  selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
 export default function MailLayout({ 
@@ -40,7 +42,9 @@ export default function MailLayout({
   onRefresh,
   analyzedEmails = [], 
   summary = { total: 0, urgent: 0, todo: 0, fyi: 0 },
-  isAnalyzing = false 
+  isAnalyzing = false,
+  onTaskClick,
+  selectedTaskId
 }: MailLayoutProps) {
   const [currentLayer, setCurrentLayer] = useState<Layer>({ type: "inbox-reminder" });
 
@@ -111,6 +115,8 @@ export default function MailLayout({
             onFlaggedClick={handleFlaggedClick}
             onRefreshClick={handleRefresh}
             onInboxReminderClick={handleInboxReminderSwitch}
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         );
       case "category-detail":
