@@ -2,6 +2,7 @@ import { ArrowLeft, Mail, Calendar, Bookmark, CheckSquare } from "lucide-react";
 import type { AnalyzedEmail } from "@shared/schema";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { limitWords } from "@/lib/text-utils";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
@@ -164,7 +165,7 @@ function EmailItem({ email }: EmailItemProps) {
             {hasTask ? "" : "Subject: "}{taskDisplay}
           </h3>
           <p className="text-sm text-muted-foreground mb-2">
-            Preview: {email.snippet || email.summary}
+            Summary: {limitWords(email.summary, 20)}
           </p>
           <p className="text-xs text-muted-foreground mb-1">
             {formattedDeadline}

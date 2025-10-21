@@ -1,5 +1,6 @@
 import { Mail, Bookmark, RefreshCw, Plus } from "lucide-react";
 import type { AnalyzedEmail } from "@shared/schema";
+import { limitWords } from "@/lib/text-utils";
 
 interface InboxReminderProps {
   unreadCount: number;
@@ -89,7 +90,7 @@ export default function InboxReminder({
                 Latest: {latestUrgent.subject}
               </p>
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {latestUrgent.summary}
+                {limitWords(latestUrgent.summary, 20)}
               </p>
             </>
           ) : isAnalyzing ? (
@@ -115,7 +116,7 @@ export default function InboxReminder({
                 Latest: {latestTodo.subject}
               </p>
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {latestTodo.summary}
+                {limitWords(latestTodo.summary, 20)}
               </p>
             </>
           ) : isAnalyzing ? (
@@ -141,7 +142,7 @@ export default function InboxReminder({
                 Latest: {latestFyi.subject}
               </p>
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {latestFyi.summary}
+                {limitWords(latestFyi.summary, 20)}
               </p>
             </>
           ) : isAnalyzing ? (
