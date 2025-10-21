@@ -6,6 +6,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
+import EmailDetail from "@/components/email-detail";
 import { useGmailEmails, useAnalyzeEmails, useRefreshEmails } from "@/hooks/use-emails";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -93,6 +94,15 @@ export default function Home() {
   const handleEmailClick = (email: GmailEmail) => {
     setSelectedEmailId(email.id);
   };
+
+  const handleBackToList = () => {
+    setSelectedEmailId(undefined);
+  };
+
+  // Find selected email
+  const selectedEmail = selectedEmailId 
+    ? gmailData?.emails.find(e => e.id === selectedEmailId)
+    : undefined;
 
   const handleRefresh = async () => {
     try {
@@ -199,13 +209,20 @@ export default function Home() {
       summary={summary}
       isAnalyzing={analyzeMutation.isPending}
     >
-      <EmailList 
-        emails={gmailData?.emails || []}
-        selectedEmailId={selectedEmailId}
-        onEmailClick={handleEmailClick}
-        isLoading={emailsLoading}
-        error={emailsError?.message || null}
-      />
+      {selectedEmail ? (
+        <EmailDetail 
+          email={selectedEmail}
+          onBack={handleBackToList}
+        />
+      ) : (
+        <EmailList 
+          emails={gmailData?.emails || []}
+          selectedEmailId={selectedEmailId}
+          onEmailClick={handleEmailClick}
+          isLoading={emailsLoading}
+          error={emailsError?.message || null}
+        />
+      )}
     </MailLayout>
   );
 }
