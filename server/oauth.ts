@@ -182,7 +182,15 @@ export async function handleGoogleCallback(req: Request, res: Response) {
     const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
 
-    // Store tokens and user info in session
+    // Regenerate session ID to prevent session fixation attacks
+    await new Promise<void>((resolve, reject) => {
+      req.session.regenerate((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Store tokens and user info in new session
     req.session.googleTokens = {
       access_token: tokens.access_token!,
       refresh_token: tokens.refresh_token || undefined,
