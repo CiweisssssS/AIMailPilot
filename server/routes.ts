@@ -90,17 +90,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { question, thread } = req.body;
       
       if (!question || !thread) {
+        console.error("Missing question or thread in request");
         return res.status(400).json({
           success: false,
           error: "Invalid request: question and thread required"
         });
       }
 
-      console.log(`Chatbot question: ${question.substring(0, 100)}...`);
+      console.log(`Chatbot question: "${question.substring(0, 100)}..."`);
+      console.log(`Thread has ${thread.normalized_messages?.length || 0} messages`);
 
       const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      const backendUrl = `${pythonBackendUrl}/api/chatbot-qa`;
       
-      const response = await fetch(`${pythonBackendUrl}/api/chatbot-qa`, {
+      console.log(`Forwarding to Python backend: ${backendUrl}`);
+      
+      const response = await fetch(backendUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -108,14 +113,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: JSON.stringify({ question, thread })
       });
 
+      console.log(`Python backend responded with status: ${response.status}`);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Python backend error (${response.status}):`, errorText);
-        throw new Error(`Python backend error: ${response.statusText}`);
+        console.error(`Python backend error (${response.status}):`, errorText.substring(0, 200));
+        return res.status(response.status).json({
+          success: false,
+          error: `Python backend error: ${errorText.substring(0, 200)}`
+        });
       }
 
       const result = await response.json();
-      console.log(`Chatbot response received`);
+      console.log(`Chatbot response received:`, JSON.stringify(result).substring(0, 100));
       res.json(result);
     } catch (error: any) {
       console.error("Error in chatbot:", error);

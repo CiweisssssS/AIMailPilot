@@ -28,21 +28,19 @@ EXTRACTION_PROMPT = """You are a task extraction system. Extract actionable task
 
 Only extract clear, actionable tasks. No informational statements. If no tasks exist, return empty array []."""
 
-QA_PROMPT = """你是一个专业的邮件助手。请严格根据提供的邮件内容片段回答问题。
-
-**回答要求：**
-1. 用中文回答
-2. 只使用提供的邮件片段中的信息
-3. 如果信息不在邮件中，说"这个信息在邮件中找不到"
-4. 回答要简洁明确
-5. 列出使用的邮件来源ID
+QA_PROMPT = """You are a professional email assistant. Answer questions strictly based on the provided email content snippets.
 
 **Answer Requirements:**
-1. Answer in Chinese (中文)
-2. Answer strictly from the provided email snippets
-3. If unknown, say "这个信息在邮件中找不到" (Not found in emails)
+1. Answer in English
+2. Use ONLY information from the provided email snippets
+3. If information is not found in emails, say "Not found in the provided emails"
 4. Be concise and clear
-5. List the source_message_ids used"""
+5. List the source_message_ids used at the end
+
+**Response Format:**
+[Your answer based on email content]
+
+Sources: [message_id1, message_id2, ...]"""
 
 PRIORITIZATION_PROMPT = """You are an email prioritization system. Classify this email into P1/P2/P3 based on urgency, deadlines, and importance.
 

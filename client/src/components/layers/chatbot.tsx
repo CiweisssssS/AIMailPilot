@@ -70,6 +70,14 @@ export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
           thread: threadData
         }
       );
+      
+      // Check if response is ok
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`API Error: ${text}`);
+      }
+      
+      // Parse JSON response
       const data = await response.json();
       return data as { answer: string; sources: string[] };
     },
@@ -80,9 +88,10 @@ export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
       }]);
     },
     onError: (error: any) => {
+      console.error("Chatbot error:", error);
       setChatHistory(prev => [...prev, {
         role: "assistant",
-        content: `抱歉，发生了错误：${error.message || "无法处理您的请求"}`
+        content: `Sorry, an error occurred: ${error.message || "Unable to process your request"}`
       }]);
     }
   });
@@ -133,15 +142,15 @@ export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
       <div className="flex-1 overflow-y-auto px-4 space-y-4">
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <h2 className="text-2xl font-bold text-foreground mb-4">你好！</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-4">Hello!</h2>
             <p className="text-base text-foreground/80 mb-6">
-              有什么可以帮到你的？
+              How can I help you today?
             </p>
             
             <div className="space-y-2 text-sm text-muted-foreground max-w-md">
-              <p>💡 总结某个类别的所有邮件</p>
-              <p>🔍 搜索关键词相关的邮件</p>
-              <p>📋 列出前3个紧急任务</p>
+              <p>💡 Summarize emails in a category</p>
+              <p>🔍 Search for emails by keyword</p>
+              <p>📋 List top 3 urgent tasks</p>
             </div>
           </div>
         ) : (
@@ -198,7 +207,7 @@ export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="在这里输入你的问题..."
+            placeholder="Type your question here..."
             className="flex-1 bg-transparent border-0 focus:outline-none text-sm"
             data-testid="input-chatbot"
             disabled={chatMutation.isPending}
