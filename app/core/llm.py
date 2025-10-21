@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Dict, Any, Optional
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -62,9 +63,18 @@ class LLMProvider:
     
     def _mock_response(self, messages: List[Dict[str, str]]) -> str:
         last_msg = messages[-1]["content"].lower()
+        system_msg = messages[0]["content"].lower() if messages else ""
         
-        if "summarize" in last_msg:
-            return "Team discussion about project kickoff. Meeting scheduled, with assigned owners for different tasks."
+        # Check if this is a summary request (system prompt contains "summarizer")
+        if "summarizer" in system_msg or ("subject:" in last_msg and "from:" in last_msg):
+            # Extract sender name if available
+            sender_match = re.search(r'from:\s*(\w+)', last_msg)
+            sender = sender_match.group(1) if sender_match else "They"
+            
+            # Return valid JSON summary
+            return json.dumps({
+                "summary": f"{sender} shares project updates and next steps."
+            })
         elif "json" in last_msg and "task" in last_msg:
             return json.dumps([
                 {
@@ -75,8 +85,10 @@ class LLMProvider:
                     "type": "action"
                 }
             ])
-        elif "answer" in last_msg:
+        elif "answer" in last_msg or "question" in last_msg:
             return "Based on the thread, you need to complete the assigned tasks. Sources: m1"
+        elif "summarize" in last_msg:
+            return "Team discussion about project kickoff with assigned tasks and deadlines."
         
         return "Mock LLM response"
     

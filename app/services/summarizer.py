@@ -194,6 +194,45 @@ Return JSON only."""
             
             if summary and not summary.endswith('.'):
                 summary += '.'
+            
+            # Re-validate after retry
+            word_count = count_words(summary)
+            has_verb = has_action_verb(summary)
+            
+            if word_count > max_words:
+                logger.warning(f"Retry still exceeded word limit ({word_count} > {max_words}). Truncating...")
+                # Hard truncate to max_words as last resort
+                words = summary.split()
+                if len(words) > max_words:
+                    summary = ' '.join(words[:max_words])
+                    if not summary.endswith('.'):
+                        summary += '.'
+                    
+                    # Re-check action verb after truncation
+                    has_verb = has_action_verb(summary)
+            
+            # If still missing action verb after retry, use template fallback
+            if not has_verb:
+                logger.warning("Summary still missing action verb after retry. Using template fallback.")
+                # Create minimal compliant summary using template
+                if "deadline" in body.lower() or "eod" in body.lower() or "asap" in body.lower():
+                    summary = f"{sender_name} requests action by deadline."
+                elif any(word in body.lower() for word in ["review", "feedback", "check", "look"]):
+                    summary = f"{sender_name} asks you to review something."
+                elif "meeting" in body.lower() or "schedule" in body.lower():
+                    summary = f"{sender_name} wants to schedule a meeting."
+                else:
+                    summary = f"{sender_name} shares information for your review."
+        
+        # Ensure summary starts with sender name (code-level guard)
+        if summary and not summary.lower().startswith(sender_name.lower()):
+            logger.warning(f"Summary doesn't start with sender name '{sender_name}'. Prepending...")
+            # Check if it starts with "The" or "They" - replace with sender name
+            if summary.lower().startswith(('the ', 'they ')):
+                summary = sender_name + summary[summary.index(' '):]
+            else:
+                # Prepend sender name
+                summary = f"{sender_name} {summary[0].lower()}{summary[1:]}"
         
         return summary
         

@@ -34,10 +34,21 @@ The project uses a **monorepo architecture** with distinct frontend (React/TypeS
 
 -   **Priority-based email classification**: P1 (Urgent) ≥ 0.75, P2 (To-do) ≥ 0.45, P3 (FYI) < 0.45.
 -   **Structured Task Extraction**: Enforced format `[verb + object + owner + due]`.
+-   **AI-Powered Email Summarization** (Updated October 2025):
+    -   **Word-Based Control**: Maximum 20 words (configurable via `SUMMARY_MAX_WORDS` environment variable)
+    -   **Format**: ONE sentence capturing ACTOR + ACTION + OBJECT + DEADLINE (if present)
+    -   **Active Voice**: Summaries start with sender's first name, followed by action verb
+    -   **Quality Guarantees**: 
+        -   No mid-word truncation (word-based, not character-based)
+        -   Retry logic with validation for word count and action verbs
+        -   Template fallbacks ensure compliance when LLM output fails validation
+        -   All summaries end with proper punctuation
+    -   **Model Settings**: GPT-4o-mini with temperature 0.2, JSON response format
+    -   **Few-Shot Learning**: Uses proven examples to guide model behavior
 -   **Hybrid AI Architecture**: Combines rule-based feature extraction (e.g., deadline proximity, urgent terms) with LLM semantic classification for robust prioritization.
 -   **Authentication**: Secure Google OAuth 2.0 with Express session management.
 -   **Data Flow**: Integrated Gmail API data fetching -> AI analysis -> UI rendering with real-time updates and error handling.
--   **Conversational AI**: Chatbot for interacting with email content.
+-   **Conversational AI**: Chatbot for interacting with email content with enriched context including summaries, priorities, and tasks.
 -   **Customizable Priorities**: User-defined tags and keyword weighting for personalized prioritization.
 
 ### System Design Choices
