@@ -10,7 +10,12 @@ The system analyzes Gmail emails using **GPT-4o-mini** with a **hybrid rule-base
 
 **Recent Changes (Oct 21, 2025)**:
 - Pivoted to Web Application for faster testing workflow vs. Apps Script deployment
-- **Implemented custom Google OAuth 2.0 flow** replacing Replit connector to obtain `gmail.readonly` scope
+- **Implemented custom Google OAuth 2.0 flow** with comprehensive security improvements:
+  - Dynamic redirect URI construction from HTTP request headers (protocol + host)
+  - Express trust proxy configuration for correct HTTPS detection behind proxies
+  - **State parameter CSRF protection**: Cryptographically secure random state (32-byte hex) generation, session storage, and verification
+  - **Session fixation mitigation**: Session ID regeneration upon successful authentication
+  - Secure cookie configuration (httpOnly, sameSite=lax, secure in production)
 - Added Express session management with secure token storage and automatic refresh
 - Created authentication routes: `/auth/google`, `/auth/google/callback`, `/api/auth/status`, `/api/auth/logout`
 - Enhanced frontend with login/logout UI and authentication state management
