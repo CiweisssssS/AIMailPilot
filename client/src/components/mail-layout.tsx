@@ -126,6 +126,8 @@ export default function MailLayout({
             analyzedEmails={analyzedEmails}
             onBack={handleBack}
             onChatbotClick={handleChatbotClick}
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
           />
         );
       case "chatbot":

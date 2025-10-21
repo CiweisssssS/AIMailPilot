@@ -9,6 +9,8 @@ interface CategoryDetailProps {
   analyzedEmails: AnalyzedEmail[];
   onBack: () => void;
   onChatbotClick: () => void;
+  onTaskClick?: (emailId: string, taskIndex: number) => void;
+  selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
 // Format deadline - backend returns "Mon DD, YYYY, HH:mm" or "TBD"
@@ -26,7 +28,7 @@ function cleanTaskTitle(title: string): string {
   return title.replace(/^\[|\]$/g, '').trim();
 }
 
-export default function CategoryDetail({ category, analyzedEmails, onBack, onChatbotClick }: CategoryDetailProps) {
+export default function CategoryDetail({ category, analyzedEmails, onBack, onChatbotClick, onTaskClick, selectedTaskId }: CategoryDetailProps) {
   // Filter emails by category
   const filteredEmails = analyzedEmails.filter(email => {
     if (category === "urgent") return email.priority.label.includes("P1");
@@ -89,6 +91,8 @@ export default function CategoryDetail({ category, analyzedEmails, onBack, onCha
             <EmailItem
               key={email.id}
               email={email}
+              onTaskClick={onTaskClick}
+              selectedTaskId={selectedTaskId}
             />
           ))
         )}
@@ -108,9 +112,11 @@ export default function CategoryDetail({ category, analyzedEmails, onBack, onCha
 
 interface EmailItemProps {
   email: AnalyzedEmail;
+  onTaskClick?: (emailId: string, taskIndex: number) => void;
+  selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
-function EmailItem({ email }: EmailItemProps) {
+function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
   const { toast } = useToast();
   const [isFlagged, setIsFlagged] = useState(false);
   
@@ -122,7 +128,8 @@ function EmailItem({ email }: EmailItemProps) {
   console.log(`Email ${email.id} - Tasks:`, email.tasks, `Deadline:`, deadline);
   const formattedDeadline = formatDeadline(deadline);
   
-  const handleFlag = () => {
+  const handleFlag = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent email item click
     setIsFlagged(!isFlagged);
     toast({
       title: isFlagged ? "Unflagged" : "Flagged",
@@ -130,20 +137,45 @@ function EmailItem({ email }: EmailItemProps) {
     });
   };
   
-  const handleAddToCalendar = () => {
+  const handleAddToCalendar = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent email item click
     toast({
       title: "Add to Calendar",
       description: "Calendar integration coming soon!",
     });
   };
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent email item click
+    toast({ 
+      title: "Task completed", 
+      description: "Mark as done feature coming soon!" 
+    });
+  };
+
+  // Check if this email is selected (match by emailId, taskIndex can be 0 for email-level selection)
+  const isSelected = selectedTaskId?.emailId === email.id;
+
+  // Handle email item click - open in middle column
+  const handleClick = () => {
+    onTaskClick?.(email.id, 0); // Use taskIndex 0 for email-level clicks
+  };
   
   return (
-    <div className="p-4 border-l-4 border-primary/30 bg-card rounded-r-lg">
+    <div 
+      className={`p-4 border-l-4 border-primary/30 rounded-r-lg transition-all cursor-pointer ${
+        isSelected 
+          ? 'bg-primary/20 ring-2 ring-primary/30' 
+          : 'bg-card hover:bg-accent/30'
+      }`}
+      onClick={handleClick}
+      data-testid={`email-item-${email.id}`}
+    >
       <div className="flex items-start gap-3 mb-3">
         <button 
           className="mt-1 p-1 hover:bg-primary/10 rounded transition-colors" 
           data-testid={`checkbox-done-${email.id}`}
-          onClick={() => toast({ title: "Task completed", description: "Mark as done feature coming soon!" })}
+          onClick={handleCheckboxClick}
         >
           <CheckSquare className="w-5 h-5 text-muted-foreground" />
         </button>
