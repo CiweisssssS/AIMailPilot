@@ -11,9 +11,9 @@ interface TaskScheduleProps {
 export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
   // Group all emails by priority (not just those with tasks)
   // This ensures high-priority emails are visible even without extracted tasks
-  const urgentEmails = analyzedEmails.filter(e => e.priority.label === "P1 - Urgent");
-  const todoEmails = analyzedEmails.filter(e => e.priority.label === "P2 - To-do");
-  const fyiEmails = analyzedEmails.filter(e => e.priority.label === "P3 - FYI");
+  const urgentEmails = analyzedEmails.filter(e => e.priority.label.includes("P1"));
+  const todoEmails = analyzedEmails.filter(e => e.priority.label.includes("P2"));
+  const fyiEmails = analyzedEmails.filter(e => e.priority.label.includes("P3"));
 
   return (
     <div className="relative h-full">

@@ -10,7 +10,7 @@ interface FlaggedMailsProps {
 
 export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
   // For now, treat P1 Urgent emails as "flagged" since we don't have explicit flagging yet
-  const flaggedEmails = analyzedEmails.filter(email => email.priority.label === "P1 - Urgent");
+  const flaggedEmails = analyzedEmails.filter(email => email.priority.label.includes("P1"));
 
   return (
     <div className="h-full flex flex-col">

@@ -128,9 +128,9 @@ export default function Home() {
   // Calculate summary statistics
   const summary = analyzedEmails.length > 0 ? {
     total: analyzedEmails.length,
-    urgent: analyzedEmails.filter(e => e.priority.label === "P1 - Urgent").length,
-    todo: analyzedEmails.filter(e => e.priority.label === "P2 - To-do").length,
-    fyi: analyzedEmails.filter(e => e.priority.label === "P3 - FYI").length,
+    urgent: analyzedEmails.filter(e => e.priority.label.includes("P1")).length,
+    todo: analyzedEmails.filter(e => e.priority.label.includes("P2")).length,
+    fyi: analyzedEmails.filter(e => e.priority.label.includes("P3")).length,
   } : { total: 0, urgent: 0, todo: 0, fyi: 0 };
 
   // CONDITIONAL RENDERING - After all hooks

@@ -11,9 +11,9 @@ interface CategoryDetailProps {
 export default function CategoryDetail({ category, analyzedEmails, onBack, onChatbotClick }: CategoryDetailProps) {
   // Filter emails by category
   const filteredEmails = analyzedEmails.filter(email => {
-    if (category === "urgent") return email.priority.label === "P1 - Urgent";
-    if (category === "todo") return email.priority.label === "P2 - To-do";
-    if (category === "fyi") return email.priority.label === "P3 - FYI";
+    if (category === "urgent") return email.priority.label.includes("P1");
+    if (category === "todo") return email.priority.label.includes("P2");
+    if (category === "fyi") return email.priority.label.includes("P3");
     return false;
   });
 

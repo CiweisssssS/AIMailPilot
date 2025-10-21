@@ -29,9 +29,9 @@ export default function InboxReminder({
   onTaskScheduleClick
 }: InboxReminderProps) {
   // Get latest email for each category
-  const urgentEmails = analyzedEmails.filter(e => e.priority.label === "P1 - Urgent");
-  const todoEmails = analyzedEmails.filter(e => e.priority.label === "P2 - To-do");
-  const fyiEmails = analyzedEmails.filter(e => e.priority.label === "P3 - FYI");
+  const urgentEmails = analyzedEmails.filter(e => e.priority.label.includes("P1"));
+  const todoEmails = analyzedEmails.filter(e => e.priority.label.includes("P2"));
+  const fyiEmails = analyzedEmails.filter(e => e.priority.label.includes("P3"));
 
   const latestUrgent = urgentEmails[0];
   const latestTodo = todoEmails[0];
