@@ -103,12 +103,12 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
             try:
                 # Get raw deadline from LLM
                 raw_due = task_dict.get('due')
-                logger.info(f"Processing task: {task_dict.get('title', 'Unknown')}, raw_due: {raw_due}")
                 
                 # Normalize deadline using strict rules
                 if raw_due:
+                    logger.info(f"Task '{task_dict.get('title', 'Unknown')}': raw_due='{raw_due}'")
                     normalized_due = normalize_deadline(str(raw_due), ref_datetime, "UTC")
-                    logger.info(f"Normalized deadline: '{raw_due}' -> '{normalized_due}'")
+                    logger.info(f"  Normalized: '{raw_due}' -> '{normalized_due}'")
                 else:
                     normalized_due = "TBD"
                     logger.info(f"No deadline provided, using TBD")

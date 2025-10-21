@@ -164,12 +164,19 @@ def normalize_deadline(
         deadline = tomorrow.replace(hour=hour, minute=0, second=0, microsecond=0)
         return format_deadline(deadline)
     
-    # Explicit date with time: "Oct 3, 5pm", "October 10, 17:00", "by Oct 3, 5pm"
-    # Pattern: Month DD, HH:mm or Month DD, HH am/pm
+    # Explicit date with time: "Oct 3, 5pm", "Oct 27 at 10am", "October 10, 17:00", "by Oct 3, 5pm"
+    # Pattern 1: "Month DD at HH:mm" or "Month DD at HH am/pm"
     date_time_match = re.search(
-        r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:,?\s+|,\s+)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+        r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
         text
     )
+    # Pattern 2: "Month DD, HH:mm" or "Month DD HH:mm" (no "at")
+    if not date_time_match:
+        date_time_match = re.search(
+            r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:,?\s+|,\s+)(\d{1,2})(?::(\d{2}))?\s*(am|pm)?',
+            text
+        )
+    
     if date_time_match:
         month_abbr = date_time_match.group(1)
         day = int(date_time_match.group(2))
