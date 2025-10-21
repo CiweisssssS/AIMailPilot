@@ -66,11 +66,16 @@ async def process_thread(request: ProcessThreadRequest):
 @router.post("/api/chatbot-qa", response_model=ChatbotQAResponse)
 async def chatbot_qa(request: ChatbotQARequest):
     try:
-        # Convert simple thread array to ThreadData if needed
+        # Convert simple thread array or dict to ThreadData if needed
         thread_data = request.thread
         
+        # If thread is a dict, convert to ThreadData
+        if isinstance(thread_data, dict):
+            from app.models.schemas import ThreadData, NormalizedMessage, TimelineItem
+            thread_data = ThreadData(**thread_data)
+        
         # If thread is a list (from Apps Script), validate and convert to ThreadData
-        if isinstance(thread_data, list):
+        elif isinstance(thread_data, list):
             from app.models.schemas import ThreadData, NormalizedMessage, TimelineItem, AppsScriptMessage
             
             # Validate as AppsScriptMessage list
