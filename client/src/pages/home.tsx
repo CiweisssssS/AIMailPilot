@@ -21,11 +21,21 @@ interface AuthStatus {
 }
 
 export default function Home() {
+  // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
   // Check authentication status
   const { data: authStatus, isLoading: authLoading, refetch: refetchAuth } = useQuery<AuthStatus>({
     queryKey: ["/api/auth/status"],
   });
 
+  // State hooks
+  const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
+  const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
+  const { toast } = useToast();
+
+  // Fetch Gmail emails (only if authenticated)
+  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(50);
+  
+  // Mutations
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout");
@@ -34,7 +44,52 @@ export default function Home() {
       refetchAuth();
     }
   });
+  
+  const analyzeMutation = useAnalyzeEmails();
+  const refreshMutation = useRefreshEmails();
 
+  // Auto-analyze emails when they are loaded (only if authenticated)
+  useEffect(() => {
+    if (authStatus?.authenticated && gmailData?.emails && gmailData.emails.length > 0 && analyzedEmails.length === 0 && !analyzeMutation.isPending) {
+      analyzeMutation.mutate(gmailData.emails, {
+        onSuccess: (data) => {
+          setAnalyzedEmails(data.analyzed_emails);
+        },
+      });
+    }
+  }, [gmailData?.emails, authStatus?.authenticated]);
+
+  // Event handlers
+  const handleEmailClick = (email: GmailEmail) => {
+    setSelectedEmailId(email.id);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setAnalyzedEmails([]);
+      await refetch();
+      toast({
+        title: "Refreshed",
+        description: "Emails refreshed successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh emails",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Calculate summary statistics
+  const summary = analyzedEmails.length > 0 ? {
+    total: analyzedEmails.length,
+    urgent: analyzedEmails.filter(e => e.priority.label === "P1 - Urgent").length,
+    todo: analyzedEmails.filter(e => e.priority.label === "P2 - To-do").length,
+    fyi: analyzedEmails.filter(e => e.priority.label === "P3 - FYI").length,
+  } : { total: 0, urgent: 0, todo: 0, fyi: 0 };
+
+  // CONDITIONAL RENDERING - After all hooks
   // Show loading state while checking auth
   if (authLoading) {
     return (
@@ -89,60 +144,6 @@ export default function Home() {
       </div>
     );
   }
-
-  // Fetch Gmail emails
-  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(50);
-  const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
-  const [analyzedEmails, setAnalyzedEmails] = useState<AnalyzedEmail[]>([]);
-  const { toast } = useToast();
-  
-  // Analyze emails mutation
-  const analyzeMutation = useAnalyzeEmails();
-  
-  // Refresh mutation
-  const refreshMutation = useRefreshEmails();
-
-  // Auto-analyze emails when they are loaded
-  useEffect(() => {
-    if (gmailData?.emails && gmailData.emails.length > 0 && analyzedEmails.length === 0 && !analyzeMutation.isPending) {
-      analyzeMutation.mutate(gmailData.emails, {
-        onSuccess: (data) => {
-          setAnalyzedEmails(data.analyzed_emails);
-        },
-      });
-    }
-  }, [gmailData?.emails]);
-
-  const handleEmailClick = (email: GmailEmail) => {
-    setSelectedEmailId(email.id);
-  };
-
-  const handleRefresh = async () => {
-    try {
-      // Clear analyzed emails to trigger re-analysis
-      setAnalyzedEmails([]);
-      // Refetch emails
-      await refetch();
-      toast({
-        title: "Refreshed",
-        description: "Emails refreshed successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to refresh emails",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Calculate summary statistics
-  const summary = analyzedEmails.length > 0 ? {
-    total: analyzedEmails.length,
-    urgent: analyzedEmails.filter(e => e.priority.label === "P1 - Urgent").length,
-    todo: analyzedEmails.filter(e => e.priority.label === "P2 - To-do").length,
-    fyi: analyzedEmails.filter(e => e.priority.label === "P3 - FYI").length,
-  } : { total: 0, urgent: 0, todo: 0, fyi: 0 };
 
   // Show main application with three-column layout
   return (
