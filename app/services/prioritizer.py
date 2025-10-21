@@ -1,171 +1,121 @@
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+import json
 import logging
 from app.models.schemas import Priority, Task, PersonalizedKeyword
-from app.core.model_manager import model_manager
+from app.services.feature_extractor import extract_features, format_features_for_llm
+from app.core.llm import llm_provider
+from app.core.prompts import PRIORITIZATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-BOSS_DOMAINS = ['ceo', 'boss', 'manager', 'director']
-CLIENT_DOMAINS = ['client', 'customer']
 
-# Semantic similarity threshold for keyword matching
-SEMANTIC_THRESHOLD = 0.65  # Lower than exact match but higher than random
-
-
-def calculate_priority(
+async def calculate_priority(
     messages: List[Dict[str, Any]],
     tasks: List[Task],
     personalized_keywords: List[PersonalizedKeyword]
 ) -> Priority:
-    score = 0.0
-    reasons = []
+    """
+    Hybrid prioritization: Rule-based feature extraction + GPT-4o-mini decision
     
-    now = datetime.now()
+    Args:
+        messages: List of email message dicts
+        tasks: Extracted tasks (not currently used, reserved for future)
+        personalized_keywords: User keywords (not currently used, reserved for future)
     
-    for task in tasks:
-        if task.due:
-            try:
-                due_date = datetime.fromisoformat(task.due.replace('Z', '+00:00'))
-                time_diff = (due_date - now).total_seconds() / 3600
-                
-                if time_diff <= 24:
-                    score += 0.4
-                    reasons.append(f"due date within 24h ({task.title[:30]}...)")
-                elif time_diff <= 72:
-                    score += 0.2
-                    reasons.append(f"due date within 72h ({task.title[:30]}...)")
-                
-                if task.type == "meeting" and time_diff <= 48:
-                    score += 0.3
-                    reasons.append(f"meeting within 48h ({task.title[:30]}...)")
-            except:
-                pass
+    Returns:
+        Priority object with label, score, and reasons
+    """
     
+    # Step 1: Extract rule-based features (0-1 values)
+    features = extract_features(messages)
+    
+    # Step 2: Prepare email content for LLM
+    combined_text = ""
     for msg in messages:
-        sender = msg.get('from_', '').lower()
+        subject = msg.get('subject', '')
+        body = msg.get('clean_body', msg.get('body', ''))
+        sender = msg.get('from_', 'Unknown')
+        combined_text += f"From: {sender}\nSubject: {subject}\n{body}\n\n"
+    
+    # Limit text length to avoid token limits
+    if len(combined_text) > 3000:
+        combined_text = combined_text[:3000] + "... [truncated]"
+    
+    # Step 3: Format features for LLM context
+    features_text = format_features_for_llm(features)
+    
+    # Step 4: Call GPT-4o-mini for final classification
+    llm_messages = [
+        {"role": "system", "content": PRIORITIZATION_PROMPT},
+        {"role": "user", "content": f"{features_text}\n\n**Email Content:**\n{combined_text}"}
+    ]
+    
+    try:
+        response = await llm_provider._call_openai(llm_messages, temperature=0.3)
         
-        for domain in BOSS_DOMAINS + CLIENT_DOMAINS:
-            if domain in sender:
-                score += 0.2
-                reasons.append(f"important sender: {domain}")
-                break
-    
-    # Semantic keyword matching with MiniLM
-    weight_map = {"High": 2.0, "Medium": 1.0, "Low": 0.5}
-    
-    for keyword in personalized_keywords:
-        term = keyword.term.lower()
-        weight_value = weight_map.get(keyword.weight, 1.0)
-        scope = keyword.scope.lower()
+        # Parse JSON response
+        response_clean = response.strip()
+        if '```json' in response_clean:
+            response_clean = response_clean.split('```json')[1].split('```')[0].strip()
+        elif '```' in response_clean:
+            response_clean = response_clean.split('```')[1].split('```')[0].strip()
         
-        try:
-            # Embed keyword once
-            keyword_emb = model_manager.embed_texts([term])[0]
-            
-            # Check for zero vector
-            if sum(keyword_emb) == 0 or any(x != x for x in keyword_emb):  # NaN check
-                logger.warning(f"Invalid embedding for keyword '{term}', using fallback")
-                # Fallback to simple substring matching
-                for msg in messages:
-                    match_found = False
-                    
-                    if 'subject' in scope and term in msg.get('subject', '').lower():
-                        score += 0.1 * weight_value
-                        reasons.append(f"keyword '{term}' in subject (exact)")
-                        match_found = True
-                    
-                    if not match_found and 'body' in scope and term in msg.get('clean_body', msg.get('body', '')).lower():
-                        score += 0.1 * weight_value
-                        reasons.append(f"keyword '{term}' in body (exact)")
-                        match_found = True
-                    
-                    if not match_found and 'sender' in scope and term in msg.get('from_', '').lower():
-                        score += 0.1 * weight_value
-                        reasons.append(f"keyword '{term}' in sender (exact)")
-                    
-                    if match_found:
-                        break
-                continue
-            
-            for msg in messages:
-                match_found = False
-                
-                if 'subject' in scope:
-                    subject = msg.get('subject', '')
-                    if subject:
-                        subject_emb = model_manager.embed_texts([subject])[0]
-                        similarity = cosine_similarity(keyword_emb, subject_emb)
-                        
-                        if similarity >= SEMANTIC_THRESHOLD:
-                            score += 0.1 * weight_value
-                            reasons.append(f"keyword '{term}' in subject (semantic {similarity:.2f})")
-                            match_found = True
-                
-                if not match_found and 'body' in scope:
-                    body = msg.get('clean_body', msg.get('body', ''))
-                    if body:
-                        # For long bodies, chunk into sentences and find best match
-                        body_sentences = body.split('. ')[:10]  # Limit to first 10 sentences
-                        body_embs = model_manager.embed_texts(body_sentences)
-                        
-                        max_sim = max(
-                            (cosine_similarity(keyword_emb, emb) for emb in body_embs),
-                            default=0.0
-                        )
-                        
-                        if max_sim >= SEMANTIC_THRESHOLD:
-                            score += 0.1 * weight_value
-                            reasons.append(f"keyword '{term}' in body (semantic {max_sim:.2f})")
-                            match_found = True
-                
-                if not match_found and 'sender' in scope:
-                    sender = msg.get('from_', '')
-                    if sender:
-                        sender_emb = model_manager.embed_texts([sender])[0]
-                        similarity = cosine_similarity(keyword_emb, sender_emb)
-                        
-                        if similarity >= SEMANTIC_THRESHOLD:
-                            score += 0.1 * weight_value
-                            reasons.append(f"keyword '{term}' in sender (semantic {similarity:.2f})")
-                
-                if match_found:
-                    break
-                    
-        except Exception as e:
-            logger.error(f"Semantic matching failed for keyword '{term}': {e}")
-            # Silent fallback - skip this keyword
-            continue
+        result = json.loads(response_clean)
+        
+        priority_label = result.get('priority', 'P3')
+        reason = result.get('reason', 'LLM classification')
+        
+        # Map priority to score
+        score_map = {"P1": 0.85, "P2": 0.55, "P3": 0.25}
+        score = score_map.get(priority_label, 0.5)
+        
+        logger.info(f"GPT-4o-mini classified as {priority_label}: {reason}")
+        
+        return Priority(
+            label=priority_label,
+            score=score,
+            reasons=[reason]
+        )
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse LLM response as JSON: {e}, using fallback")
+    except Exception as e:
+        logger.error(f"LLM prioritization failed: {e}, using fallback")
     
-    score = min(score, 1.0)
+    # Fallback: Use rule-based scoring if LLM fails
+    return _fallback_priority(features)
+
+
+def _fallback_priority(features: Dict[str, float]) -> Priority:
+    """
+    Fallback rule-based prioritization using weighted scoring
+    """
+    score = (
+        0.40 * features["deadline_proximity"]
+        + 0.25 * features["urgent_terms"]
+        + 0.20 * features["request_terms"]
+        + 0.10 * features["sender_weight"]
+        + 0.05 * features["direct_recipient"]
+        - 0.15 * features["deescalators"]
+        - 0.20 * features["noise_signals"]
+    )
+    
+    score = max(0.0, min(1.0, score))
     
     if score >= 0.75:
         label = "P1"
+        reason = "High urgency based on deadline and urgent terms"
     elif score >= 0.45:
         label = "P2"
+        reason = "Action required based on request terms"
     else:
         label = "P3"
+        reason = "Low priority or informational content"
     
-    if not reasons:
-        reasons = ["no urgent indicators found"]
+    logger.info(f"Fallback classification: {label} (score={score:.2f})")
     
     return Priority(
         label=label,
         score=round(score, 2),
-        reasons=reasons[:5]
+        reasons=[reason]
     )
-
-
-def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
-    """Compute cosine similarity between two vectors"""
-    if len(vec_a) != len(vec_b):
-        return 0.0
-    
-    dot = sum(a * b for a, b in zip(vec_a, vec_b))
-    norm_a = (sum(a ** 2 for a in vec_a)) ** 0.5
-    norm_b = (sum(b ** 2 for b in vec_b)) ** 0.5
-    
-    if norm_a < 1e-9 or norm_b < 1e-9:
-        return 0.0
-    
-    return dot / (norm_a * norm_b)
