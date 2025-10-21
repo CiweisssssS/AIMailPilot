@@ -1,24 +1,75 @@
 SUMMARY_PROMPT = """Summarize the email thread in ≤3 sentences. Include dates, owners, and concrete deliverables if present."""
 
-EXTRACTION_PROMPT = """From these emails, return JSON with fields: title, owner (email or name if explicit), due (ISO if parseable else null), source_message_id, type in {deadline, meeting, action}. No prose."""
+EXTRACTION_PROMPT = """You are a task extraction system. Extract actionable tasks from emails and format them EXACTLY as: [verb + object + owner + due].
+
+**Format Requirements:**
+- title: MUST follow pattern "[VERB + OBJECT + OWNER + DUE]"
+  - VERB: Action word (Submit, Review, Complete, Send, Schedule, Approve, etc.)
+  - OBJECT: What needs to be done (report, proposal, meeting, etc.)
+  - OWNER: Who is responsible (use name/email if mentioned, otherwise "team")
+  - DUE: When it's due (use specific date if mentioned, otherwise "TBD")
+
+**Examples:**
+- "Submit Q4 report by Alice by Friday" → title: "[Submit Q4 report Alice Friday]"
+- "Please review the proposal" → title: "[Review proposal team TBD]"
+- "Schedule meeting with Bob before EOD" → title: "[Schedule meeting team EOD today]"
+- "John needs to approve budget by tomorrow" → title: "[Approve budget John tomorrow]"
+
+**Return JSON array:**
+[
+  {
+    "title": "[VERB OBJECT OWNER DUE]",
+    "owner": "name or email",
+    "due": "ISO date or null",
+    "source_message_id": "msg_id",
+    "type": "deadline" | "meeting" | "action"
+  }
+]
+
+Only extract clear, actionable tasks. No informational statements. If no tasks exist, return empty array []."""
 
 QA_PROMPT = """Answer strictly from the provided snippets. If unknown, say 'Not found in thread.' Return a concise sentence; also list the source_message_ids used."""
 
-PRIORITIZATION_PROMPT = """You are an intelligent email prioritization system. Based on the extracted features and email content, classify this email into one of three priority levels:
+PRIORITIZATION_PROMPT = """You are an email prioritization system. Classify this email into P1/P2/P3 based on urgency, deadlines, and importance.
 
-- **P1 (Urgent)**: Requires immediate action, deadline within 24-48 hours, or contains critical/blocking issues
-- **P2 (To-do)**: Needs action but not urgent, can be handled within a few days
-- **P3 (FYI)**: Informational only, no action required, or low priority
+**Priority Definitions:**
 
-**Analysis Guidelines:**
-1. High deadline_proximity (>0.7) + urgent_terms (>0.5) → likely P1
-2. Request_terms (>0.5) with no urgent_terms → likely P2
-3. High noise_signals (>0.5) or low request_terms (<0.3) → likely P3
-4. De-escalators (>0.5) downgrade priority (P1→P2, P2→P3)
-5. Important sender (sender_weight=1.0) can upgrade priority by one level
+**P1 (Urgent)** - Requires immediate action:
+- Contains: "ASAP", "urgent", "critical", "blocking", "emergency", "immediately"
+- Deadline: Within 24-48 hours (today, tonight, tomorrow, by EOD)
+- Impact: System outage, production issue, executive request, client escalation
+- Examples:
+  * "Server down - need immediate fix"
+  * "Client presentation due tomorrow morning"
+  * "CEO needs budget approval by EOD"
 
-**Return JSON only:**
+**P2 (To-do)** - Needs action but not urgent:
+- Contains: "please", "could you", "can you", "need", "help", "feedback", "review"
+- Deadline: Within a week ("this week", "by Friday", "next week")
+- Impact: Important but not blocking, team requests, project tasks
+- Examples:
+  * "Please review proposal by end of week"
+  * "Can you send me the Q3 numbers?"
+  * "Need your feedback on the design"
+
+**P3 (FYI)** - Informational or low priority:
+- Contains: "FYI", "for your information", "no action needed", "unsubscribe", newsletters
+- Deadline: None or far future (>1 week)
+- Impact: Updates, announcements, marketing, spam
+- Examples:
+  * "Weekly team update - project on track"
+  * "Newsletter: New features launched"
+  * "FYI - meeting notes attached"
+
+**Classification Rules:**
+1. IF urgent keywords (urgent/ASAP/critical) OR deadline <24h → P1
+2. IF request keywords (please/need/help) AND deadline <7 days → P2
+3. IF noise signals (newsletter/promo/unsubscribe) OR no action → P3
+4. IF "no rush" or "whenever" mentioned → Downgrade by 1 level
+5. IF sender is boss/CEO/client → Upgrade by 1 level (max P1)
+
+**Based on features and email content, classify and return JSON:**
 {
   "priority": "P1" | "P2" | "P3",
-  "reason": "Brief explanation (1 sentence)"
+  "reason": "Brief explanation with specific evidence"
 }"""
