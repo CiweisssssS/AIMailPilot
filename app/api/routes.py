@@ -346,15 +346,51 @@ async def triage_emails(request: dict):
             batch_results = await asyncio.gather(*[analyze_single_email(msg) for msg in batch])
             all_results.extend(batch_results)
         
-        # Separate results into individual lists
-        priorities = [r['priority'] for r in all_results]
-        summaries = [r['summary'] for r in all_results]
-        tasks_list = [r['tasks'] for r in all_results]
+        # Transform into frontend-expected format
+        analyzed_emails = []
+        urgent_count = 0
+        todo_count = 0
+        fyi_count = 0
+        
+        for i, result in enumerate(all_results):
+            msg = messages[i]
+            priority = result['priority']
+            
+            # Count by priority level
+            if 'P1' in priority['label']:
+                urgent_count += 1
+            elif 'P2' in priority['label']:
+                todo_count += 1
+            else:
+                fyi_count += 1
+            
+            # Extract first task as task_extracted string
+            task_extracted = None
+            if result['tasks'] and len(result['tasks']) > 0:
+                first_task = result['tasks'][0]
+                task_extracted = first_task.get('title', 'Task extracted')
+            
+            analyzed_emails.append({
+                'id': msg.get('id', 'unknown'),
+                'threadId': msg.get('threadId', msg.get('thread_id', '')),
+                'subject': msg.get('subject', ''),
+                'from': msg.get('from_', 'unknown'),
+                'snippet': msg.get('snippet', '')[:100],
+                'date': msg.get('date', ''),
+                'summary': result['summary'],
+                'priority': priority,
+                'tasks': result['tasks'],
+                'task_extracted': task_extracted
+            })
         
         return {
-            "priorities": priorities,
-            "summaries": summaries,
-            "tasks": tasks_list
+            "analyzed_emails": analyzed_emails,
+            "summary": {
+                "total": len(analyzed_emails),
+                "urgent": urgent_count,
+                "todo": todo_count,
+                "fyi": fyi_count
+            }
         }
     
     except Exception as e:

@@ -105,12 +105,13 @@ export const analyzedEmailSchema = z.object({
   id: z.string(),
   threadId: z.string(),
   subject: z.string(),
-  from_: z.string(),
+  from: z.string(),
   snippet: z.string(),
   date: z.string(),
   summary: z.string(),
   priority: prioritySchema,
   tasks: z.array(taskSchema),
+  task_extracted: z.string().nullable().optional(),
 });
 
 export const triageResponseSchema = z.object({
