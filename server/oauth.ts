@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import type { Request, Response } from "express";
+import { randomBytes } from "crypto";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -49,10 +50,23 @@ export async function handleGoogleAuth(req: Request, res: Response) {
   try {
     const oauth2Client = getOAuth2Client(req);
     
+    // Generate cryptographically secure random state for CSRF protection
+    const state = randomBytes(32).toString('hex');
+    
+    // Store state in session for verification in callback
+    req.session.oauthState = state;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: SCOPES,
-      prompt: "consent" // Force to get refresh token
+      prompt: "consent", // Force to get refresh token
+      state: state // Include state parameter for CSRF protection
     });
 
     console.log("Redirecting to Google OAuth URL...");
@@ -133,10 +147,30 @@ export async function handleGoogleAuth(req: Request, res: Response) {
 export async function handleGoogleCallback(req: Request, res: Response) {
   try {
     const code = req.query.code as string;
+    const state = req.query.state as string;
     
     if (!code) {
       return res.status(400).send("Authorization code not provided");
     }
+
+    // Verify state parameter for CSRF protection
+    const sessionState = req.session.oauthState;
+    if (!state || !sessionState || state !== sessionState) {
+      // Clear session on state mismatch
+      req.session.destroy(() => {});
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 100px auto; padding: 20px;">
+            <h1>⚠️ Authentication Failed</h1>
+            <p>Invalid or missing state parameter. This may indicate a CSRF attack or expired session.</p>
+            <p><a href="/">← Return to Home</a></p>
+          </body>
+        </html>
+      `);
+    }
+
+    // Clear state from session after successful verification
+    delete req.session.oauthState;
 
     const oauth2Client = getOAuth2Client(req);
     
