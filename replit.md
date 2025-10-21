@@ -2,7 +2,7 @@
 
 ## Overview
 
-An AI-powered email assistant designed as a Gmail Workspace Add-on with a Python FastAPI backend and Google Apps Script frontend. The system provides inbox-level intelligence through a **5-layer sidebar interface** that analyzes multiple emails using **delta fetch + "Read = Processed" strategy**. All analysis runs on **local CPU-only Hugging Face models** (no paid LLM APIs required).
+An AI-powered email assistant designed as a Gmail Workspace Add-on with a Python FastAPI backend and Google Apps Script frontend. The system provides inbox-level intelligence through a **5-layer sidebar interface** that analyzes multiple emails using **delta fetch + "Read = Processed" strategy**. Analysis uses **GPT-4o-mini** with a **hybrid rule-based + LLM architecture** for intelligent email prioritization, summarization, and task extraction.
 
 ## User Preferences
 
@@ -35,20 +35,19 @@ Preferred communication style: Simple, everyday language.
 
 **Service Layer Pattern**: Modular services for distinct responsibilities:
 - **Normalizer**: Sorts messages chronologically, deduplicates, strips quoted replies and signatures
-- **Summarizer**: CPU-only DistilBART (distilbart-cnn-12-6) for extractive summarization with rule-based fallback
-- **Extractor**: Hybrid approach - MiniLM embeddings (all-MiniLM-L6-v2), BERT-NER (bert-base-NER), and Flan-T5-small for task/owner/deadline extraction with regex patterns as fallback
-- **Prioritizer**: Score-based classification (P1 Urgent / P2 To-do / P3 FYI) using deadline proximity, sender importance, meeting detection, and personalized keyword weights
-- **QA Service**: RAG pipeline with ms-marco-MiniLM-L-6-v2 for embedding/retrieval, fuzzy matching with rapidfuzz, and Flan-T5-small for answer generation
+- **Summarizer**: GPT-4o-mini for intelligent summarization with subject-based fallback
+- **Extractor**: GPT-4o-mini for task/owner/deadline extraction with validation and fallback handling
+- **Prioritizer**: **Hybrid architecture** - Rule-based feature extraction (deadline_proximity, urgent_terms, request_terms, deescalators, noise_signals, sender_weight, direct_recipient) → GPT-4o-mini semantic classification → Fallback to weighted scoring on API errors
+- **QA Service**: Prompt-based RAG using GPT-4o-mini with recent message snippets for context
 - **User Settings**: SQLite-based custom tag storage
 
-**Analysis Mode**: Local CPU-only Hugging Face models (no paid APIs) - embedding-based retrieval, transformer-based NER, seq2seq summarization/QA, with heuristic fallbacks for robustness
+**Analysis Mode**: GPT-4o-mini (OpenAI API) with intelligent fallback mechanisms. When API calls fail, services gracefully degrade to rule-based heuristics ensuring continuous operation.
 
-**Model Stack**: All models run on CPU with batch_size=5 lazy loading:
-- **all-MiniLM-L6-v2**: Sentence embeddings (384-dim)
-- **bert-base-NER**: Named entity recognition for persons/organizations
-- **distilbart-cnn-12-6**: Abstractive summarization
-- **flan-t5-small**: Task extraction and QA answer generation
-- **ms-marco-MiniLM-L-6-v2**: Passage retrieval embeddings
+**AI Model**: **GPT-4o-mini** - OpenAI's lightweight model optimized for speed and cost
+- Cost: $0.15/M input tokens, $0.60/M output tokens
+- Temperature: 0.3-0.7 depending on task (lower for extraction, higher for summarization)
+- Max tokens: 500 per request
+- Retry strategy: Exponential backoff (3 attempts) via tenacity
 
 **Data Flow**: Stateless request/response model - no email storage, only derived analysis results. User preferences persisted in SQLite.
 
@@ -102,7 +101,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Third-Party Services
 
-**OpenAI API** (not used): System uses fully heuristic analysis - no paid LLM APIs required
+**OpenAI API** (GPT-4o-mini): Primary AI engine for summarization, task extraction, and hybrid prioritization. API key stored in environment variables (OPENAI_API_KEY). Fallback mechanisms ensure system continues operating if API quota is exceeded or service is unavailable.
 
 **Gmail API**: Advanced service enabled in Apps Script for email thread retrieval and metadata access.
 

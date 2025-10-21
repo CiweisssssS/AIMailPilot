@@ -71,13 +71,13 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
         tasks = []
         for task_dict in tasks_data:
             try:
+                # Ensure all required fields have valid defaults
                 task = Task(
-                    title=task_dict.get('title', 'Untitled'),
-                    owner=task_dict.get('owner', 'team'),
+                    title=task_dict.get('title') or 'Untitled',
+                    owner=task_dict.get('owner') or 'team',  # Ensure owner is never None
                     due=task_dict.get('due'),
-                    source_message_id=task_dict.get('source_message_id', 
-                                                   messages[0].get('id', 'unknown')),
-                    type=task_dict.get('type', 'action')
+                    source_message_id=task_dict.get('source_message_id') or (messages[0].get('id', 'unknown') if messages else 'unknown'),
+                    type=task_dict.get('type') or 'action'
                 )
                 tasks.append(task)
             except Exception as e:
