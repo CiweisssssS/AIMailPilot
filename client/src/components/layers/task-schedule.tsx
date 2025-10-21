@@ -21,14 +21,16 @@ interface TaskWithEmail {
 }
 
 export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefreshClick, onInboxReminderClick }: TaskScheduleProps) {
-  // Flatten all tasks with their email context
-  const allTasks: TaskWithEmail[] = analyzedEmails.flatMap(email =>
-    email.tasks.map((task, index) => ({
-      email,
-      taskIndex: index,
-      due: task.due
-    }))
-  );
+  // Flatten all tasks with their email context, filter for P1 and P2 only
+  const allTasks: TaskWithEmail[] = analyzedEmails
+    .filter(email => email.priority?.label === 'P1' || email.priority?.label === 'P2')
+    .flatMap(email =>
+      email.tasks.map((task, index) => ({
+        email,
+        taskIndex: index,
+        due: task.due
+      }))
+    );
 
   // Group tasks by time bucket
   const groupedTasks = groupTasksByBucket(allTasks);
