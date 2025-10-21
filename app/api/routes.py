@@ -368,12 +368,26 @@ async def triage_emails(request: dict):
             task_extracted = None
             if result['tasks'] and len(result['tasks']) > 0:
                 first_task = result['tasks'][0]
-                task_extracted = first_task.get('title', 'Task extracted')
+                # Tasks are Pydantic objects, not dicts - access attribute directly
+                if hasattr(first_task, 'title'):
+                    task_extracted = first_task.title
+                elif isinstance(first_task, dict):
+                    task_extracted = first_task.get('title', None)
             
             # Safe snippet handling
             snippet = msg.get('snippet', '') or ''
             if snippet and len(snippet) > 100:
                 snippet = snippet[:100]
+            
+            # Convert tasks to dicts if they are Pydantic objects
+            tasks_list = []
+            for task in result['tasks']:
+                if hasattr(task, 'dict'):
+                    tasks_list.append(task.dict())
+                elif isinstance(task, dict):
+                    tasks_list.append(task)
+                else:
+                    tasks_list.append({'title': str(task)})
             
             analyzed_emails.append({
                 'id': msg.get('id', 'unknown'),
@@ -384,7 +398,7 @@ async def triage_emails(request: dict):
                 'date': msg.get('date', ''),
                 'summary': result['summary'],
                 'priority': priority,
-                'tasks': result['tasks'],
+                'tasks': tasks_list,
                 'task_extracted': task_extracted
             })
         
