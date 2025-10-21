@@ -123,7 +123,7 @@ export default function MailLayout({
           />
         );
       case "chatbot":
-        return <Chatbot onBack={handleBack} />;
+        return <Chatbot onBack={handleBack} analyzedEmails={analyzedEmails} />;
       case "customize-priorities":
         return (
           <CustomizePriorities

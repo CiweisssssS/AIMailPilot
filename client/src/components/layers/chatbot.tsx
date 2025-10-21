@@ -1,18 +1,108 @@
-import { ArrowLeft, Mail, Send } from "lucide-react";
+import { ArrowLeft, Mail, Send, User, Bot } from "lucide-react";
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { AnalyzedEmail } from "@shared/schema";
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
 
 interface ChatbotProps {
   onBack: () => void;
+  analyzedEmails?: AnalyzedEmail[];
 }
 
-export default function Chatbot({ onBack }: ChatbotProps) {
+export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
   const [message, setMessage] = useState("");
+  const [chatHistory, setChatHistory] = useState<Message[]>([]);
+
+  // Prepare thread data from analyzed emails for API
+  const prepareThreadData = () => {
+    if (analyzedEmails.length === 0) {
+      return {
+        thread_id: "empty-thread",
+        participants: [],
+        timeline: [],
+        normalized_messages: []
+      };
+    }
+
+    const participants = new Set<string>();
+    const timeline: any[] = [];
+    const normalized_messages: any[] = [];
+
+    analyzedEmails.forEach(email => {
+      participants.add(email.from);
+      email.tasks?.forEach(task => {
+        if (task.owner) participants.add(task.owner);
+      });
+
+      timeline.push({
+        id: email.id,
+        date: email.date,
+        subject: email.subject
+      });
+
+      normalized_messages.push({
+        id: email.id,
+        clean_body: email.snippet || email.summary
+      });
+    });
+
+    return {
+      thread_id: analyzedEmails[0]?.threadId || "chatbot-thread",
+      participants: Array.from(participants),
+      timeline,
+      normalized_messages
+    };
+  };
+
+  const chatMutation = useMutation({
+    mutationFn: async (question: string) => {
+      const threadData = prepareThreadData();
+      const response = await apiRequest(
+        "POST",
+        "/api/chatbot-qa",
+        {
+          question,
+          thread: threadData
+        }
+      );
+      const data = await response.json();
+      return data as { answer: string; sources: string[] };
+    },
+    onSuccess: (data) => {
+      setChatHistory(prev => [...prev, {
+        role: "assistant",
+        content: data.answer
+      }]);
+    },
+    onError: (error: any) => {
+      setChatHistory(prev => [...prev, {
+        role: "assistant",
+        content: `抱歉，发生了错误：${error.message || "无法处理您的请求"}`
+      }]);
+    }
+  });
 
   const handleSend = () => {
-    if (!message.trim()) return;
-    // TODO: Implement chatbot API call
-    console.log("Sending message:", message);
+    if (!message.trim() || chatMutation.isPending) return;
+    
+    const userMessage = message.trim();
+    
+    // Add user message to history
+    setChatHistory(prev => [...prev, {
+      role: "user",
+      content: userMessage
+    }]);
+    
+    // Clear input
     setMessage("");
+    
+    // Call API
+    chatMutation.mutate(userMessage);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -35,22 +125,69 @@ export default function Chatbot({ onBack }: ChatbotProps) {
         </button>
         <div className="flex items-center gap-2 text-primary">
           <Mail className="w-5 h-5" />
-          <span className="font-semibold">AIMailPilot</span>
+          <span className="font-semibold">AIMailPilot Chatbot</span>
         </div>
       </div>
 
-      {/* Welcome Message */}
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-        <h2 className="text-3xl font-bold text-foreground mb-4">Hello, user!</h2>
-        <p className="text-base text-foreground/80 mb-8">
-          Feel free to ask me any questions.
-        </p>
-        
-        <div className="space-y-2 text-sm text-muted-foreground max-w-md">
-          <p>- Summarize all items in a category</p>
-          <p>- Search for emails or tasks by keyword</p>
-          <p>- Ask me things like 'Top 3 urgent tasks'</p>
-        </div>
+      {/* Chat Messages Area */}
+      <div className="flex-1 overflow-y-auto px-4 space-y-4">
+        {chatHistory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center px-6">
+            <h2 className="text-2xl font-bold text-foreground mb-4">你好！</h2>
+            <p className="text-base text-foreground/80 mb-6">
+              有什么可以帮到你的？
+            </p>
+            
+            <div className="space-y-2 text-sm text-muted-foreground max-w-md">
+              <p>💡 总结某个类别的所有邮件</p>
+              <p>🔍 搜索关键词相关的邮件</p>
+              <p>📋 列出前3个紧急任务</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {chatHistory.map((msg, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {msg.role === "assistant" && (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-5 h-5 text-primary" />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[85%] px-4 py-3 rounded-2xl ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                </div>
+                {msg.role === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-primary" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {chatMutation.isPending && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-5 h-5 text-primary" />
+                </div>
+                <div className="bg-muted px-4 py-3 rounded-2xl">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Input Area */}
@@ -61,13 +198,14 @@ export default function Chatbot({ onBack }: ChatbotProps) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Type your question here."
+            placeholder="在这里输入你的问题..."
             className="flex-1 bg-transparent border-0 focus:outline-none text-sm"
             data-testid="input-chatbot"
+            disabled={chatMutation.isPending}
           />
           <button 
             onClick={handleSend}
-            disabled={!message.trim()}
+            disabled={!message.trim() || chatMutation.isPending}
             className="p-2 rounded-full bg-primary hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="button-send"
           >
