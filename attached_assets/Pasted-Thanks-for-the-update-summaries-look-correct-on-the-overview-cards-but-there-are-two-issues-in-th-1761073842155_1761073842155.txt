@@ -1,0 +1,48 @@
+Thanks for the update — summaries look correct on the overview cards, but there are two issues in the category detail view:
+
+ISSUE A — Summary not synced
+- On the overview (dashboard) cards, the Summary shows the new model output correctly.
+- After clicking into a category (e.g., Urgent / To-Do), the card “Preview” text does not match the same summary; it looks like an older field and still gets truncated mid-word.
+
+ISSUE B — Hard truncation
+- In the category list, the “Preview” text is being cut by characters (mid-word). We require word-based limiting with an ellipsis added only on a word boundary.
+
+Please implement the following fixes:
+
+1) Single source of truth for summary
+   - Backend response already returns `summary` (JSON).
+   - Make ALL views read the same field:
+       * Overview cards
+       * Category list (P1/P2/P3)
+       * Detail panel header
+   - If there is any legacy field (e.g., `preview_text`), deprecate it and map to `summary` at the API adapter layer.
+   - Ensure navigation keeps the same `summary` instance (no recompute during routing).
+
+2) Word-based limit (no mid-word cut)
+   - Do NOT substring trim.
+   - Implement a small helper `limitWords(text, maxWords)`:
+       * Split by whitespace, if `> maxWords`, join first N words + "…"
+       * Never break inside a word.
+   - Use the SAME helper in all places that show a shortened summary (overview + category list).
+   - `SUMMARY_MAX_WORDS` stays configurable (default 20 for EN).
+   - If the model returns > maxWords, prefer re-ask/shorten in backend; UI is ONLY a last-mile clamp, not a hard cut.
+
+3) Rename UI label
+   - Replace every “Preview” label with “Summary” across the app:
+       * Overview cards subtitle
+       * Category list item subtitle
+       * Detail panel meta row
+   - Make sure accessibility labels/ARIA and test IDs are updated accordingly.
+
+4) Acceptance checklist
+   - The email “Deck Review Needed by EOD” should show EXACTLY this in ALL three places (overview, category, detail):
+       Summary: “Rebecca needs you to review the updated pitch deck and share your feedback by EOD.”
+   - No mid-word truncation anywhere. When clamped, it ends with a single ellipsis (“…”).
+   - Changing `SUMMARY_MAX_WORDS` (e.g., 14 → 22) updates both overview and category views consistently after a refresh.
+   - There is no longer any `preview_text` usage in the codebase (grep returns 0).
+
+5) Tests
+   - Unit test `limitWords()` with:
+       * exact boundary (N words)
+       * N+1 words (adds ellipsis on word boundary)
+       * punctuation handling*
