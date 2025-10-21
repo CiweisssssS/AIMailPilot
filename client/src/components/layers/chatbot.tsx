@@ -45,9 +45,29 @@ export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
         subject: email.subject
       });
 
+      // Build rich context including subject, summary, priority, and tasks
+      let clean_body = `Subject: ${email.subject}\n`;
+      clean_body += `From: ${email.from}\n`;
+      clean_body += `Priority: ${email.priority.label}\n`;
+      clean_body += `Summary: ${email.summary}\n`;
+      
+      if (email.tasks && email.tasks.length > 0) {
+        clean_body += `Tasks:\n`;
+        email.tasks.forEach(task => {
+          clean_body += `- ${task.title}`;
+          if (task.owner) clean_body += ` (Owner: ${task.owner})`;
+          if (task.due) clean_body += ` (Due: ${task.due})`;
+          clean_body += `\n`;
+        });
+      }
+      
+      if (email.task_extracted) {
+        clean_body += `Extracted Task: ${email.task_extracted}\n`;
+      }
+
       normalized_messages.push({
         id: email.id,
-        clean_body: email.snippet || email.summary
+        clean_body: clean_body
       });
     });
 
