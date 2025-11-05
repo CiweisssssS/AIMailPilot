@@ -112,6 +112,7 @@ export const analyzedEmailSchema = z.object({
   priority: prioritySchema,
   tasks: z.array(taskSchema),
   task_extracted: z.string().nullable().optional(),
+  is_flagged: z.boolean().optional(),
 });
 
 export const triageResponseSchema = z.object({

@@ -1,8 +1,10 @@
 import { ArrowLeft, Mail, Calendar, Bookmark, CheckSquare } from "lucide-react";
 import type { AnalyzedEmail } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { limitWords } from "@/lib/text-utils";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
@@ -120,6 +122,13 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
   const { toast } = useToast();
   const [isFlagged, setIsFlagged] = useState(false);
   
+  // Initialize flag status from email if available
+  useEffect(() => {
+    if (email.is_flagged !== undefined) {
+      setIsFlagged(email.is_flagged);
+    }
+  }, [email.is_flagged]);
+  
   const hasTask = email.task_extracted && email.task_extracted.trim() !== "" && email.task_extracted !== "None";
   const taskDisplay = hasTask ? cleanTaskTitle(email.task_extracted!) : email.subject;
   
@@ -128,13 +137,35 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
   console.log(`Email ${email.id} - Tasks:`, email.tasks, `Deadline:`, deadline);
   const formattedDeadline = formatDeadline(deadline);
   
+  // Flag toggle mutation
+  const flagMutation = useMutation({
+    mutationFn: async (newFlagStatus: boolean) => {
+      return await apiRequest("POST", "/api/flags/toggle", {
+        email_id: email.id,
+        is_flagged: newFlagStatus
+      });
+    },
+    onSuccess: (_, newFlagStatus) => {
+      setIsFlagged(newFlagStatus);
+      toast({
+        title: newFlagStatus ? "Flagged" : "Unflagged",
+        description: newFlagStatus ? "Email added to flagged" : "Email removed from flagged",
+      });
+    },
+    onError: (error) => {
+      console.error("Flag toggle failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update flag status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+  
   const handleFlag = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent email item click
-    setIsFlagged(!isFlagged);
-    toast({
-      title: isFlagged ? "Unflagged" : "Flagged",
-      description: isFlagged ? "Email removed from flagged" : "Email added to flagged",
-    });
+    const newFlagStatus = !isFlagged;
+    flagMutation.mutate(newFlagStatus);
   };
   
   const handleAddToCalendar = (e: React.MouseEvent) => {

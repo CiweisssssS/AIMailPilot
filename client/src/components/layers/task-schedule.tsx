@@ -282,7 +282,13 @@ function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTas
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const formatted = `${monthNames[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
       
-      await apiRequest("PATCH", `/api/tasks/${task.email.id}/${task.taskIndex}`, { due: formatted });
+      // Save to database via deadline override API
+      await apiRequest("POST", "/api/deadline-overrides", {
+        email_id: task.email.id,
+        task_index: task.taskIndex,
+        original_deadline: task.due || "TBD",
+        override_deadline: formatted
+      });
 
       // Update React Query cache
       queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, (oldData: AnalyzedEmail[] | undefined) => {
@@ -306,9 +312,10 @@ function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTas
       
       toast({
         title: "Deadline Updated",
-        description: "Task deadline has been set successfully.",
+        description: "Task deadline has been saved to database.",
       });
     } catch (error) {
+      console.error("Deadline update failed:", error);
       toast({
         title: "Error",
         description: "Failed to update deadline. Please try again.",

@@ -1,7 +1,8 @@
-import { ArrowLeft, Mail, ExternalLink } from "lucide-react";
+import { ArrowLeft, Mail, ExternalLink, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { AnalyzedEmail } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 interface FlaggedMailsProps {
   analyzedEmails: AnalyzedEmail[];
@@ -25,8 +26,14 @@ function cleanTaskTitle(title: string): string {
 }
 
 export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
-  // For now, treat P1 Urgent emails as "flagged" since we don't have explicit flagging yet
-  const flaggedEmails = analyzedEmails.filter(email => email.priority.label.includes("P1"));
+  // Fetch flagged emails from database
+  const { data: flaggedData, isLoading } = useQuery<{ flagged_emails: Array<{ email_id: string }> }>({
+    queryKey: ["/api/flags"],
+  });
+
+  // Filter analyzed emails to only show flagged ones
+  const flaggedEmailIds = new Set(flaggedData?.flagged_emails?.map(f => f.email_id) || []);
+  const flaggedEmails = analyzedEmails.filter(email => flaggedEmailIds.has(email.id));
 
   return (
     <div className="h-full flex flex-col">
@@ -55,7 +62,12 @@ export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }:
 
       {/* Flagged Items */}
       <div className="flex-1 space-y-4 overflow-y-auto">
-        {flaggedEmails.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center text-muted-foreground p-8 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading flagged emails...
+          </div>
+        ) : flaggedEmails.length === 0 ? (
           <div className="text-center text-muted-foreground p-8">
             No flagged emails at the moment
           </div>
