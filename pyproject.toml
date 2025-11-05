@@ -17,6 +17,7 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "tenacity>=9.1.2",
     "uvicorn>=0.37.0",
+    "supabase>=2.23.2",
 ]
 
 [[tool.uv.index]]

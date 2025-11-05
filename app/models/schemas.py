@@ -171,3 +171,64 @@ class PrioritizeRequest(BaseModel):
 
 class PrioritizeResponse(BaseModel):
     priority: Priority
+
+
+# ==========================================
+# Flag Status Schemas
+# ==========================================
+
+class ToggleFlagRequest(BaseModel):
+    email_id: str
+    is_flagged: bool
+
+
+class ToggleFlagResponse(BaseModel):
+    success: bool
+    email_id: str
+    is_flagged: bool
+
+
+class GetFlaggedEmailsResponse(BaseModel):
+    flagged_emails: List[dict]
+
+
+class DeleteFlagRequest(BaseModel):
+    email_id: str
+
+
+class DeleteFlagResponse(BaseModel):
+    success: bool
+    email_id: str
+
+
+# ==========================================
+# Deadline Override Schemas
+# ==========================================
+
+class SetDeadlineOverrideRequest(BaseModel):
+    email_id: str
+    task_index: int
+    original_deadline: str
+    override_deadline: str
+
+
+class SetDeadlineOverrideResponse(BaseModel):
+    success: bool
+    email_id: str
+    task_index: int
+    override_deadline: str
+
+
+class GetDeadlineOverridesResponse(BaseModel):
+    deadline_overrides: List[dict]
+
+
+class DeleteDeadlineOverrideRequest(BaseModel):
+    email_id: str
+    task_index: int
+
+
+class DeleteDeadlineOverrideResponse(BaseModel):
+    success: bool
+    email_id: str
+    task_index: int

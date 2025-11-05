@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from app.models.schemas import (
     ProcessThreadRequest,
     ProcessThreadResponse,
@@ -15,7 +15,15 @@ from app.models.schemas import (
     ExtractTasksRequest,
     ExtractTasksResponse,
     PrioritizeRequest,
-    PrioritizeResponse
+    PrioritizeResponse,
+    ToggleFlagRequest,
+    ToggleFlagResponse,
+    GetFlaggedEmailsResponse,
+    DeleteFlagResponse,
+    SetDeadlineOverrideRequest,
+    SetDeadlineOverrideResponse,
+    GetDeadlineOverridesResponse,
+    DeleteDeadlineOverrideResponse
 )
 from app.services.normalizer import normalize_thread
 from app.services.summarizer import summarize_thread
@@ -436,4 +444,196 @@ async def triage_emails(request: dict):
         }
     
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# Flag Status Routes
+# ==========================================
+
+@router.post("/api/flags/toggle", response_model=ToggleFlagResponse)
+async def toggle_flag(request: Request, body: ToggleFlagRequest):
+    """
+    Toggle flag status for an email.
+    Requires user authentication.
+    """
+    try:
+        from app.db.supabase_client import toggle_flag_status
+        
+        # Get user email from session
+        user = request.session.get('user')
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_email = user['email']
+        
+        # Toggle flag in database
+        await toggle_flag_status(user_email, body.email_id, body.is_flagged)
+        
+        return ToggleFlagResponse(
+            success=True,
+            email_id=body.email_id,
+            is_flagged=body.is_flagged
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling flag: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/flags", response_model=GetFlaggedEmailsResponse)
+async def get_flagged_emails_route(request: Request):
+    """
+    Get all flagged emails for the current user.
+    Requires user authentication.
+    """
+    try:
+        from app.db.supabase_client import get_flagged_emails
+        
+        # Get user email from session
+        user = request.session.get('user')
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_email = user['email']
+        
+        # Get flagged emails from database
+        flagged = await get_flagged_emails(user_email)
+        
+        return GetFlaggedEmailsResponse(flagged_emails=flagged)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting flagged emails: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/flags/{email_id}", response_model=DeleteFlagResponse)
+async def delete_flag(request: Request, email_id: str):
+    """
+    Delete flag status for an email.
+    Requires user authentication.
+    """
+    try:
+        from app.db.supabase_client import delete_flag_status
+        
+        # Get user email from session
+        user = request.session.get('user')
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_email = user['email']
+        
+        # Delete flag from database
+        await delete_flag_status(user_email, email_id)
+        
+        return DeleteFlagResponse(
+            success=True,
+            email_id=email_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting flag: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# Deadline Override Routes
+# ==========================================
+
+@router.post("/api/deadline-overrides", response_model=SetDeadlineOverrideResponse)
+async def set_deadline_override_route(request: Request, body: SetDeadlineOverrideRequest):
+    """
+    Set or update deadline override for a task.
+    Requires user authentication.
+    """
+    try:
+        from app.db.supabase_client import set_deadline_override as db_set_deadline
+        
+        # Get user email from session
+        user = request.session.get('user')
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_email = user['email']
+        
+        # Set deadline override in database
+        await db_set_deadline(
+            user_email,
+            body.email_id,
+            body.task_index,
+            body.original_deadline,
+            body.override_deadline
+        )
+        
+        return SetDeadlineOverrideResponse(
+            success=True,
+            email_id=body.email_id,
+            task_index=body.task_index,
+            override_deadline=body.override_deadline
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting deadline override: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/deadline-overrides", response_model=GetDeadlineOverridesResponse)
+async def get_deadline_overrides_route(request: Request):
+    """
+    Get all deadline overrides for the current user.
+    Requires user authentication.
+    """
+    try:
+        from app.db.supabase_client import get_deadline_overrides as db_get_deadline_overrides
+        
+        # Get user email from session
+        user = request.session.get('user')
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_email = user['email']
+        
+        # Get deadline overrides from database
+        overrides = await db_get_deadline_overrides(user_email)
+        
+        return GetDeadlineOverridesResponse(deadline_overrides=overrides)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting deadline overrides: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/deadline-overrides/{email_id}/{task_index}", response_model=DeleteDeadlineOverrideResponse)
+async def delete_deadline_override_route(request: Request, email_id: str, task_index: int):
+    """
+    Delete deadline override for a task.
+    Requires user authentication.
+    """
+    try:
+        from app.db.supabase_client import delete_deadline_override as db_delete_deadline
+        
+        # Get user email from session
+        user = request.session.get('user')
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user_email = user['email']
+        
+        # Delete deadline override from database
+        await db_delete_deadline(user_email, email_id, task_index)
+        
+        return DeleteDeadlineOverrideResponse(
+            success=True,
+            email_id=email_id,
+            task_index=task_index
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting deadline override: {e}")
         raise HTTPException(status_code=500, detail=str(e))
