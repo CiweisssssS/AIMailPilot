@@ -160,11 +160,32 @@ async def batch_analyze(request: BatchAnalyzeRequest):
     - DistilBART for summarization
     - MiniLM + NER + Flan-T5 for task extraction
     - MiniLM for semantic keyword matching in prioritization
+    
+    Also enriches results with Supabase data:
+    - Flag status (is_flagged)
+    - Deadline overrides
     """
     try:
         results = []
         threads = request.threads
         keywords = request.keywords
+        user_email = request.user_email
+        
+        # Prefetch Supabase data for all emails (batch query)
+        email_ids = [thread.id for thread in threads]
+        flag_status_dict = {}
+        deadline_overrides_dict = {}
+        
+        if user_email:
+            # Run Supabase queries in thread pool to avoid blocking event loop
+            flag_status_dict, deadline_overrides_dict = await asyncio.gather(
+                asyncio.to_thread(
+                    lambda: __import__('app.db.supabase_client', fromlist=['get_flag_status_for_emails']).get_flag_status_for_emails(user_email, email_ids)
+                ),
+                asyncio.to_thread(
+                    lambda: __import__('app.db.supabase_client', fromlist=['get_deadline_overrides_for_emails']).get_deadline_overrides_for_emails(user_email, email_ids)
+                )
+            )
         
         async def analyze_single_thread(thread):
             try:
@@ -184,6 +205,12 @@ async def batch_analyze(request: BatchAnalyzeRequest):
                 # Extract tasks with MiniLM + NER + Flan-T5
                 tasks = await extract_tasks(messages_dict)
                 
+                # Apply deadline overrides from Supabase
+                for task_index, task in enumerate(tasks):
+                    override_key = (thread.id, task_index)
+                    if override_key in deadline_overrides_dict:
+                        task.due = deadline_overrides_dict[override_key]
+                
                 # Prioritize with hybrid approach (rule-based + GPT-4o-mini)
                 priority = await calculate_priority(
                     messages_dict,
@@ -191,11 +218,15 @@ async def batch_analyze(request: BatchAnalyzeRequest):
                     keywords
                 )
                 
+                # Get flag status from Supabase
+                is_flagged = flag_status_dict.get(thread.id, False)
+                
                 return ThreadAnalysisResult(
                     id=thread.id,
                     summary=summary,
                     priority=priority,
-                    tasks=tasks
+                    tasks=tasks,
+                    is_flagged=is_flagged
                 )
             except Exception as e:
                 from app.models.schemas import Priority
@@ -203,7 +234,8 @@ async def batch_analyze(request: BatchAnalyzeRequest):
                     id=thread.id,
                     summary=f"Error: {str(e)}",
                     priority=Priority(label="P3", score=0.0, reasons=["analysis failed"]),
-                    tasks=[]
+                    tasks=[],
+                    is_flagged=False
                 )
         
         # Process in batches of 5 (model_manager batch_size)
@@ -305,15 +337,31 @@ async def prioritize_email(request: PrioritizeRequest):
 @router.post("/triage")
 async def triage_emails(request: dict):
     """
-    Analyze multiple Gmail emails in parallel and return priorities, summaries, and tasks
-    Frontend expects: { priorities: Priority[], summaries: string[], tasks: Task[][] }
+    Analyze multiple Gmail emails in parallel and return priorities, summaries, and tasks.
+    Also enriches results with Supabase data (flag status, deadline overrides).
+    Frontend expects: { analyzed_emails: [], summary: {} }
     """
     try:
         from app.models.schemas import Priority
         
         messages = request.get('messages', [])
+        user_email = request.get('user_email')
+        
         if not messages:
-            return {"priorities": [], "summaries": [], "tasks": []}
+            return {"analyzed_emails": [], "summary": {"total": 0, "urgent": 0, "todo": 0, "fyi": 0}}
+        
+        # Prefetch Supabase data for all emails (batch query)
+        email_ids = [msg.get('id', 'unknown') for msg in messages]
+        flag_status_dict = {}
+        deadline_overrides_dict = {}
+        
+        if user_email:
+            # Run Supabase queries in thread pool to avoid blocking event loop
+            from app.db.supabase_client import get_flag_status_for_emails, get_deadline_overrides_for_emails
+            flag_status_dict, deadline_overrides_dict = await asyncio.gather(
+                asyncio.to_thread(get_flag_status_for_emails, user_email, email_ids),
+                asyncio.to_thread(get_deadline_overrides_for_emails, user_email, email_ids)
+            )
         
         # Parallel processing function for a single email
         async def analyze_single_email(msg):
@@ -336,6 +384,13 @@ async def triage_emails(request: dict):
                 
                 # Wait for both to complete
                 summary, tasks = await asyncio.gather(summary_task, tasks_task)
+                
+                # Apply deadline overrides from Supabase
+                email_id = msg.get('id', 'unknown')
+                for task_index, task in enumerate(tasks):
+                    override_key = (email_id, task_index)
+                    if override_key in deadline_overrides_dict:
+                        task.due = deadline_overrides_dict[override_key]
                 
                 # Calculate priority (needs tasks result)
                 priority = await calculate_priority([msg_dict], tasks, [])
@@ -420,8 +475,12 @@ async def triage_emails(request: dict):
                     logger.info(f"Task (unknown type): {task}")
                     tasks_list.append({'title': str(task)})
             
+            # Get flag status from Supabase
+            email_id = msg.get('id', 'unknown')
+            is_flagged = flag_status_dict.get(email_id, False)
+            
             analyzed_emails.append({
-                'id': msg.get('id', 'unknown'),
+                'id': email_id,
                 'threadId': msg.get('threadId', msg.get('thread_id', '')),
                 'subject': msg.get('subject', ''),
                 'from': msg.get('from_', 'unknown'),
@@ -430,7 +489,8 @@ async def triage_emails(request: dict):
                 'summary': result['summary'],
                 'priority': priority,
                 'tasks': tasks_list,
-                'task_extracted': task_extracted
+                'task_extracted': task_extracted,
+                'is_flagged': is_flagged
             })
         
         return {

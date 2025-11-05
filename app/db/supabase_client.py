@@ -235,3 +235,74 @@ async def delete_deadline_override(user_email: str, email_id: str, task_index: i
     except Exception as e:
         logger.error(f"Failed to delete deadline override: {e}")
         raise
+
+
+# ==========================================
+# Batch Query Operations (for batch-analyze)
+# ==========================================
+
+def get_flag_status_for_emails(user_email: str, email_ids: list[str]) -> dict[str, bool]:
+    """
+    Batch fetch flag status for multiple emails.
+    Returns a dict mapping email_id -> is_flagged.
+    
+    Args:
+        user_email: User's email address
+        email_ids: List of Gmail message IDs
+    
+    Returns:
+        Dict mapping email_id to is_flagged status
+    """
+    try:
+        if not email_ids:
+            return {}
+        
+        client = get_supabase_client()
+        
+        response = client.table("flag_status")\
+            .select("email_id, is_flagged")\
+            .eq("user_email", user_email)\
+            .in_("email_id", email_ids)\
+            .execute()
+        
+        result = {row["email_id"]: row["is_flagged"] for row in response.data}
+        logger.info(f"Batch fetched flag status for {len(email_ids)} emails, found {len(result)} flags")
+        return result
+    except Exception as e:
+        logger.error(f"Failed to batch fetch flag status: {e}")
+        return {}
+
+
+def get_deadline_overrides_for_emails(user_email: str, email_ids: list[str]) -> dict[tuple[str, int], str]:
+    """
+    Batch fetch deadline overrides for multiple emails.
+    Returns a dict mapping (email_id, task_index) -> override_deadline.
+    
+    Args:
+        user_email: User's email address
+        email_ids: List of Gmail message IDs
+    
+    Returns:
+        Dict mapping (email_id, task_index) to override_deadline
+    """
+    try:
+        if not email_ids:
+            return {}
+        
+        client = get_supabase_client()
+        
+        response = client.table("deadline_overrides")\
+            .select("email_id, task_index, override_deadline")\
+            .eq("user_email", user_email)\
+            .in_("email_id", email_ids)\
+            .execute()
+        
+        result = {
+            (row["email_id"], row["task_index"]): row["override_deadline"]
+            for row in response.data
+        }
+        logger.info(f"Batch fetched deadline overrides for {len(email_ids)} emails, found {len(result)} overrides")
+        return result
+    except Exception as e:
+        logger.error(f"Failed to batch fetch deadline overrides: {e}")
+        return {}

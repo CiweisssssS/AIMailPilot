@@ -101,6 +101,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Analyzing ${emails.length} emails...`);
       console.log('First email sample:', JSON.stringify(emails[0]).substring(0, 200));
 
+      // Get user email from session for Supabase queries
+      const userEmail = (req.session as any)?.user?.email || null;
+      console.log(`User email from session: ${userEmail || 'not authenticated'}`);
+
       const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
       
       const response = await fetch(`${pythonBackendUrl}/triage`, {
@@ -108,7 +112,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ messages: emails })
+        body: JSON.stringify({ 
+          messages: emails,
+          user_email: userEmail
+        })
       });
 
       if (!response.ok) {

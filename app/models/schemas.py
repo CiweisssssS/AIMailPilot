@@ -126,11 +126,13 @@ class ThreadAnalysisResult(BaseModel):
     summary: str
     priority: Priority
     tasks: List[Task]
+    is_flagged: Optional[bool] = False
 
 
 class BatchAnalyzeRequest(BaseModel):
     threads: List[ThreadInput]
     keywords: List[PersonalizedKeyword] = []
+    user_email: Optional[str] = None
 
 
 class BatchAnalyzeResponse(BaseModel):
