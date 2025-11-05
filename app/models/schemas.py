@@ -180,6 +180,7 @@ class PrioritizeResponse(BaseModel):
 # ==========================================
 
 class ToggleFlagRequest(BaseModel):
+    user_email: str
     email_id: str
     is_flagged: bool
 
@@ -208,6 +209,7 @@ class DeleteFlagResponse(BaseModel):
 # ==========================================
 
 class SetDeadlineOverrideRequest(BaseModel):
+    user_email: str
     email_id: str
     task_index: int
     original_deadline: str

@@ -187,6 +187,262 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Flag status API routes - forward to Python backend
+  app.post("/api/flags/toggle", async (req, res) => {
+    try {
+      // Check authentication
+      if (!(req.session as any)?.user?.email) {
+        return res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+      }
+
+      const userEmail = (req.session as any).user.email;
+      const { email_id, is_flagged } = req.body;
+
+      if (!email_id || typeof is_flagged !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request: email_id and is_flagged required"
+        });
+      }
+
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/flags/toggle`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          user_email: userEmail,
+          email_id,
+          is_flagged
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error toggling flag:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to toggle flag"
+      });
+    }
+  });
+
+  app.get("/api/flags", async (req, res) => {
+    try {
+      // Check authentication
+      if (!(req.session as any)?.user?.email) {
+        return res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+      }
+
+      const userEmail = (req.session as any).user.email;
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/flags?user_email=${encodeURIComponent(userEmail)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching flagged emails:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to fetch flagged emails"
+      });
+    }
+  });
+
+  app.delete("/api/flags/:emailId", async (req, res) => {
+    try {
+      // Check authentication
+      if (!(req.session as any)?.user?.email) {
+        return res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+      }
+
+      const userEmail = (req.session as any).user.email;
+      const { emailId } = req.params;
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/flags/${emailId}?user_email=${encodeURIComponent(userEmail)}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error deleting flag:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to delete flag"
+      });
+    }
+  });
+
+  // Deadline override API routes - forward to Python backend
+  app.post("/api/deadline-overrides", async (req, res) => {
+    try {
+      // Check authentication
+      if (!(req.session as any)?.user?.email) {
+        return res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+      }
+
+      const userEmail = (req.session as any).user.email;
+      const { email_id, task_index, original_deadline, override_deadline } = req.body;
+
+      if (!email_id || task_index === undefined || !override_deadline) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request: email_id, task_index, and override_deadline required"
+        });
+      }
+
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/deadline-overrides`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          user_email: userEmail,
+          email_id,
+          task_index,
+          original_deadline,
+          override_deadline
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error setting deadline override:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to set deadline override"
+      });
+    }
+  });
+
+  app.get("/api/deadline-overrides", async (req, res) => {
+    try {
+      // Check authentication
+      if (!(req.session as any)?.user?.email) {
+        return res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+      }
+
+      const userEmail = (req.session as any).user.email;
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/deadline-overrides?user_email=${encodeURIComponent(userEmail)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching deadline overrides:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to fetch deadline overrides"
+      });
+    }
+  });
+
+  app.delete("/api/deadline-overrides/:emailId/:taskIndex", async (req, res) => {
+    try {
+      // Check authentication
+      if (!(req.session as any)?.user?.email) {
+        return res.status(401).json({
+          success: false,
+          error: "Not authenticated"
+        });
+      }
+
+      const userEmail = (req.session as any).user.email;
+      const { emailId, taskIndex } = req.params;
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${pythonBackendUrl}/api/deadline-overrides/${emailId}/${taskIndex}?user_email=${encodeURIComponent(userEmail)}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend error (${response.status}):`, errorText);
+        throw new Error(`Python backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error deleting deadline override:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to delete deadline override"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
