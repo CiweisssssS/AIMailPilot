@@ -25,6 +25,76 @@ function cleanTaskTitle(title: string): string {
   return title.replace(/^\[|\]$/g, '').trim();
 }
 
+// Extract priority number from label (e.g., "P1 - Urgent" → 1)
+function extractPriorityLevel(priorityLabel: string): number {
+  const match = priorityLabel.match(/P(\d)/);
+  return match ? parseInt(match[1]) : 999; // Unknown priority goes last
+}
+
+// Parse deadline into Date object (null for TBD)
+function parseDeadline(dateStr: string | null | undefined): Date | null {
+  if (!dateStr || dateStr === "TBD" || dateStr === "null") {
+    return null;
+  }
+  
+  // Backend returns "Mon DD, YYYY, HH:mm" format (e.g., "Nov 04, 2025, 20:31")
+  // We need to parse this manually for cross-browser compatibility
+  try {
+    const monthMap: Record<string, number> = {
+      Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+      Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+    };
+    
+    // Split "Nov 04, 2025, 20:31" into parts
+    const parts = dateStr.split(/[,\s:]+/).filter(p => p);
+    if (parts.length < 5) return null;
+    
+    const monthStr = parts[0]; // "Nov"
+    const day = parseInt(parts[1]); // 4
+    const year = parseInt(parts[2]); // 2025
+    const hour = parseInt(parts[3]); // 20
+    const minute = parseInt(parts[4]); // 31
+    
+    const month = monthMap[monthStr];
+    if (month === undefined || isNaN(day) || isNaN(year) || isNaN(hour) || isNaN(minute)) {
+      return null;
+    }
+    
+    const date = new Date(year, month, day, hour, minute);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+// Sort emails by priority (P1→P2→P3) then by deadline (earliest→latest, TBD last)
+function sortFlaggedEmails(emails: AnalyzedEmail[]): AnalyzedEmail[] {
+  return [...emails].sort((a, b) => {
+    // 1. Sort by priority first
+    const priorityA = extractPriorityLevel(a.priority.label);
+    const priorityB = extractPriorityLevel(b.priority.label);
+    
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB; // Lower number (P1) comes first
+    }
+    
+    // 2. Within same priority, sort by deadline
+    const deadlineA = a.tasks?.[0]?.due;
+    const deadlineB = b.tasks?.[0]?.due;
+    
+    const dateA = parseDeadline(deadlineA);
+    const dateB = parseDeadline(deadlineB);
+    
+    // TBD goes last within the same priority group
+    if (dateA === null && dateB === null) return 0;
+    if (dateA === null) return 1;  // A is TBD, goes after B
+    if (dateB === null) return -1; // B is TBD, A goes first
+    
+    // Both have real dates - earliest comes first
+    return dateA.getTime() - dateB.getTime();
+  });
+}
+
 export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
   // Fetch flagged emails from database
   const { data: flaggedData, isLoading } = useQuery<{ flagged_emails: Array<{ email_id: string }> }>({
@@ -33,7 +103,10 @@ export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }:
 
   // Filter analyzed emails to only show flagged ones
   const flaggedEmailIds = new Set(flaggedData?.flagged_emails?.map(f => f.email_id) || []);
-  const flaggedEmails = analyzedEmails.filter(email => flaggedEmailIds.has(email.id));
+  const filteredEmails = analyzedEmails.filter(email => flaggedEmailIds.has(email.id));
+  
+  // Sort by priority (P1→P2→P3) then by deadline (earliest→latest, TBD last)
+  const flaggedEmails = sortFlaggedEmails(filteredEmails);
 
   return (
     <div className="h-full flex flex-col">
