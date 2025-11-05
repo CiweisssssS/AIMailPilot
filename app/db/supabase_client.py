@@ -1,9 +1,13 @@
 """
 Supabase Client Initialization
 Handles connection to Supabase PostgreSQL database for data persistence.
+
+IMPORTANT: All database operations use asyncio.to_thread to wrap synchronous
+supabase-py calls, preventing FastAPI event loop blocking.
 """
 import os
-from typing import Optional, Any
+import asyncio
+from typing import Optional, Any, Callable, TypeVar
 from supabase import create_client, Client
 import logging
 
@@ -11,6 +15,22 @@ logger = logging.getLogger(__name__)
 
 # Global Supabase client instance
 _supabase_client: Optional[Client] = None
+
+T = TypeVar('T')
+
+
+async def _run_in_thread(func: Callable[[], T]) -> T:
+    """
+    Execute a synchronous Supabase operation in a thread pool to avoid blocking
+    the FastAPI event loop.
+    
+    Args:
+        func: Synchronous function to execute
+    
+    Returns:
+        Result of the function execution
+    """
+    return await asyncio.to_thread(func)
 
 
 def get_supabase_client() -> Client:
@@ -90,12 +110,14 @@ async def toggle_flag_status(user_email: str, email_id: str, is_flagged: bool) -
     try:
         client = get_supabase_client()
         
-        # Upsert: insert if not exists, update if exists
-        response = client.table("flag_status").upsert({
-            "user_email": user_email,
-            "email_id": email_id,
-            "is_flagged": is_flagged
-        }, on_conflict="user_email,email_id").execute()
+        def _upsert():
+            return client.table("flag_status").upsert({
+                "user_email": user_email,
+                "email_id": email_id,
+                "is_flagged": is_flagged
+            }, on_conflict="user_email,email_id").execute()
+        
+        response = await _run_in_thread(_upsert)
         
         logger.info(f"Flag status toggled for user={user_email}, email_id={email_id}, is_flagged={is_flagged}")
         return response.data[0] if response.data else {}
@@ -117,7 +139,10 @@ async def get_flagged_emails(user_email: str) -> list[Any]:
     try:
         client = get_supabase_client()
         
-        response = client.table("flag_status").select("*").eq("user_email", user_email).eq("is_flagged", True).order("updated_at", desc=True).execute()
+        def _select():
+            return client.table("flag_status").select("*").eq("user_email", user_email).eq("is_flagged", True).order("updated_at", desc=True).execute()
+        
+        response = await _run_in_thread(_select)
         
         logger.info(f"Retrieved {len(response.data)} flagged emails for user={user_email}")
         return response.data
@@ -140,7 +165,10 @@ async def delete_flag_status(user_email: str, email_id: str) -> bool:
     try:
         client = get_supabase_client()
         
-        response = client.table("flag_status").delete().eq("user_email", user_email).eq("email_id", email_id).execute()
+        def _delete():
+            return client.table("flag_status").delete().eq("user_email", user_email).eq("email_id", email_id).execute()
+        
+        await _run_in_thread(_delete)
         
         logger.info(f"Flag status deleted for user={user_email}, email_id={email_id}")
         return True
@@ -176,13 +204,16 @@ async def set_deadline_override(
     try:
         client = get_supabase_client()
         
-        response = client.table("deadline_overrides").upsert({
-            "user_email": user_email,
-            "email_id": email_id,
-            "task_index": task_index,
-            "original_deadline": original_deadline,
-            "override_deadline": override_deadline
-        }, on_conflict="user_email,email_id,task_index").execute()
+        def _upsert():
+            return client.table("deadline_overrides").upsert({
+                "user_email": user_email,
+                "email_id": email_id,
+                "task_index": task_index,
+                "original_deadline": original_deadline,
+                "override_deadline": override_deadline
+            }, on_conflict="user_email,email_id,task_index").execute()
+        
+        response = await _run_in_thread(_upsert)
         
         logger.info(f"Deadline override set for user={user_email}, email_id={email_id}, task_index={task_index}")
         return response.data[0] if response.data else {}
@@ -204,7 +235,10 @@ async def get_deadline_overrides(user_email: str) -> list[Any]:
     try:
         client = get_supabase_client()
         
-        response = client.table("deadline_overrides").select("*").eq("user_email", user_email).execute()
+        def _select():
+            return client.table("deadline_overrides").select("*").eq("user_email", user_email).execute()
+        
+        response = await _run_in_thread(_select)
         
         logger.info(f"Retrieved {len(response.data)} deadline overrides for user={user_email}")
         return response.data
@@ -228,7 +262,10 @@ async def delete_deadline_override(user_email: str, email_id: str, task_index: i
     try:
         client = get_supabase_client()
         
-        response = client.table("deadline_overrides").delete().eq("user_email", user_email).eq("email_id", email_id).eq("task_index", task_index).execute()
+        def _delete():
+            return client.table("deadline_overrides").delete().eq("user_email", user_email).eq("email_id", email_id).eq("task_index", task_index).execute()
+        
+        await _run_in_thread(_delete)
         
         logger.info(f"Deadline override deleted for user={user_email}, email_id={email_id}, task_index={task_index}")
         return True

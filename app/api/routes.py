@@ -340,6 +340,9 @@ async def triage_emails(request: dict):
     Analyze multiple Gmail emails in parallel and return priorities, summaries, and tasks.
     Also enriches results with Supabase data (flag status, deadline overrides).
     Frontend expects: { analyzed_emails: [], summary: {} }
+    
+    Note: user_email is optional for unauthenticated analysis. When provided, 
+    persistent data (flags, deadline overrides) will be loaded and merged.
     """
     try:
         from app.models.schemas import Priority
@@ -351,17 +354,25 @@ async def triage_emails(request: dict):
             return {"analyzed_emails": [], "summary": {"total": 0, "urgent": 0, "todo": 0, "fyi": 0}}
         
         # Prefetch Supabase data for all emails (batch query)
+        # Only query database if user is authenticated
         email_ids = [msg.get('id', 'unknown') for msg in messages]
         flag_status_dict = {}
         deadline_overrides_dict = {}
         
         if user_email:
+            logger.info(f"Fetching Supabase data for user={user_email}, {len(email_ids)} emails")
             # Run Supabase queries in thread pool to avoid blocking event loop
             from app.db.supabase_client import get_flag_status_for_emails, get_deadline_overrides_for_emails
-            flag_status_dict, deadline_overrides_dict = await asyncio.gather(
-                asyncio.to_thread(get_flag_status_for_emails, user_email, email_ids),
-                asyncio.to_thread(get_deadline_overrides_for_emails, user_email, email_ids)
-            )
+            try:
+                flag_status_dict, deadline_overrides_dict = await asyncio.gather(
+                    asyncio.to_thread(get_flag_status_for_emails, user_email, email_ids),
+                    asyncio.to_thread(get_deadline_overrides_for_emails, user_email, email_ids)
+                )
+            except Exception as db_error:
+                # Log but don't fail the entire request if Supabase is unavailable
+                logger.error(f"Supabase query failed: {db_error}")
+        else:
+            logger.info("No user_email provided, skipping Supabase data fetch")
         
         # Parallel processing function for a single email
         async def analyze_single_email(msg):

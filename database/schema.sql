@@ -60,19 +60,29 @@ CREATE TRIGGER update_deadline_overrides_updated_at BEFORE UPDATE ON deadline_ov
 
 -- ==========================================
 -- Row Level Security (RLS) Policies
--- Enable RLS for multi-tenant security
 -- ==========================================
-ALTER TABLE flag_status ENABLE ROW LEVEL SECURITY;
-ALTER TABLE deadline_overrides ENABLE ROW LEVEL SECURITY;
-
--- Policy: Users can only access their own data
-CREATE POLICY flag_status_user_policy ON flag_status
-    FOR ALL
-    USING (user_email = current_setting('app.current_user_email', true));
-
-CREATE POLICY deadline_overrides_user_policy ON deadline_overrides
-    FOR ALL
-    USING (user_email = current_setting('app.current_user_email', true));
+-- NOTE: RLS is DISABLED for this application because we use application-layer
+-- access control (user_email parameter in queries) instead of database-level RLS.
+-- 
+-- IMPORTANT: Use SUPABASE_KEY with service_role key (not anon key) to bypass RLS.
+-- This allows the application to enforce user isolation at the API layer while
+-- maintaining full database access for background operations.
+--
+-- If you prefer database-level RLS:
+-- 1. Use the anon key for SUPABASE_KEY
+-- 2. Uncomment the policies below
+-- 3. Modify app/db/supabase_client.py to set session variable before queries
+--
+-- ALTER TABLE flag_status ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE deadline_overrides ENABLE ROW LEVEL SECURITY;
+--
+-- CREATE POLICY flag_status_user_policy ON flag_status
+--     FOR ALL
+--     USING (user_email = current_setting('app.current_user_email', true));
+--
+-- CREATE POLICY deadline_overrides_user_policy ON deadline_overrides
+--     FOR ALL
+--     USING (user_email = current_setting('app.current_user_email', true));
 
 -- ==========================================
 -- Initial Data / Seed (Optional)
