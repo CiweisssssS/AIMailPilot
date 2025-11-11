@@ -105,6 +105,7 @@ export function DeadlineEditor({
           setNewDeadline("");
         }}
         className="h-7 text-xs"
+        data-testid={`button-cancel-deadline-${emailId}-${taskIndex}`}
       >
         Cancel
       </Button>

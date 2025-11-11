@@ -49,3 +49,65 @@ export async function getUncachableGoogleCalendarClient() {
 
   return google.calendar({ version: 'v3', auth: oauth2Client });
 }
+
+// Helper to parse "Mon DD, YYYY, HH:mm" to Date object
+function parseDeadlineToDate(deadlineStr: string): Date {
+  // Example: "Nov 10, 2025, 23:59"
+  const monthMap: { [key: string]: number } = {
+    Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+    Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+  };
+  
+  const parts = deadlineStr.split(', ');
+  const [monthDay, year, time] = parts;
+  const [month, day] = monthDay.split(' ');
+  const [hours, minutes] = time.split(':').map(Number);
+  
+  return new Date(
+    parseInt(year),
+    monthMap[month],
+    parseInt(day),
+    hours,
+    minutes
+  );
+}
+
+export async function createCalendarEvent(
+  title: string,
+  description: string,
+  startDateTime: string
+): Promise<{ eventId: string; eventLink: string }> {
+  try {
+    const calendar = await getUncachableGoogleCalendarClient();
+
+    // Parse the deadline format "Mon DD, YYYY, HH:mm" to Date object
+    const deadlineDate = parseDeadlineToDate(startDateTime);
+    const endDate = new Date(deadlineDate.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+    const event = {
+      summary: title,
+      description: description,
+      start: {
+        dateTime: deadlineDate.toISOString(),
+        timeZone: 'UTC',
+      },
+      end: {
+        dateTime: endDate.toISOString(),
+        timeZone: 'UTC',
+      },
+    };
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: event,
+    });
+
+    return {
+      eventId: response.data.id!,
+      eventLink: response.data.htmlLink!,
+    };
+  } catch (error) {
+    console.error('Failed to create calendar event:', error);
+    throw error;
+  }
+}

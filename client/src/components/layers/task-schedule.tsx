@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
+import { DeadlineEditor, AddToCalendarButton } from "@/components/deadline-editor";
 
 interface TaskScheduleProps {
   analyzedEmails: AnalyzedEmail[];
@@ -218,11 +219,9 @@ interface TimelineItemProps {
 }
 
 function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTaskId }: TimelineItemProps) {
-  const { toast } = useToast();
-  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
-  const [newDeadline, setNewDeadline] = useState("");
+  const [currentDeadline, setCurrentDeadline] = useState<string | null>(task.due);
 
-  const deadline = parseDeadline(task.due);
+  const deadline = parseDeadline(currentDeadline);
   const isTBD = deadline.bucket === "tbd";
 
   // Get task title (use task_extracted or subject)
@@ -263,65 +262,25 @@ function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTas
     return dueString;
   };
 
-  const handleAddToCalendar = () => {
-    if (isTBD) {
-      return; // Disabled for TBD
-    }
-    toast({
-      title: "Add to Calendar",
-      description: "Calendar integration coming soon!",
+  const handleDeadlineUpdated = (newDeadline: string) => {
+    setCurrentDeadline(newDeadline);
+    
+    // Update React Query cache
+    queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, (oldData: AnalyzedEmail[] | undefined) => {
+      if (!oldData) return oldData;
+      
+      return oldData.map((email) => {
+        if (email.id === task.email.id) {
+          const updatedTasks = [...email.tasks];
+          updatedTasks[task.taskIndex] = {
+            ...updatedTasks[task.taskIndex],
+            due: newDeadline
+          };
+          return { ...email, tasks: updatedTasks };
+        }
+        return email;
+      });
     });
-  };
-
-  const handleSetDeadline = async () => {
-    if (!newDeadline) return;
-
-    try {
-      // Convert datetime-local format (YYYY-MM-DDTHH:mm) to "Mon DD, YYYY, HH:mm"
-      const date = new Date(newDeadline);
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const formatted = `${monthNames[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-      
-      // Save to database via deadline override API
-      await apiRequest("POST", "/api/deadline-overrides", {
-        email_id: task.email.id,
-        task_index: task.taskIndex,
-        original_deadline: task.due || "TBD",
-        override_deadline: formatted
-      });
-
-      // Update React Query cache
-      queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, (oldData: AnalyzedEmail[] | undefined) => {
-        if (!oldData) return oldData;
-        
-        return oldData.map((email) => {
-          if (email.id === task.email.id) {
-            const updatedTasks = [...email.tasks];
-            updatedTasks[task.taskIndex] = {
-              ...updatedTasks[task.taskIndex],
-              due: formatted
-            };
-            return { ...email, tasks: updatedTasks };
-          }
-          return email;
-        });
-      });
-
-      setIsEditingDeadline(false);
-      setNewDeadline("");
-      
-      toast({
-        title: "Deadline Updated",
-        description: "Task deadline has been saved to database.",
-      });
-    } catch (error) {
-      console.error("Deadline update failed:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update deadline. Please try again.",
-        variant: "destructive",
-      });
-    }
   };
 
   return (
@@ -337,12 +296,21 @@ function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTas
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Time Line */}
-          <div className="text-sm text-muted-foreground mb-1">
-            Time: {formatTimeDisplay(task.due)}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <span>Time: {formatTimeDisplay(currentDeadline)}</span>
             {showOverdueBadge && (
-              <Badge variant="destructive" className="text-xs px-2 py-0 ml-2">
+              <Badge variant="destructive" className="text-xs px-2 py-0">
                 Overdue
               </Badge>
+            )}
+            {isTBD && (
+              <DeadlineEditor
+                emailId={task.email.id}
+                taskIndex={task.taskIndex}
+                currentDeadline={currentDeadline}
+                isTBD={isTBD}
+                onDeadlineUpdated={handleDeadlineUpdated}
+              />
             )}
           </div>
 
@@ -350,70 +318,18 @@ function TimelineItem({ task, showOverdueBadge = false, onTaskClick, selectedTas
           <div className="text-sm font-semibold text-foreground line-clamp-2 leading-relaxed">
             Task: {taskTitle}
           </div>
-
-          {/* TBD Warning */}
-          {isTBD && !isEditingDeadline && (
-            <div className="flex items-center gap-2 text-destructive text-xs mt-2">
-              <AlertCircle className="w-4 h-4" />
-              <span>Please set deadline manually</span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsEditingDeadline(true)}
-                className="ml-auto h-7 text-xs"
-                data-testid={`button-set-deadline-${task.email.id}-${task.taskIndex}`}
-              >
-                Set Deadline
-              </Button>
-            </div>
-          )}
-
-          {/* Deadline Picker */}
-          {isEditingDeadline && (
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="datetime-local"
-                value={newDeadline}
-                onChange={(e) => setNewDeadline(e.target.value)}
-                className="text-xs border rounded px-2 py-1 bg-background"
-                data-testid={`input-deadline-${task.email.id}-${task.taskIndex}`}
-              />
-              <Button
-                size="sm"
-                onClick={handleSetDeadline}
-                className="h-7 text-xs"
-                data-testid={`button-save-deadline-${task.email.id}-${task.taskIndex}`}
-              >
-                Save
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setIsEditingDeadline(false);
-                  setNewDeadline("");
-                }}
-                className="h-7 text-xs"
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Calendar Icon */}
-        <button 
-          onClick={handleAddToCalendar}
+        <AddToCalendarButton
+          emailId={task.email.id}
+          taskIndex={task.taskIndex}
+          title={taskTitle}
+          deadline={currentDeadline}
+          description={task.email.summary}
           disabled={isTBD}
-          className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
-            isTBD 
-              ? 'opacity-30 cursor-not-allowed' 
-              : 'hover:bg-primary/10 cursor-pointer'
-          }`}
-          data-testid={`button-add-calendar-${task.email.id}-${task.taskIndex}`}
-        >
-          <Calendar className={`w-5 h-5 ${isTBD ? 'text-muted-foreground' : 'text-primary'}`} />
-        </button>
+          className="flex-shrink-0 p-2 rounded-lg"
+        />
       </div>
     </div>
   );

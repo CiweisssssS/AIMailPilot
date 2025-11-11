@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { limitWords } from "@/lib/text-utils";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DeadlineEditor, AddToCalendarButton } from "@/components/deadline-editor";
+import { ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
@@ -183,6 +184,23 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
 
   const handleDeadlineUpdated = (newDeadline: string) => {
     setCurrentDeadline(newDeadline);
+    
+    // Update React Query cache to sync with timeline and other views
+    queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, (oldData: AnalyzedEmail[] | undefined) => {
+      if (!oldData) return oldData;
+      
+      return oldData.map((e) => {
+        if (e.id === email.id) {
+          const updatedTasks = [...e.tasks];
+          updatedTasks[0] = {
+            ...updatedTasks[0],
+            due: newDeadline
+          };
+          return { ...e, tasks: updatedTasks };
+        }
+        return e;
+      });
+    });
   };
 
   // Check if this email is selected (match by emailId, taskIndex can be 0 for email-level selection)
