@@ -10,14 +10,16 @@ from datetime import datetime, timedelta
 from typing import Optional
 import logging
 from zoneinfo import ZoneInfo
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def normalize_deadline(
-    text: str,
+    text: Optional[str],
     ref_datetime: Optional[datetime] = None,
-    tz: str = "UTC"
+    tz: str = "UTC",
+    sent_date: Optional[datetime] = None
 ) -> str:
     """
     Normalize deadline text to "Mon DD, YYYY, HH:mm" format or "TBD"
@@ -26,6 +28,7 @@ def normalize_deadline(
         text: Raw deadline text (e.g., "by EOD", "Friday 5pm", "Oct 3, 5pm")
         ref_datetime: Reference datetime for relative dates (defaults to now)
         tz: Timezone string (e.g., "America/Los_Angeles", "UTC")
+        sent_date: Email sent date for year inference (defaults to ref_datetime)
     
     Returns:
         Normalized deadline string in format "Mon DD, YYYY, HH:mm" or "TBD"
@@ -35,7 +38,7 @@ def normalize_deadline(
         "Oct 03, 2023, 17:00"
         
         >>> normalize_deadline("by EOD")
-        "Oct 21, 2023, 23:59"
+        "Oct 21, 2023, 17:00"
         
         >>> normalize_deadline("next week")
         "TBD"
@@ -56,6 +59,11 @@ def normalize_deadline(
             ref_datetime = ref_datetime.replace(tzinfo=timezone)
         except Exception:
             ref_datetime = ref_datetime.replace(tzinfo=ZoneInfo("UTC"))
+    
+    # Use sent_date for year inference if provided, otherwise use ref_datetime
+    year_ref = sent_date if sent_date is not None else ref_datetime
+    if year_ref.tzinfo is None:
+        year_ref = year_ref.replace(tzinfo=ref_datetime.tzinfo)
     
     text = text.strip().lower()
     
@@ -107,19 +115,19 @@ def normalize_deadline(
         logger.info(f"Matched time + today: text='{text}' -> {format_deadline(deadline)}")
         return format_deadline(deadline)
     
-    # EOD/COB synonyms - today at 23:59 (only if no explicit time)
+    # EOD/COB synonyms - today at work_end_hour (only if no explicit time)
     eod_patterns = [
         r'\beod\b', r'\bend\s+of\s+day\b', r'\bcob\b', 
         r'\bclose\s+of\s+business\b', r'\btonight\b'
     ]
     # Only match "today" if it's standalone (no time follows)
     if re.search(r'\btoday\b(?!\s+\d)', text):
-        deadline = ref_datetime.replace(hour=23, minute=59, second=0, microsecond=0)
+        deadline = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
         return format_deadline(deadline)
     
     for pattern in eod_patterns:
         if re.search(pattern, text):
-            deadline = ref_datetime.replace(hour=23, minute=59, second=0, microsecond=0)
+            deadline = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
             return format_deadline(deadline)
     
     # Tomorrow with specific time
@@ -194,11 +202,11 @@ def normalize_deadline(
             'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
         }.get(month_abbr, ref_datetime.month)
         
-        # Determine year - if month/day is in the past, use next year
-        year = ref_datetime.year
+        # Determine year - use year_ref (email sent date) for comparison
+        year = year_ref.year
         try:
             deadline = ref_datetime.replace(year=year, month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
-            if deadline < ref_datetime:
+            if deadline < year_ref:
                 deadline = deadline.replace(year=year + 1)
         except ValueError:
             return "TBD"
@@ -219,11 +227,11 @@ def normalize_deadline(
             'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
         }.get(month_abbr, ref_datetime.month)
         
-        # Default to EOD (23:59)
-        year = ref_datetime.year
+        # Default to work_end_hour
+        year = year_ref.year
         try:
-            deadline = ref_datetime.replace(year=year, month=month, day=day, hour=23, minute=59, second=0, microsecond=0)
-            if deadline < ref_datetime:
+            deadline = ref_datetime.replace(year=year, month=month, day=day, hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
+            if deadline < year_ref:
                 deadline = deadline.replace(year=year + 1)
         except ValueError:
             return "TBD"
@@ -291,8 +299,8 @@ def normalize_deadline(
                 
                 deadline = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
             else:
-                # No time specified - default to EOD
-                deadline = target_date.replace(hour=23, minute=59, second=0, microsecond=0)
+                # No time specified - default to work_end_hour
+                deadline = target_date.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
             
             return format_deadline(deadline)
     

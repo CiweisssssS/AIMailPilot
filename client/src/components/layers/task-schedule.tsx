@@ -88,11 +88,24 @@ export default function TaskSchedule({ analyzedEmails, onFlaggedClick, onRefresh
           />
         )}
 
-        {/* Today (includes overdue) */}
-        {(groupedTasks.today.length > 0 || groupedTasks.overdue.length > 0) && (
+        {/* Past Due / Overdue */}
+        {groupedTasks.overdue.length > 0 && (
+          <TimelineBucket
+            title="Past Due"
+            tasks={groupedTasks.overdue}
+            bucket="overdue"
+            color="destructive"
+            showCountBadge={true}
+            onTaskClick={onTaskClick}
+            selectedTaskId={selectedTaskId}
+          />
+        )}
+
+        {/* Today */}
+        {groupedTasks.today.length > 0 && (
           <TimelineBucket
             title="Today"
-            tasks={[...groupedTasks.overdue, ...groupedTasks.today]}
+            tasks={groupedTasks.today}
             bucket="today"
             color="primary"
             onTaskClick={onTaskClick}
@@ -170,11 +183,12 @@ interface TimelineBucketProps {
   tasks: TaskWithEmail[];
   bucket: TimeBucket;
   color: "primary" | "destructive" | "muted";
+  showCountBadge?: boolean;
   onTaskClick?: (emailId: string, taskIndex: number) => void;
   selectedTaskId?: { emailId: string; taskIndex: number };
 }
 
-function TimelineBucket({ title, tasks, bucket, color, onTaskClick, selectedTaskId }: TimelineBucketProps) {
+function TimelineBucket({ title, tasks, bucket, color, showCountBadge = false, onTaskClick, selectedTaskId }: TimelineBucketProps) {
   const nodeColor = {
     primary: "bg-primary",
     destructive: "bg-destructive",
@@ -193,6 +207,11 @@ function TimelineBucket({ title, tasks, bucket, color, onTaskClick, selectedTask
       <div className="flex items-center gap-3 mb-6">
         <div className={`w-3 h-3 rounded-full ${nodeColor}`} />
         <h3 className={`text-xl font-bold ${titleColor}`}>{title}</h3>
+        {showCountBadge && (
+          <Badge variant="destructive" className="ml-2" data-testid={`badge-count-${bucket}`}>
+            {tasks.length}
+          </Badge>
+        )}
       </div>
 
       {/* Timeline Items */}
@@ -201,7 +220,7 @@ function TimelineBucket({ title, tasks, bucket, color, onTaskClick, selectedTask
           <TimelineItem
             key={`${task.email.id}-${task.taskIndex}`}
             task={task}
-            showOverdueBadge={bucket === "today" && parseDeadline(task.due).bucket === "overdue"}
+            showOverdueBadge={bucket === "overdue"}
             onTaskClick={onTaskClick}
             selectedTaskId={selectedTaskId}
           />

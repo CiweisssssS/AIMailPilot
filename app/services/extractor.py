@@ -3,7 +3,7 @@ Task Extractor Service - Extract tasks using GPT-4o-mini
 """
 
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from app.core.llm import llm_provider
@@ -14,11 +14,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def extract_tasks_from_text(text: str, subject: str = "") -> Dict[str, Any]:
+async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optional[str] = None) -> Dict[str, Any]:
     """
     Extract tasks using GPT-4o-mini
     
-    Input: { text: string, subject?: string }
+    Input: { text: string, subject?: string, sent_date?: string }
     Output: { tasks: [{ title, owner, due_iso, source_span }] }
     """
     if not text:
@@ -30,6 +30,17 @@ async def extract_tasks_from_text(text: str, subject: str = "") -> Dict[str, Any
     # Limit text length
     if len(combined_text) > 3000:
         combined_text = combined_text[:3000] + "... [truncated]"
+    
+    # Parse sent_date for year inference
+    email_sent_date = None
+    if sent_date:
+        try:
+            from dateutil import parser as date_parser
+            email_sent_date = date_parser.parse(sent_date)
+            if email_sent_date.tzinfo is None:
+                email_sent_date = email_sent_date.replace(tzinfo=ZoneInfo("UTC"))
+        except Exception as e:
+            logger.warning(f"Failed to parse sent_date '{sent_date}': {e}")
     
     try:
         # Call LLM extractor (returns list of dicts)
@@ -48,11 +59,11 @@ async def extract_tasks_from_text(text: str, subject: str = "") -> Dict[str, Any
             # Get raw deadline from LLM
             raw_due = task.get('due')
             
-            # Normalize deadline using strict rules
+            # Normalize deadline using strict rules with email sent date
             if raw_due:
                 # If LLM returns ISO format, use it as deadline text to normalize
                 # Otherwise use raw text
-                normalized_due = normalize_deadline(str(raw_due), ref_datetime, "UTC")
+                normalized_due = normalize_deadline(str(raw_due), ref_datetime, "UTC", sent_date=email_sent_date)
             else:
                 normalized_due = "TBD"
             
@@ -85,12 +96,14 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
         
         # Get reference datetime from email date or use current time as fallback
         ref_datetime = datetime.now(ZoneInfo("UTC"))
+        email_sent_date = None
         if messages and messages[0].get('date'):
             try:
                 from dateutil import parser as date_parser
                 email_date = date_parser.parse(messages[0]['date'])
                 if email_date.tzinfo is None:
                     email_date = email_date.replace(tzinfo=ZoneInfo("UTC"))
+                email_sent_date = email_date
                 ref_datetime = email_date
                 logger.info(f"Using email date as reference: {ref_datetime}")
             except Exception as e:
@@ -104,10 +117,10 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
                 # Get raw deadline from LLM
                 raw_due = task_dict.get('due')
                 
-                # Normalize deadline using strict rules
+                # Normalize deadline using strict rules with email sent date
                 if raw_due:
                     logger.info(f"Task '{task_dict.get('title', 'Unknown')}': raw_due='{raw_due}'")
-                    normalized_due = normalize_deadline(str(raw_due), ref_datetime, "UTC")
+                    normalized_due = normalize_deadline(str(raw_due), ref_datetime, "UTC", sent_date=email_sent_date)
                     logger.info(f"  Normalized: '{raw_due}' -> '{normalized_due}'")
                 else:
                     normalized_due = "TBD"

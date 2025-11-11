@@ -52,27 +52,27 @@ class TestNormalizeDeadline:
         assert normalize_deadline("sometime this week", self.ref_dt) == "TBD"
         assert normalize_deadline("roughly Friday", self.ref_dt) == "TBD"
     
-    # ===== EOD/COB Synonyms - Should Normalize to Today 23:59 =====
+    # ===== EOD/COB Synonyms - Should Normalize to Today work_end_hour (17:00) =====
     
     def test_eod_normalizes_to_today_eod(self):
         result = normalize_deadline("by EOD", self.ref_dt)
-        assert result == "Oct 21, 2023, 23:59"
+        assert result == "Oct 21, 2023, 17:00"
     
     def test_end_of_day_normalizes(self):
         result = normalize_deadline("by end of day", self.ref_dt)
-        assert result == "Oct 21, 2023, 23:59"
+        assert result == "Oct 21, 2023, 17:00"
     
     def test_cob_normalizes(self):
         result = normalize_deadline("COB", self.ref_dt)
-        assert result == "Oct 21, 2023, 23:59"
+        assert result == "Oct 21, 2023, 17:00"
     
     def test_today_normalizes(self):
         result = normalize_deadline("today", self.ref_dt)
-        assert result == "Oct 21, 2023, 23:59"
+        assert result == "Oct 21, 2023, 17:00"
     
     def test_tonight_normalizes(self):
         result = normalize_deadline("tonight", self.ref_dt)
-        assert result == "Oct 21, 2023, 23:59"
+        assert result == "Oct 21, 2023, 17:00"
     
     def test_today_with_explicit_time_pm(self):
         result = normalize_deadline("today 3pm", self.ref_dt)
@@ -131,28 +131,28 @@ class TestNormalizeDeadline:
         result = normalize_deadline("December 1, 14:30", self.ref_dt)
         assert result == "Dec 01, 2023, 14:30"
     
-    # ===== Explicit Date without Time (Defaults to EOD) =====
+    # ===== Explicit Date without Time (Defaults to work_end_hour) =====
     
     def test_explicit_date_no_time(self):
         result = normalize_deadline("by October 10", self.ref_dt)
         # Oct 10 is before ref date, should use next year
-        assert result == "Oct 10, 2024, 23:59"
+        assert result == "Oct 10, 2024, 17:00"
     
     def test_explicit_date_future_no_time(self):
         result = normalize_deadline("November 25", self.ref_dt)
-        assert result == "Nov 25, 2023, 23:59"
+        assert result == "Nov 25, 2023, 17:00"
     
     # ===== Weekday Tests =====
     
     def test_weekday_friday(self):
         # Ref date is Saturday Oct 21, next Friday is Oct 27
         result = normalize_deadline("by Friday", self.ref_dt)
-        assert result == "Oct 27, 2023, 23:59"
+        assert result == "Oct 27, 2023, 17:00"
     
     def test_weekday_monday(self):
         # Ref date is Saturday Oct 21, next Monday is Oct 23
         result = normalize_deadline("Monday", self.ref_dt)
-        assert result == "Oct 23, 2023, 23:59"
+        assert result == "Oct 23, 2023, 17:00"
     
     def test_weekday_with_time(self):
         result = normalize_deadline("Friday 2pm", self.ref_dt)
@@ -164,7 +164,7 @@ class TestNormalizeDeadline:
     
     def test_next_weekday(self):
         result = normalize_deadline("next Wednesday", self.ref_dt)
-        assert result == "Oct 25, 2023, 23:59"
+        assert result == "Oct 25, 2023, 17:00"
     
     # ===== Edge Cases =====
     
