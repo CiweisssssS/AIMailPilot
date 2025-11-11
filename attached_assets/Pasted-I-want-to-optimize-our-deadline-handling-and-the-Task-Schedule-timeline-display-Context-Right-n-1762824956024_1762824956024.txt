@@ -1,0 +1,34 @@
+I want to optimize our deadline handling and the Task & Schedule timeline display.
+
+Context:
+Right now our backend deadline normalization (app/utils/deadline_utils.py) is doing all the parsing and returns strings like "Nov 10, 2025, 23:59". This is good as a single source of truth, but several default times are set to 23:59 (EOD/COB, date-only, weekday-without-time). When we sync these to Google Calendar, a 23:59 → +1h event is not very visible and does not match normal “end of workday” expectations.
+
+I also noticed that the frontend already has an "overdue" bucket in client/src/lib/date-utils.ts (it checks `isBefore(date, startOfDay(now))`), but in the timeline UI we don’t show an explicit “Past Due” section. I want users to clearly see emails/tasks whose due dates have already passed.
+
+Please update the behavior as follows:
+
+1) Human-friendly deadline time for EOD-like cases
+- When the normalized deadline comes from phrases like: "EOD", "end of day", "COB", "close of business", standalone "today", or a date without time (e.g. "Oct 15"),
+- Instead of defaulting to 23:59, map it to a visible end-of-workday slot (for example 17:00–18:00 local time).
+- This should apply to:
+  - EOD / COB / end of today
+  - explicit date without time ("Oct 15")
+  - weekday without time ("Friday")
+- Keep the existing “TBD” short-circuit behavior for ambiguous phrases.
+
+2) Use email sent date as the reference for year inference
+- Right now we do: “If parsed date is in the past → use next year.”
+- Please adjust this so that we compare the parsed date against the email’s sent timestamp (the message date), not only against “now”.
+- This is to avoid pushing an obviously valid date in the email (e.g. “Oct 15” in an email sent on Oct 5) into next year when we re-run analysis later.
+
+3) Add a separate “Past Due / Overdue” section in the timeline view
+- The frontend already categorizes deadlines into: overdue, today, this week, this month, later.
+- Make the timeline UI show an explicit top section for overdue items (e.g. “Past Due” or “Overdue”) and list all tasks whose normalized deadline is before today.
+- This section should appear above “Today”.
+- Items in Past Due should still support the existing actions (open mail, mark done, update deadline → which persists to Supabase and can resync to calendar).
+
+4) Calendar sync
+- When creating Google Calendar events from these normalized deadlines, use the human-friendly time window (17:00–18:00) for EOD/date-only cases instead of creating 23:59 events.
+- Goal: calendar events should be clearly visible and consistent with the new deadline mapping.
+
+Do not change the overall normalized string format ("Mon DD, YYYY, HH:mm") that the backend returns. Just adjust the mapping rules and the timeline display so that users can 1) see past-due tasks and 2) get more reasonable times on calendar.
