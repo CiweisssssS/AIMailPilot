@@ -166,6 +166,127 @@ class TestNormalizeDeadline:
         result = normalize_deadline("next Wednesday", self.ref_dt)
         assert result == "Oct 25, 2023, 17:00"
     
+    # ===== "End of ..." Patterns =====
+    
+    def test_end_of_today(self):
+        result = normalize_deadline("end of today", self.ref_dt)
+        assert result == "Oct 21, 2023, 17:00"
+    
+    def test_by_the_end_of_today(self):
+        result = normalize_deadline("by the end of today", self.ref_dt)
+        assert result == "Oct 21, 2023, 17:00"
+    
+    def test_end_of_tomorrow(self):
+        result = normalize_deadline("end of tomorrow", self.ref_dt)
+        assert result == "Oct 22, 2023, 17:00"
+    
+    def test_by_the_end_of_tomorrow(self):
+        result = normalize_deadline("by the end of tomorrow", self.ref_dt)
+        assert result == "Oct 22, 2023, 17:00"
+    
+    def test_tomorrow_eod(self):
+        result = normalize_deadline("tomorrow EOD", self.ref_dt)
+        assert result == "Oct 22, 2023, 17:00"
+    
+    def test_end_of_friday(self):
+        # Ref date is Saturday Oct 21, end of Friday is Oct 27 (next Friday)
+        result = normalize_deadline("end of Friday", self.ref_dt)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_friday_eod_from_saturday(self):
+        # Ref date is Saturday Oct 21, Friday EOD is Oct 27 (next Friday)
+        result = normalize_deadline("Friday EOD", self.ref_dt)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_friday_eod_same_day_before_work_hours(self):
+        # Friday Oct 20 at 10am, Friday EOD should be same day
+        friday_morning = datetime(2023, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("UTC"))
+        result = normalize_deadline("Friday EOD", friday_morning)
+        assert result == "Oct 20, 2023, 17:00"
+    
+    def test_friday_eod_same_day_after_work_hours(self):
+        # Friday Oct 20 at 6pm (18:00), Friday EOD should be next Friday
+        friday_evening = datetime(2023, 10, 20, 18, 0, 0, tzinfo=ZoneInfo("UTC"))
+        result = normalize_deadline("Friday EOD", friday_evening)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_end_of_this_week(self):
+        # Ref date is Saturday Oct 21, end of this week is Friday Oct 27
+        result = normalize_deadline("end of this week", self.ref_dt)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_by_the_end_of_this_week(self):
+        result = normalize_deadline("by the end of this week", self.ref_dt)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_eow(self):
+        result = normalize_deadline("EOW", self.ref_dt)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_before_the_week_ends(self):
+        result = normalize_deadline("before the week ends", self.ref_dt)
+        assert result == "Oct 27, 2023, 17:00"
+    
+    def test_end_of_next_week(self):
+        # Ref date is Saturday Oct 21, end of next week is Friday Nov 3
+        result = normalize_deadline("end of next week", self.ref_dt)
+        assert result == "Nov 03, 2023, 17:00"
+    
+    def test_end_of_this_month(self):
+        # October has 31 days
+        result = normalize_deadline("end of this month", self.ref_dt)
+        assert result == "Oct 31, 2023, 17:00"
+    
+    def test_by_the_end_of_this_month(self):
+        result = normalize_deadline("by the end of this month", self.ref_dt)
+        assert result == "Oct 31, 2023, 17:00"
+    
+    def test_end_of_next_month(self):
+        # November has 30 days
+        result = normalize_deadline("end of next month", self.ref_dt)
+        assert result == "Nov 30, 2023, 17:00"
+    
+    def test_end_of_this_quarter(self):
+        # Oct is in Q4, which ends Dec 31
+        result = normalize_deadline("end of this quarter", self.ref_dt)
+        assert result == "Dec 31, 2023, 17:00"
+    
+    def test_end_of_the_quarter(self):
+        result = normalize_deadline("end of the quarter", self.ref_dt)
+        assert result == "Dec 31, 2023, 17:00"
+    
+    def test_by_the_end_of_this_quarter(self):
+        result = normalize_deadline("by the end of this quarter", self.ref_dt)
+        assert result == "Dec 31, 2023, 17:00"
+    
+    def test_end_of_quarter_q1(self):
+        # February (Q1) should end March 31
+        feb_ref = datetime(2023, 2, 15, 10, 0, 0, tzinfo=ZoneInfo("UTC"))
+        result = normalize_deadline("end of this quarter", feb_ref)
+        assert result == "Mar 31, 2023, 17:00"
+    
+    def test_end_of_quarter_q2(self):
+        # May (Q2) should end June 30
+        may_ref = datetime(2023, 5, 15, 10, 0, 0, tzinfo=ZoneInfo("UTC"))
+        result = normalize_deadline("end of this quarter", may_ref)
+        assert result == "Jun 30, 2023, 17:00"
+    
+    def test_end_of_quarter_q3(self):
+        # August (Q3) should end September 30
+        aug_ref = datetime(2023, 8, 15, 10, 0, 0, tzinfo=ZoneInfo("UTC"))
+        result = normalize_deadline("end of this quarter", aug_ref)
+        assert result == "Sep 30, 2023, 17:00"
+    
+    def test_ambiguous_next_week_without_end_of(self):
+        # "next week" without "end of" should still be TBD
+        result = normalize_deadline("next week", self.ref_dt)
+        assert result == "TBD"
+    
+    def test_ambiguous_this_quarter_without_end_of(self):
+        # "this quarter" without "end of" should still be TBD
+        result = normalize_deadline("this quarter", self.ref_dt)
+        assert result == "TBD"
+    
     # ===== Edge Cases =====
     
     def test_empty_string_returns_tbd(self):

@@ -68,12 +68,9 @@ def normalize_deadline(
     text = text.strip().lower()
     
     # Check for ambiguous expressions - return TBD immediately
-    # Note: Exclude "end of ..." variants which are now handled explicitly
+    # Note: "end of ..." variants are handled later, so check context
     ambiguous_patterns = [
-        r'(?<!end\s+of\s)\bnext\s+week\b',  # Exclude "end of next week"
         r'\bearly\s+next\s+week\b',
-        r'(?<!end\s+of\s)\blater\s+this\s+month\b',  # Exclude "end of this month" context
-        r'(?<!end\s+of\s)(?<!end\s+of\s+the\s)\bthis\s+quarter\b',  # Exclude "end of this quarter"
         r'\basap\b',
         r'\bimmediately\b',
         r'\bat\s+your\s+earliest\s+convenience\b',
@@ -88,6 +85,19 @@ def normalize_deadline(
         if re.search(pattern, text):
             logger.debug(f"Ambiguous deadline detected: '{text}' matches pattern '{pattern}'")
             return "TBD"
+    
+    # Special handling for "next week", "this month", "this quarter" - TBD unless "end of"
+    if re.search(r'\bnext\s+week\b', text) and not re.search(r'\bend\s+of\s+next\s+week\b', text):
+        logger.debug(f"Ambiguous: 'next week' without 'end of'")
+        return "TBD"
+    
+    if re.search(r'\blater\s+this\s+month\b', text):
+        logger.debug(f"Ambiguous: 'later this month'")
+        return "TBD"
+    
+    if re.search(r'\bthis\s+quarter\b', text) and not re.search(r'\bend\s+of\s+(this\s+)?quarter\b', text):
+        logger.debug(f"Ambiguous: 'this quarter' without 'end of'")
+        return "TBD"
     
     # Check for "today" with explicit time BEFORE EOD patterns
     # Pattern 1: "today 3pm", "today at 15:00", etc. (today first)
@@ -117,12 +127,19 @@ def normalize_deadline(
         return format_deadline(deadline)
     
     # EOD/COB synonyms - today at work_end_hour (only if no explicit time)
+    # Note: Exclude weekday+EOD patterns like "Friday EOD" which are handled separately
     eod_patterns = [
-        r'\beod\b', r'\bend\s+of\s+day\b', r'\bcob\b', 
+        r'\bend\s+of\s+day\b', r'\bcob\b', 
         r'\bclose\s+of\s+business\b', r'\btonight\b'
     ]
     # Only match "today" if it's standalone (no time follows)
     if re.search(r'\btoday\b(?!\s+\d)', text):
+        deadline = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
+        return format_deadline(deadline)
+    
+    # Match standalone EOD (not preceded by weekday name)
+    weekdays_pattern = r'(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)'
+    if re.search(r'\beod\b', text) and not re.search(f'{weekdays_pattern}\\s+eod', text):
         deadline = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
         return format_deadline(deadline)
     
@@ -169,8 +186,17 @@ def normalize_deadline(
             current_weekday = ref_datetime.weekday()
             days_ahead = (target_weekday - current_weekday) % 7
             
+            # If today IS the target weekday
             if days_ahead == 0:
-                days_ahead = 7  # Next occurrence
+                # Check if we're still before work_end_hour - if so, use today
+                deadline_today = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
+                if ref_datetime < deadline_today:
+                    # Still before work end hour - use today
+                    logger.info(f"Matched 'end of weekday' (same day): text='{text}' -> {format_deadline(deadline_today)}")
+                    return format_deadline(deadline_today)
+                else:
+                    # Past work end hour - use next week
+                    days_ahead = 7
             
             target_date = ref_datetime + timedelta(days=days_ahead)
             deadline = target_date.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
