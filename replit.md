@@ -67,6 +67,14 @@ The project uses a **monorepo architecture** with distinct frontend (React/TypeS
 -   **Data Flow**: Integrated Gmail API data fetching -> AI analysis -> UI rendering with real-time updates and error handling.
 -   **Conversational AI**: Chatbot for interacting with email content with enriched context including summaries, priorities, and tasks.
 -   **Customizable Priorities**: User-defined tags and keyword weighting for personalized prioritization.
+-   **Google Calendar Integration** (Updated November 2025):
+    -   **Timezone-Aware Event Creation**: Direct RFC3339 formatting without JavaScript Date object timezone conversion
+    -   **Parsing Method**: `parseDeadlineToRFC3339()` converts "Mon DD, YYYY, HH:mm" to "YYYY-MM-DDTHH:mm:ss" using pure string manipulation
+    -   **Duration Handling**: `addHoursToRFC3339()` uses integer arithmetic with overflow handling (hours → days → months → years)
+    -   **Timezone Configuration**: `CALENDAR_TIMEZONE` environment variable (default: 'America/Los_Angeles') specifies the timezone for all calendar events
+    -   **Behavior**: UI displays "Nov 11, 2025, 17:00" → Google Calendar event shows "Nov 11, 2025, 17:00" in configured timezone (no UTC conversion)
+    -   **1-hour Duration**: All calendar events default to 1-hour duration from the deadline time
+    -   **Input Validation**: Strict format checking with descriptive error messages for malformed deadline strings
 
 ### System Design Choices
 
