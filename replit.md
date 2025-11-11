@@ -38,13 +38,19 @@ The project uses a **monorepo architecture** with distinct frontend (React/TypeS
     -   **Server-side normalization**: `normalize_deadline()` utility function with strict rules
     -   **Format**: "Mon DD, YYYY, HH:mm" (24-hour) or "TBD"
     -   **Configurable Work Hours**: `WORK_END_HOUR` environment variable (default: 17) controls end-of-workday time for human-friendly defaults
-    -   **Normalize cases**: EOD/COB → today work_end_hour (17:00 by default), "tomorrow noon/morning/evening", weekdays without time → work_end_hour, explicit dates with/without time, "today 3pm" → today 15:00
+    -   **Normalize cases**: 
+        -   EOD/COB → today at work_end_hour (17:00 by default)
+        -   "tomorrow noon/morning/evening", weekdays without time → work_end_hour
+        -   Explicit dates with/without time: "today 3pm" → today 15:00
+        -   **"End of ..." patterns** (new): "end of today/tomorrow", "Friday EOD", "end of this/next week", "EOW", "end of this/next month", "end of this/next quarter"
+        -   Weekday+EOD with same-day logic: "Friday EOD" on Friday before 17:00 → same day 17:00, after 17:00 → next Friday 17:00
+    -   **Helper utilities**: `calculate_end_of_week()` (Friday at work_end_hour), `calculate_end_of_month()` (last day of month), `calculate_end_of_quarter()` (Mar 31, Jun 30, Sep 30, Dec 31)
     -   **Year Inference**: Uses email `sent_date` when available (not current time) for accurate year calculation
     -   **TBD cases**: Ambiguous phrases ("next week", "ASAP", "by tomorrow" without time), date ranges, vague expressions
     -   **TBD UX**: Red warning UI, disabled calendar button, manual date-time picker
     -   **PATCH /api/tasks/:emailId/:taskIndex**: Server validates deadline format; updates stored in React Query cache (not persisted across sessions)
     -   **Task & Schedule Timeline**: Chronological buckets (Past Due, Today, This Week, This Month, Later), TBD section pinned at top, overdue badges with count, vertical timeline with circular nodes
-    -   **Comprehensive test coverage**: 40 unit tests covering all normalization rules including WORK_END_HOUR behavior
+    -   **Comprehensive test coverage**: 65 unit tests covering all normalization rules including WORK_END_HOUR behavior and "end of ..." patterns
 -   **AI-Powered Email Summarization** (Updated October 2025):
     -   **Word-Based Control**: Maximum 20 words (configurable via `SUMMARY_MAX_WORDS` environment variable)
     -   **Format**: ONE sentence capturing ACTOR + ACTION + OBJECT + DEADLINE (if present)
