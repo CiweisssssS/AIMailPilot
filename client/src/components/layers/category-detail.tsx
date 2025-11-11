@@ -1,10 +1,11 @@
-import { ArrowLeft, Mail, Calendar, Bookmark, CheckSquare } from "lucide-react";
+import { ArrowLeft, Mail, Bookmark, CheckSquare } from "lucide-react";
 import type { AnalyzedEmail } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { limitWords } from "@/lib/text-utils";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { DeadlineEditor, AddToCalendarButton } from "@/components/deadline-editor";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
@@ -133,9 +134,13 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
   const taskDisplay = hasTask ? cleanTaskTitle(email.task_extracted!) : email.subject;
   
   // Get deadline from first task if available
-  const deadline = email.tasks && email.tasks.length > 0 ? email.tasks[0].due : null;
+  const [currentDeadline, setCurrentDeadline] = useState<string | null>(
+    email.tasks && email.tasks.length > 0 ? email.tasks[0].due : null
+  );
+  const deadline = currentDeadline;
   console.log(`Email ${email.id} - Tasks:`, email.tasks, `Deadline:`, deadline);
   const formattedDeadline = formatDeadline(deadline);
+  const isTBD = !deadline || deadline === "TBD" || deadline === "null";
   
   // Flag toggle mutation
   const flagMutation = useMutation({
@@ -167,14 +172,6 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
     const newFlagStatus = !isFlagged;
     flagMutation.mutate(newFlagStatus);
   };
-  
-  const handleAddToCalendar = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent email item click
-    toast({
-      title: "Add to Calendar",
-      description: "Calendar integration coming soon!",
-    });
-  };
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent email item click
@@ -182,6 +179,10 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
       title: "Task completed", 
       description: "Mark as done feature coming soon!" 
     });
+  };
+
+  const handleDeadlineUpdated = (newDeadline: string) => {
+    setCurrentDeadline(newDeadline);
   };
 
   // Check if this email is selected (match by emailId, taskIndex can be 0 for email-level selection)
@@ -217,9 +218,20 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
           <p className="text-sm text-muted-foreground mb-2">
             Summary: {limitWords(email.summary, 20)}
           </p>
-          <p className="text-xs text-muted-foreground mb-1">
-            {formattedDeadline}
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs text-muted-foreground">
+              {formattedDeadline}
+            </p>
+            {isTBD && (
+              <DeadlineEditor
+                emailId={email.id}
+                taskIndex={0}
+                currentDeadline={deadline}
+                isTBD={isTBD}
+                onDeadlineUpdated={handleDeadlineUpdated}
+              />
+            )}
+          </div>
         </div>
         <button 
           className="p-1 hover:bg-primary/10 rounded transition-colors" 
@@ -229,14 +241,17 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
           <Bookmark className={`w-5 h-5 ${isFlagged ? 'fill-primary text-primary' : 'text-primary'}`} />
         </button>
       </div>
-      <button 
-        onClick={handleAddToCalendar}
-        className="text-sm bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors" 
-        data-testid={`button-add-to-calendar-${email.id}`}
-      >
-        <Calendar className="w-4 h-4" />
-        Add to Calendar
-      </button>
+      <div className="flex items-center gap-2">
+        <AddToCalendarButton
+          emailId={email.id}
+          taskIndex={0}
+          title={taskDisplay}
+          deadline={deadline}
+          description={email.summary}
+          disabled={isTBD}
+          className="text-sm bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg"
+        />
+      </div>
     </div>
   );
 }
