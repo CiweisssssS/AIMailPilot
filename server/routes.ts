@@ -454,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { title, description, startDateTime, endDateTime } = req.body;
+      const { title, description, startDateTime } = req.body;
 
       if (!title || !startDateTime) {
         return res.status(400).json({
@@ -463,54 +463,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Use Google Calendar client to create event
-      const { getUncachableGoogleCalendarClient } = await import("./google-calendar-client");
-      const calendar = await getUncachableGoogleCalendarClient();
-
-      // Parse the deadline format "Mon DD, YYYY, HH:mm" to ISO 8601
-      const parseDeadlineToISO = (dateStr: string): string => {
-        const monthMap: Record<string, number> = {
-          Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-          Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
-        };
-        
-        const parts = dateStr.split(/[,\s:]+/).filter(p => p);
-        const month = monthMap[parts[0]];
-        const day = parseInt(parts[1]);
-        const year = parseInt(parts[2]);
-        const hour = parseInt(parts[3]);
-        const minute = parseInt(parts[4]);
-        
-        const date = new Date(year, month, day, hour, minute);
-        return date.toISOString();
-      };
-
-      const startISO = parseDeadlineToISO(startDateTime);
-      // Default end time is 1 hour after start if not specified
-      const endISO = endDateTime ? parseDeadlineToISO(endDateTime) : new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
-
-      const event = {
-        summary: title,
-        description: description || '',
-        start: {
-          dateTime: startISO,
-          timeZone: 'America/Los_Angeles', // Default timezone, could be made configurable
-        },
-        end: {
-          dateTime: endISO,
-          timeZone: 'America/Los_Angeles',
-        },
-      };
-
-      const response = await calendar.events.insert({
-        calendarId: 'primary',
-        requestBody: event,
-      });
+      // Use the helper function from google-calendar-client which properly handles timezones
+      const { createCalendarEvent } = await import("./google-calendar-client");
+      
+      const result = await createCalendarEvent(
+        title,
+        description || '',
+        startDateTime
+      );
 
       res.json({
         success: true,
-        eventId: response.data.id,
-        eventLink: response.data.htmlLink,
+        eventId: result.eventId,
+        eventLink: result.eventLink,
       });
     } catch (error: any) {
       console.error("Error creating calendar event:", error);
