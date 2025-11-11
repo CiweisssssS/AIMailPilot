@@ -137,9 +137,11 @@ def normalize_deadline(
         deadline = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
         return format_deadline(deadline)
     
-    # Match standalone EOD (not preceded by weekday name)
+    # Match standalone EOD (not preceded by weekday name or "tomorrow")
     weekdays_pattern = r'(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)'
-    if re.search(r'\beod\b', text) and not re.search(f'{weekdays_pattern}\\s+eod', text):
+    if (re.search(r'\beod\b', text) and 
+        not re.search(f'{weekdays_pattern}\\s+eod', text) and
+        not re.search(r'\btomorrow\s+eod\b', text)):
         deadline = ref_datetime.replace(hour=settings.work_end_hour, minute=0, second=0, microsecond=0)
         return format_deadline(deadline)
     
