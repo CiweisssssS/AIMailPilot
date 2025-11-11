@@ -1,0 +1,35 @@
+I want to extend our deadline parsing so that all “end of …” style phrases are normalized to real deadlines instead of falling back to "TBD".
+
+Current issue:
+Right now, expressions like “by the end of tomorrow” or “please confirm by the end of this week” are not matched by our existing patterns in app/utils/deadline_utils.py, so they fall through to the final “no match → TBD” branch. This makes the UI show “Deadline: TBD” even though the user clearly provided a time boundary.
+
+What to do:
+Please add a new parsing block in app/utils/deadline_utils.py right after the current EOD/today handling and before the generic "tomorrow" / date parsing, to handle all “end of …” patterns.
+
+Patterns to support (all case-insensitive):
+- "end of today", "by the end of today"
+- "end of tomorrow", "by the end of tomorrow", "tomorrow EOD"
+- "end of <weekday>" (end of Monday, end of Friday, by Friday EOD)
+- "end of this week", "by the end of this week", "by EOW", "before the week ends"
+- "end of next week"
+- "end of this month", "end of next month"
+- "end of this quarter", "end of the quarter"
+
+Mapping rules:
+1. end of today → today at WORK_END_HOUR
+2. end of tomorrow / tomorrow EOD → tomorrow at WORK_END_HOUR
+3. end of <weekday> → find the next occurrence of that weekday (relative to email sent date if available, otherwise now) and set time to WORK_END_HOUR
+4. end of this week / EOW → this week’s Friday at WORK_END_HOUR
+5. end of next week → next week’s Friday at WORK_END_HOUR
+6. end of this month → last day of this month at WORK_END_HOUR
+7. end of next month → last day of next month at WORK_END_HOUR
+8. end of this quarter → last day of the current quarter at WORK_END_HOUR
+
+Important:
+- Reuse the same “work end hour” as a configurable value (e.g. WORK_END_HOUR = 17) so we can change it later.
+- Keep the existing ambiguous list (asap, sometime, around, next week without “end of”) as TBD.
+- Keep the existing output format "Mon DD, YYYY, HH:MM".
+- When computing “next week” or “this week”, use the email’s sent timestamp as the reference if available, not just the current system time.
+
+Goal:
+After this change, phrases like “confirm your attendance by the end of tomorrow” should produce a concrete deadline (tomorrow at the configured work end hour) instead of "TBD".
