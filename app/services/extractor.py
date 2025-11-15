@@ -10,8 +10,59 @@ from app.core.llm import llm_provider
 from app.models.schemas import Task
 from app.utils.deadline_utils import normalize_deadline
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+GENERIC_OWNER_TOKENS = {"team", "unknown", "you", "everyone", "all", "folks", "self", "sender", "myself"}
+
+OWNER_PATTERNS = [
+    r"\b([A-Z][a-z]+)\s*,\s*(?:please|can you|could you|kindly|need(?:\s+you)?|will you)",
+    r"\b([A-Z][a-z]+)\s+needs?\s+to\b",
+    r"\b([A-Z][a-z]+)\s+must\b",
+    r"\b([A-Z][a-z]+)\s+should\b",
+    r"\b([A-Z][a-z]+\s+(?:Department|Team))\s+(?:must|needs|should)\b",
+]
+
+
+def _infer_owner(current_owner: Optional[str], text: str) -> str:
+    """
+    Attempt to infer a more specific owner from the email text when the LLM returns a generic/default owner.
+    """
+    owner = (current_owner or "").strip()
+    if owner and owner.lower() not in GENERIC_OWNER_TOKENS:
+        return owner
+
+    for pattern in OWNER_PATTERNS:
+        match = re.search(pattern, text)
+        if match:
+            candidate = match.group(1).strip()
+            if candidate and candidate.lower() not in GENERIC_OWNER_TOKENS:
+                return candidate
+
+    return owner or "team"
+
+
+def _estimate_source_span(text: str, title: str) -> Dict[str, int]:
+    """
+    Provide a rough span for the extracted task title to help downstream features highlight the origin.
+    """
+    if not text or not title:
+        return {"start": 0, "end": min(len(text), 1)}
+
+    snippet = title[:40]
+    idx = text.lower().find(snippet.lower())
+    if idx == -1:
+        idx = 0
+    end = min(len(text), idx + max(len(snippet), 1))
+    return {"start": idx, "end": end}
+
+
+def _prepare_text(subject: str, body: str, limit: int = 3000) -> str:
+    combined_text = f"Subject: {subject}\n\n{body}" if subject else body
+    if len(combined_text) > limit:
+        return combined_text[:limit] + "... [truncated]"
+    return combined_text
 
 
 async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optional[str] = None) -> Dict[str, Any]:
@@ -25,11 +76,7 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
         return {"tasks": []}
     
     # Prepare content
-    combined_text = f"Subject: {subject}\n\n{text}" if subject else text
-    
-    # Limit text length
-    if len(combined_text) > 3000:
-        combined_text = combined_text[:3000] + "... [truncated]"
+    text_for_llm = _prepare_text(subject, text)
     
     # Parse sent_date for year inference
     email_sent_date = None
@@ -47,8 +94,10 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
         tasks = await llm_provider.extract_tasks([{
             'id': 'msg1',
             'subject': subject,
-            'clean_body': text,
-            'from_': 'Unknown'
+            'clean_body': text_for_llm,
+            'body': text_for_llm,
+            'from_': 'Unknown',
+            'date': sent_date
         }])
         
         # Convert to expected format with source_span and normalize deadlines
@@ -67,11 +116,14 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
             else:
                 normalized_due = "TBD"
             
+            inferred_owner = _infer_owner(task.get('owner'), text_for_llm)
+            source_span = _estimate_source_span(text_for_llm, task.get('title', ''))
+
             formatted_tasks.append({
                 "title": task.get('title', 'Untitled task'),
-                "owner": task.get('owner', 'team'),
+                "owner": inferred_owner,
                 "due_iso": normalized_due,  # Now in "Mon DD, YYYY, HH:mm" or "TBD" format
-                "source_span": {"start": 0, "end": len(text)}  # Placeholder span
+                "source_span": source_span
             })
         
         logger.info(f"GPT-4o-mini extracted {len(formatted_tasks)} tasks with normalized deadlines")
@@ -91,6 +143,10 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
         return []
     
     try:
+        primary_subject = messages[0].get('subject', '') if messages else ''
+        primary_body = messages[0].get('clean_body', messages[0].get('body', '')) if messages else ''
+        primary_text = _prepare_text(primary_subject, primary_body)
+
         # Use LLM provider's extract_tasks
         tasks_data = await llm_provider.extract_tasks(messages)
         
@@ -129,7 +185,7 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
                 # Ensure all required fields have valid defaults
                 task = Task(
                     title=task_dict.get('title') or 'Untitled',
-                    owner=task_dict.get('owner') or 'team',  # Ensure owner is never None
+                    owner=_infer_owner(task_dict.get('owner'), primary_text),  # Ensure owner is never None
                     due=normalized_due,  # Use normalized deadline
                     source_message_id=task_dict.get('source_message_id') or (messages[0].get('id', 'unknown') if messages else 'unknown'),
                     type=task_dict.get('type') or 'action'

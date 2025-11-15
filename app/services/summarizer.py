@@ -4,7 +4,7 @@ Summarizer Service - Generate summaries using GPT-4o-mini
 
 import json
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.llm import llm_provider
 from app.core.config import settings
 from app.core.prompts import get_summary_system_prompt, SUMMARY_FEW_SHOT_EXAMPLES
@@ -51,6 +51,33 @@ def extract_sender_name(sender_email: str) -> str:
         return username.capitalize()
     
     return "They"
+
+
+def build_summary(sender_name: str, actor: str, action: str, obj: str, deadline: Optional[str]) -> str:
+    """Compose a deterministic summary sentence from structured pieces."""
+    actor = actor.strip() if actor else sender_name
+    action = action.strip() if action else "shares"
+    obj = obj.strip() if obj else "an update"
+    sentence = f"{sender_name} {action}"
+    if obj:
+        sentence += f" {obj}"
+    if deadline:
+        clean_deadline = deadline.strip().strip(".")
+        if clean_deadline:
+            sentence += f" by {clean_deadline}"
+    if not sentence.endswith("."):
+        sentence += "."
+    return sentence
+
+
+def enforce_sender_prefix(summary: str, sender_name: str) -> str:
+    """Ensure generated summary starts with the sender's name."""
+    summary = summary.strip()
+    if not summary:
+        return f"{sender_name} shares an update."
+    if summary.lower().startswith(sender_name.lower()):
+        return summary
+    return f"{sender_name} {summary[0].lower()}{summary[1:]}"
 
 
 async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_length: int = 80) -> Dict[str, Any]:
@@ -130,7 +157,7 @@ async def _generate_summary_with_retry(subject: str, sender_name: str, body: str
 From: {sender_name}
 Body (trimmed): {body}
 
-Return JSON only."""
+Return JSON only with keys: summary, actor, action, object, deadline."""
     
     # Prepare messages with few-shot examples
     messages = [
@@ -157,12 +184,24 @@ Return JSON only."""
             response_data = response
             
         summary = response_data.get("summary", "").strip()
-        
-        # Ensure period at end
+        actor = (response_data.get("actor") or sender_name).strip()
+        action = (response_data.get("action") or "").strip()
+        obj = (response_data.get("object") or "").strip()
+        deadline = response_data.get("deadline")
+
+        if not summary:
+            summary = build_summary(sender_name, actor, action, obj, deadline)
+
+        summary = enforce_sender_prefix(summary, sender_name)
+        if obj and obj.lower() not in summary.lower():
+            summary = build_summary(sender_name, actor, action, obj, deadline)
+
+        if deadline and deadline.lower() not in summary.lower():
+            summary = build_summary(sender_name, actor, action, obj, deadline)
+
         if summary and not summary.endswith('.'):
             summary += '.'
-        
-        # Validate word count and action verb
+
         word_count = count_words(summary)
         has_verb = has_action_verb(summary)
         
@@ -171,7 +210,7 @@ Return JSON only."""
             logger.warning(f"Summary validation failed: {word_count} words (max {max_words}), has_verb={has_verb}. Retrying...")
             
             # Retry with stricter prompt
-            retry_message = f"""Shorten to <= {max_words} words. Keep actor + action + deadline intact. Return JSON only."""
+            retry_message = f"""Shorten to <= {max_words} words. Keep actor + action + object + deadline intact. Return JSON only."""
             
             retry_messages = [
                 {"role": "system", "content": system_prompt},
@@ -191,7 +230,15 @@ Return JSON only."""
                 retry_data = retry_response
                 
             summary = retry_data.get("summary", "").strip()
-            
+            actor = (retry_data.get("actor") or actor).strip()
+            action = (retry_data.get("action") or action).strip()
+            obj = (retry_data.get("object") or obj).strip()
+            deadline = retry_data.get("deadline") or deadline
+
+            if not summary:
+                summary = build_summary(sender_name, actor, action, obj, deadline)
+
+            summary = enforce_sender_prefix(summary, sender_name)
             if summary and not summary.endswith('.'):
                 summary += '.'
             
@@ -214,26 +261,22 @@ Return JSON only."""
             # If still missing action verb after retry, use template fallback
             if not has_verb:
                 logger.warning("Summary still missing action verb after retry. Using template fallback.")
-                # Create minimal compliant summary using template
+                template_action = action or "shares"
+                template_object = obj or "an update"
+                template_deadline = deadline
                 if "deadline" in body.lower() or "eod" in body.lower() or "asap" in body.lower():
-                    summary = f"{sender_name} requests action by deadline."
+                    template_action = "requests action"
+                    template_deadline = template_deadline or "the stated deadline"
                 elif any(word in body.lower() for word in ["review", "feedback", "check", "look"]):
-                    summary = f"{sender_name} asks you to review something."
+                    template_action = "asks you to review"
+                    template_object = template_object or "the materials"
                 elif "meeting" in body.lower() or "schedule" in body.lower():
-                    summary = f"{sender_name} wants to schedule a meeting."
-                else:
-                    summary = f"{sender_name} shares information for your review."
+                    template_action = "wants to schedule"
+                    template_object = template_object or "a meeting"
+                summary = build_summary(sender_name, actor, template_action, template_object, template_deadline)
         
-        # Ensure summary starts with sender name (code-level guard)
-        if summary and not summary.lower().startswith(sender_name.lower()):
-            logger.warning(f"Summary doesn't start with sender name '{sender_name}'. Prepending...")
-            # Check if it starts with "The" or "They" - replace with sender name
-            if summary.lower().startswith(('the ', 'they ')):
-                summary = sender_name + summary[summary.index(' '):]
-            else:
-                # Prepend sender name
-                summary = f"{sender_name} {summary[0].lower()}{summary[1:]}"
-        
+        summary = enforce_sender_prefix(summary, sender_name)
+
         return summary
         
     except json.JSONDecodeError as e:

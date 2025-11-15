@@ -45,6 +45,7 @@ async def calculate_priority(
     features_text = format_features_for_llm(features)
     
     # Step 4: Call GPT-4o-mini for final classification
+    # Step 4: Call GPT-4o-mini for final classification
     llm_messages = [
         {"role": "system", "content": PRIORITIZATION_PROMPT},
         {"role": "user", "content": f"{features_text}\n\n**Email Content:**\n{combined_text}"}
@@ -64,10 +65,15 @@ async def calculate_priority(
         
         priority_label = result.get('priority', 'P3')
         reason = result.get('reason', 'LLM classification')
+
+        priority_label = result.get('priority', 'P3')
+        reason = result.get('reason', 'LLM classification')
         
         # Map priority to score
         score_map = {"P1": 0.85, "P2": 0.55, "P3": 0.25}
         score = score_map.get(priority_label, 0.5)
+        
+        logger.info(f"GPT-4o-mini classified as {priority_label}: {reason}")
         
         logger.info(f"GPT-4o-mini classified as {priority_label}: {reason}")
         
