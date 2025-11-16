@@ -1,0 +1,11 @@
+email_id,gold_priority,predicted_priority,gold_reason,predicted_reason
+p002,P1,P2,A hard financial deadline with compliance implications elevates priority to P1.,"The email contains a request to submit an invoice with a deadline of Nov 20, which is within a week. It does not contain any urgent terms or immediate action requirements."
+p003,P1,P2,Live issue impacting product functionality; meeting scheduled for next day.,"The email contains a request to meet to resolve an API issue, which is important but not urgent, with a deadline of tomorrow (within 24 hours)."
+p005,P3,P2,Planning task; no operational urgency.,"The email contains a request for venue preferences with a deadline of Monday morning, which is within a week. It does not contain any urgent terms."
+p007,P3,P2,"Informational policy update, no immediate action.","The email contains a request for review ('please review') and has a deadline of next week, making it important but not urgent."
+p008,P2,P1,Routine recurring task with a same-day deadline.,"The email contains a deadline of 'by 4 PM today', which is within 24 hours, indicating urgent action is required."
+p010,P3,P2,Preparation task with a non-urgent deadline.,"The email contains a request to read the attached brief before Monday's sprint, indicating a deadline within a week. It does not contain urgent terms or immediate action requirements."
+p011,P2,P3,Scheduled maintenance that may impact availability.,The email provides information about a scheduled database migration with no immediate action required and a deadline far in the future (Nov 18). It contains no urgent or request terms.
+p012,P3,P2,Planning-oriented review with moderate timeline.,"The email contains a request for feedback ('send recommendations') with a deadline of next Tuesday, which is within a week."
+p015,P3,P2,Standard HR planning task with no operational urgency.,"The email contains a request for feedback ('provide suggestions') and has a deadline of 'by the end of the week', which qualifies it for P2 classification."
+p019,P3,P2,Strategic planning with non-urgent timeline.,"The email contains a request to draft Q1 objectives by Thursday, which indicates a deadline within a week. It includes a request term 'draft' but does not contain urgent keywords, making it a P2."

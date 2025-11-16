@@ -1,0 +1,29 @@
+email_id,subject,fact_type,status,similarity,gold,pred
+s001,Brand Guidelines Review,object,missing_pred,0.00,new brand guidelines,
+s002,Invoice Submission Reminder,object,missing_pred,0.00,September invoice,
+s003,API Issue Sync,action,mismatch,0.00,meet,discuss
+s003,API Issue Sync,object,missing_pred,0.00,API rate limit issue,
+s004,Document Feedback Request,object,missing_pred,0.00,campaign document,
+s005,Team Offsite Planning,object,mismatch,0.31,venue preferences,your preferred options for the offsite venue by Monday morning
+s006,Client Demo Prep,object,mismatch,0.18,demo slides,shared drive before noon tomorrow
+s007,Security Policy Update,action,mismatch,0.46,review,request
+s007,Security Policy Update,object,mismatch,0.48,password policy update,the password policy changes and update your password accordingly next week
+s007,Security Policy Update,deadline,missing_pred,0.00,next week,
+s008,Weekly Report Reminder,object,missing_pred,0.00,weekly report,
+s009,Budget Approval Needed,object,missing_pred,0.00,Q4 marketing budget,
+s010,Design Sprint Kickoff,action,mismatch,0.29,read,ask
+s010,Design Sprint Kickoff,object,mismatch,0.44,design sprint brief,the attached brief before the design sprint starts Monday
+s010,Design Sprint Kickoff,deadline,partial,0.55,before Monday,before the design sprint starts Monday
+s011,Database Migration Notice,action,missing_pred,0.00,announce,
+s012,Feedback on Internship Proposal,object,missing_pred,0.00,internship proposal,
+s013,Contract Renewal,action,mismatch,0.14,confirm,request
+s013,Contract Renewal,object,missing_pred,0.00,contract renewal,
+s014,Presentation Slide Request,action,mismatch,0.18,send,request
+s014,Presentation Slide Request,object,missing_pred,0.00,strategy deck,
+s015,Q2 Hiring Plan,object,missing_pred,0.00,Q2 hiring plan,
+s016,Project Alpha Timeline,object,missing_pred,0.00,phase 2 timeline,
+s017,Client Escalation Thread,action,missing_pred,0.00,request analysis,
+s017,Client Escalation Thread,object,missing_pred,0.00,login failure issue,
+s018,Product Launch Readiness,object,missing_pred,0.00,launch assets,
+s019,Quarterly Planning Thread,object,missing_pred,0.00,Q1 objectives,
+s020,Data Pipeline Outage,object,missing_pred,0.00,data pipeline,

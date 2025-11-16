@@ -1,0 +1,15 @@
+{
+  "model": "anthropic:claude-3-5-haiku",
+  "slot_actor_acc": 0.0,
+  "slot_action_acc": 0.1,
+  "slot_object_acc": 0.3,
+  "slot_deadline_acc": 0.85,
+  "json_parse_rate": 1.0,
+  "format_compliance": 1.0,
+  "rouge_like": 0.6880145514530189,
+  "fact_precision": 0.3768689497636866,
+  "fact_recall": 0.47450302965008845,
+  "fact_f1": 0.40523257323043255,
+  "latency_avg_ms": 1406.098461151123,
+  "latency_med_ms": 1388.9544010162354
+}

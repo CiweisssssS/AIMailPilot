@@ -12,20 +12,29 @@ class LLMProvider:
         self.provider = settings.llm_provider
         self.api_key = settings.openai_api_key
         self.model = settings.openai_model
+        self.summary_model = settings.openai_summary_model or self.model
+        self.extractor_model = settings.openai_extractor_model or self.model
         self.use_mock = not self.api_key or self.provider == "mock"
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _call_openai(self, messages: List[Dict[str, str]], temperature: float = 0.7, response_format: Optional[Dict[str, str]] = None) -> str:
+    async def _call_openai(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        response_format: Optional[Dict[str, str]] = None,
+        model_override: Optional[str] = None,
+    ) -> str:
         if self.use_mock:
             return self._mock_response(messages)
         
+        model_name = model_override or self.model
         import logging
         logger = logging.getLogger(__name__)
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
                 payload = {
-                    "model": self.model,
+                    "model": model_name,
                     "messages": messages,
                     "temperature": temperature,
                     "max_tokens": 500
@@ -53,12 +62,13 @@ class LLMProvider:
                 logger.error(f"OpenAI API call failed: {e}")
                 raise
     
-    async def call_with_json_mode(self, messages: List[Dict[str, str]], temperature: float = 0.2) -> str:
+    async def call_with_json_mode(self, messages: List[Dict[str, str]], temperature: float = 0.2, model_override: Optional[str] = None) -> str:
         """Call OpenAI with JSON response format enforced"""
         return await self._call_openai(
             messages=messages,
             temperature=temperature,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            model_override=model_override,
         )
     
     def _mock_response(self, messages: List[Dict[str, str]]) -> str:
@@ -107,7 +117,7 @@ class LLMProvider:
                 {"role": "user", "content": combined_text}
             ]
             
-            return await self._call_openai(llm_messages, temperature=0.5)
+            return await self._call_openai(llm_messages, temperature=0.5, model_override=self.summary_model)
         
         summaries = []
         for i in range(0, len(messages), 2):
@@ -122,7 +132,7 @@ class LLMProvider:
                 {"role": "user", "content": batch_text}
             ]
             
-            summary = await self._call_openai(llm_messages, temperature=0.5)
+            summary = await self._call_openai(llm_messages, temperature=0.5, model_override=self.summary_model)
             summaries.append(summary)
         
         final_text = "\n\n".join(summaries)
@@ -131,7 +141,7 @@ class LLMProvider:
             {"role": "user", "content": final_text}
         ]
         
-        return await self._call_openai(llm_messages, temperature=0.5)
+        return await self._call_openai(llm_messages, temperature=0.5, model_override=self.summary_model)
     
     async def extract_tasks(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         combined_text = "\n\n".join([
@@ -144,7 +154,7 @@ class LLMProvider:
             {"role": "user", "content": combined_text}
         ]
         
-        response = await self._call_openai(llm_messages, temperature=0.3)
+        response = await self._call_openai(llm_messages, temperature=0.3, model_override=self.extractor_model)
         
         try:
             if response.strip().startswith('['):

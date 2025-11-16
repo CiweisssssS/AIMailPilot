@@ -1,0 +1,1339 @@
+[
+  {
+    "id": "s001",
+    "subject": "Brand Guidelines Review",
+    "body": "Hi Mark, We've completed the first draft of the updated brand guidelines. Please review the new color palette and logo usage and send your feedback by Friday at 6 PM.",
+    "sender": "Rebecca Lee <rebecca@designhub.com>",
+    "gold_summary": "Rebecca asks Mark to review the new brand guidelines and send feedback by Friday at 6 PM.",
+    "predicted_summary": "Rebecca needs Mark to review the new color palette and logo usage and send feedback by Friday at 6 PM.",
+    "rouge1": 0.8235294117647058,
+    "rougeL": 0.8235294117647058,
+    "gold_facts": {
+      "actor": "Rebecca",
+      "action": "review",
+      "object": "new brand guidelines",
+      "deadline": "Friday 6 PM"
+    },
+    "pred_facts": {
+      "actor": "Rebecca needs Mark to",
+      "action": "review",
+      "object": null,
+      "deadline": "by Friday at 6 PM"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Rebecca",
+        "pred": "Rebecca needs Mark to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "review",
+        "pred": "review"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "new brand guidelines",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Friday 6 PM",
+        "pred": "by Friday at 6 PM"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 20
+  },
+  {
+    "id": "s002",
+    "subject": "Invoice Submission Reminder",
+    "body": "Hi team, Please finalize your September invoice and upload it to the portal by Nov 20 at 5 PM UTC.",
+    "sender": "David Chen <dchen@financepro.io>",
+    "gold_summary": "David reminds the team to finalize and upload their September invoice by Nov 20 at 5 PM UTC.",
+    "predicted_summary": "David finalize and upload September invoice by Nov 20 at 5 PM UTC.",
+    "rouge1": 0.7222222222222222,
+    "rougeL": 0.7222222222222222,
+    "gold_facts": {
+      "actor": "David",
+      "action": "finalize and upload",
+      "object": "September invoice",
+      "deadline": "Nov 20 5 PM UTC"
+    },
+    "pred_facts": {
+      "actor": "David",
+      "action": "finalize",
+      "object": null,
+      "deadline": "by Nov 20 at 5 PM UTC"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "David",
+        "pred": "David"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "finalize and upload",
+        "pred": "finalize"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "September invoice",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Nov 20 5 PM UTC",
+        "pred": "by Nov 20 at 5 PM UTC"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 13
+  },
+  {
+    "id": "s003",
+    "subject": "API Issue Sync",
+    "body": "Let's meet tomorrow at 10 AM PT to discuss the API rate limit issue and decide next steps.",
+    "sender": "Alex Wu <alexwu@devteam.com>",
+    "gold_summary": "Alex invites you to a meeting tomorrow at 10 AM PT to discuss the API rate limit issue.",
+    "predicted_summary": "Alex wants to meet to discuss the API rate limit issue tomorrow at 10 AM PT.",
+    "rouge1": 0.7777777777777778,
+    "rougeL": 0.5,
+    "gold_facts": {
+      "actor": "Alex",
+      "action": "meet",
+      "object": "API rate limit issue",
+      "deadline": "tomorrow 10 AM PT"
+    },
+    "pred_facts": {
+      "actor": "Alex wants to meet to",
+      "action": "discuss",
+      "object": null,
+      "deadline": "tomorrow at 10 AM PT"
+    },
+    "fact_precision": 0.6666666666666666,
+    "fact_recall": 0.5,
+    "fact_strict_tp": 2,
+    "fact_partial_tp": 0,
+    "fact_fp": 1,
+    "fact_fn": 2,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Alex",
+        "pred": "Alex wants to meet to"
+      },
+      {
+        "fact_type": "action",
+        "status": "mismatch",
+        "similarity": 0.0,
+        "gold": "meet",
+        "pred": "discuss"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "API rate limit issue",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "tomorrow 10 AM PT",
+        "pred": "tomorrow at 10 AM PT"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 16
+  },
+  {
+    "id": "s004",
+    "subject": "Document Feedback Request",
+    "body": "Could you review the attached campaign document and return comments by EOD Wednesday?",
+    "sender": "Nina Patel <nina@marketinglab.org>",
+    "gold_summary": "Nina asks you to review the campaign document and return comments by EOD Wednesday.",
+    "predicted_summary": "Nina needs you to review the attached campaign document and return comments by EOD Wednesday.",
+    "rouge1": 0.9285714285714286,
+    "rougeL": 0.9285714285714286,
+    "gold_facts": {
+      "actor": "Nina",
+      "action": "review",
+      "object": "campaign document",
+      "deadline": "EOD Wednesday"
+    },
+    "pred_facts": {
+      "actor": "Nina needs you to",
+      "action": "review",
+      "object": null,
+      "deadline": "by EOD Wednesday"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Nina",
+        "pred": "Nina needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "review",
+        "pred": "review"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "campaign document",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "EOD Wednesday",
+        "pred": "by EOD Wednesday"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 15
+  },
+  {
+    "id": "s005",
+    "subject": "Team Offsite Planning",
+    "body": "We need to finalize the offsite venue. Please send your preferred options by Monday morning.",
+    "sender": "Marcus Hall <marcus@opscenter.co>",
+    "gold_summary": "Marcus requests venue preferences for the team offsite by Monday morning.",
+    "predicted_summary": "Marcus needs you to send your preferred options for the offsite venue by Monday morning.",
+    "rouge1": 0.7272727272727273,
+    "rougeL": 0.6363636363636364,
+    "gold_facts": {
+      "actor": "Marcus",
+      "action": "send",
+      "object": "venue preferences",
+      "deadline": "Monday morning"
+    },
+    "pred_facts": {
+      "actor": "Marcus",
+      "action": "send",
+      "object": "your preferred options for the offsite venue by Monday morning",
+      "deadline": "by Monday morning"
+    },
+    "fact_precision": 0.75,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 1,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Marcus",
+        "pred": "Marcus"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "send",
+        "pred": "send"
+      },
+      {
+        "fact_type": "object",
+        "status": "mismatch",
+        "similarity": 0.30985915492957744,
+        "gold": "venue preferences",
+        "pred": "your preferred options for the offsite venue by Monday morning"
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Monday morning",
+        "pred": "by Monday morning"
+      }
+    ],
+    "has_action_verb": false,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 15
+  },
+  {
+    "id": "s006",
+    "subject": "Client Demo Prep",
+    "body": "Prepare the product demo slides and upload them to the shared drive before noon tomorrow.",
+    "sender": "Ivy Thompson <ivy@productexperts.ai>",
+    "gold_summary": "Ivy asks you to prepare the demo slides and upload them to the drive before noon tomorrow.",
+    "predicted_summary": "Ivy needs you to prepare the product demo slides and upload them to the shared drive before noon tomorrow.",
+    "rouge1": 0.9411764705882353,
+    "rougeL": 0.9411764705882353,
+    "gold_facts": {
+      "actor": "Ivy",
+      "action": "prepare and upload",
+      "object": "demo slides",
+      "deadline": "noon tomorrow"
+    },
+    "pred_facts": {
+      "actor": "Ivy needs you to",
+      "action": "prepare",
+      "object": "shared drive before noon tomorrow",
+      "deadline": "before noon tomorrow"
+    },
+    "fact_precision": 0.75,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 1,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Ivy",
+        "pred": "Ivy needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "prepare and upload",
+        "pred": "prepare"
+      },
+      {
+        "fact_type": "object",
+        "status": "mismatch",
+        "similarity": 0.18181818181818182,
+        "gold": "demo slides",
+        "pred": "shared drive before noon tomorrow"
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "noon tomorrow",
+        "pred": "before noon tomorrow"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 19
+  },
+  {
+    "id": "s007",
+    "subject": "Security Policy Update",
+    "body": "We are updating our password policy next week. Please review the changes and update your password accordingly.",
+    "sender": "Security Team <security@company.com>",
+    "gold_summary": "The security team notifies you about next week's password policy update and asks you to review the changes.",
+    "predicted_summary": "Security requests you to review the password policy changes and update your password accordingly next week.",
+    "rouge1": 0.6111111111111112,
+    "rougeL": 0.3333333333333333,
+    "gold_facts": {
+      "actor": "Security",
+      "action": "review",
+      "object": "password policy update",
+      "deadline": "next week"
+    },
+    "pred_facts": {
+      "actor": "Security",
+      "action": "request",
+      "object": "the password policy changes and update your password accordingly next week",
+      "deadline": null
+    },
+    "fact_precision": 0.3333333333333333,
+    "fact_recall": 0.25,
+    "fact_strict_tp": 1,
+    "fact_partial_tp": 0,
+    "fact_fp": 2,
+    "fact_fn": 3,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Security",
+        "pred": "Security"
+      },
+      {
+        "fact_type": "action",
+        "status": "mismatch",
+        "similarity": 0.46153846153846156,
+        "gold": "review",
+        "pred": "request"
+      },
+      {
+        "fact_type": "object",
+        "status": "mismatch",
+        "similarity": 0.4782608695652174,
+        "gold": "password policy update",
+        "pred": "the password policy changes and update your password accordingly next week"
+      },
+      {
+        "fact_type": "deadline",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "next week",
+        "pred": ""
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 16
+  },
+  {
+    "id": "s008",
+    "subject": "Weekly Report Reminder",
+    "body": "Please submit your weekly report by 4 PM today so I can consolidate the data.",
+    "sender": "Liam Zhang <liam@analyticsnow.io>",
+    "gold_summary": "Liam reminds you to submit your weekly report by 4 PM today.",
+    "predicted_summary": "Liam needs you to submit your weekly report by 4 PM today.",
+    "rouge1": 0.9166666666666666,
+    "rougeL": 0.9166666666666666,
+    "gold_facts": {
+      "actor": "Liam",
+      "action": "submit",
+      "object": "weekly report",
+      "deadline": "4 PM today"
+    },
+    "pred_facts": {
+      "actor": "Liam needs you to",
+      "action": "submit",
+      "object": null,
+      "deadline": "by 4 PM today"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Liam",
+        "pred": "Liam needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "submit",
+        "pred": "submit"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "weekly report",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "4 PM today",
+        "pred": "by 4 PM today"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 12
+  },
+  {
+    "id": "s009",
+    "subject": "Budget Approval Needed",
+    "body": "The Q4 marketing budget draft is ready. Please review and approve it by Thursday afternoon.",
+    "sender": "Grace Kim <grace@financehub.net>",
+    "gold_summary": "Grace asks you to review and approve the Q4 marketing budget by Thursday afternoon.",
+    "predicted_summary": "Grace needs you to review and approve the Q4 marketing budget draft by Thursday afternoon.",
+    "rouge1": 0.9285714285714286,
+    "rougeL": 0.9285714285714286,
+    "gold_facts": {
+      "actor": "Grace",
+      "action": "review and approve",
+      "object": "Q4 marketing budget",
+      "deadline": "Thursday afternoon"
+    },
+    "pred_facts": {
+      "actor": "Grace needs you to",
+      "action": "review",
+      "object": null,
+      "deadline": "by Thursday afternoon"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Grace",
+        "pred": "Grace needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "review and approve",
+        "pred": "review"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "Q4 marketing budget",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Thursday afternoon",
+        "pred": "by Thursday afternoon"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 15
+  },
+  {
+    "id": "s010",
+    "subject": "Design Sprint Kickoff",
+    "body": "Our next design sprint starts Monday. Please read the attached brief beforehand.",
+    "sender": "Hannah Lee <hlee@uxcreators.com>",
+    "gold_summary": "Hannah asks you to read the attached brief before Monday's design sprint kickoff.",
+    "predicted_summary": "Hannah asks you to read the attached brief before the design sprint starts Monday.",
+    "rouge1": 0.8461538461538461,
+    "rougeL": 0.8461538461538461,
+    "gold_facts": {
+      "actor": "Hannah",
+      "action": "read",
+      "object": "design sprint brief",
+      "deadline": "before Monday"
+    },
+    "pred_facts": {
+      "actor": "Hannah",
+      "action": "ask",
+      "object": "the attached brief before the design sprint starts Monday",
+      "deadline": "before the design sprint starts Monday"
+    },
+    "fact_precision": 0.5,
+    "fact_recall": 0.5,
+    "fact_strict_tp": 1,
+    "fact_partial_tp": 1,
+    "fact_fp": 2,
+    "fact_fn": 2,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Hannah",
+        "pred": "Hannah"
+      },
+      {
+        "fact_type": "action",
+        "status": "mismatch",
+        "similarity": 0.2857142857142857,
+        "gold": "read",
+        "pred": "ask"
+      },
+      {
+        "fact_type": "object",
+        "status": "mismatch",
+        "similarity": 0.4411764705882353,
+        "gold": "design sprint brief",
+        "pred": "the attached brief before the design sprint starts Monday"
+      },
+      {
+        "fact_type": "deadline",
+        "status": "partial",
+        "similarity": 0.5531914893617021,
+        "gold": "before Monday",
+        "pred": "before the design sprint starts Monday"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 14
+  },
+  {
+    "id": "s011",
+    "subject": "Database Migration Notice",
+    "body": "We will perform a database migration on Nov 18 from 1–3 AM UTC. Expect downtime.",
+    "sender": "Infra Team <infra@company.com>",
+    "gold_summary": "The infra team announces a database migration on Nov 18 from 1–3 AM UTC.",
+    "predicted_summary": "Infra informs about a database migration by Nov 18 from 1–3 AM UTC.",
+    "rouge1": 0.7333333333333333,
+    "rougeL": 0.7333333333333333,
+    "gold_facts": {
+      "actor": "Infra",
+      "action": "announce",
+      "object": "database migration",
+      "deadline": "Nov 18 1–3 AM UTC"
+    },
+    "pred_facts": {
+      "actor": "Infra",
+      "action": null,
+      "object": "a database migration by Nov 18 from 1–3 AM UTC",
+      "deadline": "by Nov 18 from 1–3 AM UTC"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Infra",
+        "pred": "Infra"
+      },
+      {
+        "fact_type": "action",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "announce",
+        "pred": ""
+      },
+      {
+        "fact_type": "object",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "database migration",
+        "pred": "a database migration by Nov 18 from 1–3 AM UTC"
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 0.8095238095238095,
+        "gold": "Nov 18 1–3 AM UTC",
+        "pred": "by Nov 18 from 1–3 AM UTC"
+      }
+    ],
+    "has_action_verb": false,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 13
+  },
+  {
+    "id": "s012",
+    "subject": "Feedback on Internship Proposal",
+    "body": "Please review the internship program proposal and share your recommendations by next Tuesday.",
+    "sender": "Olivia Park <olivia@hrpartners.org>",
+    "gold_summary": "Olivia asks you to review the internship proposal and share recommendations by next Tuesday.",
+    "predicted_summary": "Olivia needs you to review the internship program proposal and share your recommendations by next Tuesday.",
+    "rouge1": 0.9285714285714286,
+    "rougeL": 0.9285714285714286,
+    "gold_facts": {
+      "actor": "Olivia",
+      "action": "review and recommend",
+      "object": "internship proposal",
+      "deadline": "next Tuesday"
+    },
+    "pred_facts": {
+      "actor": "Olivia needs you to",
+      "action": "review",
+      "object": null,
+      "deadline": "by next Tuesday"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Olivia",
+        "pred": "Olivia needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "review and recommend",
+        "pred": "review"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "internship proposal",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "next Tuesday",
+        "pred": "by next Tuesday"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 16
+  },
+  {
+    "id": "s013",
+    "subject": "Contract Renewal",
+    "body": "Your service contract expires on December 1. Please confirm renewal intentions by Nov 25.",
+    "sender": "Vendor Support <support@vendorsuite.com>",
+    "gold_summary": "Vendor Support requests confirmation of your contract renewal intentions by Nov 25.",
+    "predicted_summary": "Vendor requests confirmation of contract renewal intentions by Nov 25.",
+    "rouge1": 0.8333333333333334,
+    "rougeL": 0.8333333333333334,
+    "gold_facts": {
+      "actor": "Vendor Support",
+      "action": "confirm",
+      "object": "contract renewal",
+      "deadline": "Nov 25"
+    },
+    "pred_facts": {
+      "actor": "Vendor",
+      "action": "request",
+      "object": null,
+      "deadline": "by Nov 25"
+    },
+    "fact_precision": 0.6666666666666666,
+    "fact_recall": 0.5,
+    "fact_strict_tp": 2,
+    "fact_partial_tp": 0,
+    "fact_fp": 1,
+    "fact_fn": 2,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Vendor Support",
+        "pred": "Vendor"
+      },
+      {
+        "fact_type": "action",
+        "status": "mismatch",
+        "similarity": 0.14285714285714285,
+        "gold": "confirm",
+        "pred": "request"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "contract renewal",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Nov 25",
+        "pred": "by Nov 25"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 10
+  },
+  {
+    "id": "s014",
+    "subject": "Presentation Slide Request",
+    "body": "Could you send me the latest version of the strategy deck before our meeting Thursday morning?",
+    "sender": "Tom Rivera <trivera@strategyteam.io>",
+    "gold_summary": "Tom asks you to send the latest strategy deck before the Thursday morning meeting.",
+    "predicted_summary": "Tom requests the latest version of the strategy deck before the meeting Thursday morning.",
+    "rouge1": 0.7142857142857143,
+    "rougeL": 0.6428571428571429,
+    "gold_facts": {
+      "actor": "Tom",
+      "action": "send",
+      "object": "strategy deck",
+      "deadline": "Thursday morning"
+    },
+    "pred_facts": {
+      "actor": "Tom",
+      "action": "request",
+      "object": null,
+      "deadline": "before the meeting Thursday morning"
+    },
+    "fact_precision": 0.6666666666666666,
+    "fact_recall": 0.5,
+    "fact_strict_tp": 2,
+    "fact_partial_tp": 0,
+    "fact_fp": 1,
+    "fact_fn": 2,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Tom",
+        "pred": "Tom"
+      },
+      {
+        "fact_type": "action",
+        "status": "mismatch",
+        "similarity": 0.18181818181818182,
+        "gold": "send",
+        "pred": "request"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "strategy deck",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Thursday morning",
+        "pred": "before the meeting Thursday morning"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 14
+  },
+  {
+    "id": "s015",
+    "subject": "Q2 Hiring Plan",
+    "body": "Please take a look at the Q2 hiring plan draft and provide suggestions by the end of the week.",
+    "sender": "Ella Morgan <ella@hrteam.co>",
+    "gold_summary": "Ella asks you to review the Q2 hiring plan and provide suggestions by the end of the week.",
+    "predicted_summary": "Ella needs you to review the Q2 hiring plan draft and provide suggestions by the end of the week.",
+    "rouge1": 0.9444444444444444,
+    "rougeL": 0.9444444444444444,
+    "gold_facts": {
+      "actor": "Ella",
+      "action": "review and suggest",
+      "object": "Q2 hiring plan",
+      "deadline": "end of week"
+    },
+    "pred_facts": {
+      "actor": "Ella needs you to",
+      "action": "review",
+      "object": null,
+      "deadline": "by the end of the week"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Ella",
+        "pred": "Ella needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "review and suggest",
+        "pred": "review"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "Q2 hiring plan",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "end of week",
+        "pred": "by the end of the week"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 19
+  },
+  {
+    "id": "s016",
+    "subject": "Project Alpha Timeline",
+    "body": [
+      {
+        "from_": "Team Lead",
+        "clean_body": "We need to finalize Phase 2 tasks. Please review the draft timeline before Friday."
+      },
+      {
+        "from_": "Sam",
+        "clean_body": "I added comments to the document. Let's align on ownership tomorrow."
+      }
+    ],
+    "sender": "Team Lead <lead@projectalpha.com>",
+    "gold_summary": "The team discusses Phase 2 planning, asking everyone to review the draft timeline before Friday and align on task ownership.",
+    "predicted_summary": "Team needs you to review the draft timeline before Friday.",
+    "rouge1": 0.4,
+    "rougeL": 0.4,
+    "gold_facts": {
+      "actor": "Team",
+      "action": "review and align",
+      "object": "phase 2 timeline",
+      "deadline": "Friday"
+    },
+    "pred_facts": {
+      "actor": "Team needs you to",
+      "action": "review",
+      "object": null,
+      "deadline": "before Friday"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Team",
+        "pred": "Team needs you to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "review and align",
+        "pred": "review"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "phase 2 timeline",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Friday",
+        "pred": "before Friday"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 10
+  },
+  {
+    "id": "s017",
+    "subject": "Client Escalation Thread",
+    "body": [
+      {
+        "from_": "Support Manager",
+        "clean_body": "Client X reported recurring login failures. We need a root-cause analysis today."
+      },
+      {
+        "from_": "Engineer Mike",
+        "clean_body": "Investigating now. Will send findings by 3 PM."
+      },
+      {
+        "from_": "QA Lead",
+        "clean_body": "Testing environment recreated the issue. Preparing screenshots."
+      }
+    ],
+    "sender": "Support Manager <support@servicehub.com>",
+    "gold_summary": "The team coordinates on Client X's login failures, requesting a root-cause analysis and promising findings by 3 PM.",
+    "predicted_summary": "Support needs a root-cause analysis for Client X's login failures today.",
+    "rouge1": 0.42105263157894735,
+    "rougeL": 0.21052631578947367,
+    "gold_facts": {
+      "actor": "Support Manager",
+      "action": "request analysis",
+      "object": "login failure issue",
+      "deadline": "today / 3 PM"
+    },
+    "pred_facts": {
+      "actor": "Support",
+      "action": null,
+      "object": null,
+      "deadline": "today"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.5,
+    "fact_strict_tp": 2,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 2,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Support Manager",
+        "pred": "Support"
+      },
+      {
+        "fact_type": "action",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "request analysis",
+        "pred": ""
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "login failure issue",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "today / 3 PM",
+        "pred": "today"
+      }
+    ],
+    "has_action_verb": false,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 11
+  },
+  {
+    "id": "s018",
+    "subject": "Product Launch Readiness",
+    "body": [
+      {
+        "from_": "Tara",
+        "clean_body": "We must finalize launch assets. Please upload social copy by Monday."
+      },
+      {
+        "from_": "Designer Ana",
+        "clean_body": "Draft images are ready. Need approval."
+      },
+      {
+        "from_": "Tara",
+        "clean_body": "Great—let’s align on final versions tomorrow."
+      }
+    ],
+    "sender": "PM Tara <tara@productlaunch.io>",
+    "gold_summary": "Tara leads discussion on launch readiness, asking the team to upload social copy by Monday and align on final assets.",
+    "predicted_summary": "PM tara needs to upload social copy, and Ana requires approval for draft images by Monday.",
+    "rouge1": 0.4,
+    "rougeL": 0.35,
+    "gold_facts": {
+      "actor": "Tara",
+      "action": "upload and align",
+      "object": "launch assets",
+      "deadline": "Monday"
+    },
+    "pred_facts": {
+      "actor": "PM tara needs to",
+      "action": "upload",
+      "object": null,
+      "deadline": "by Monday"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Tara",
+        "pred": "PM tara needs to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "upload and align",
+        "pred": "upload"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "launch assets",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Monday",
+        "pred": "by Monday"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 16
+  },
+  {
+    "id": "s019",
+    "subject": "Quarterly Planning Thread",
+    "body": [
+      {
+        "from_": "Paul",
+        "clean_body": "Start drafting Q1 objectives. Initial outline needed by Thursday."
+      },
+      {
+        "from_": "Julia",
+        "clean_body": "Added some early ideas to the doc."
+      },
+      {
+        "from_": "Paul",
+        "clean_body": "Thanks—let's refine the structure tomorrow."
+      }
+    ],
+    "sender": "Director Paul <paul@strategyboard.com>",
+    "gold_summary": "Paul coordinates quarterly planning, requesting an initial Q1 objectives outline by Thursday and discussing refinements.",
+    "predicted_summary": "Director paul needs to draft Q1 objectives and provide an initial outline by Thursday.",
+    "rouge1": 0.6,
+    "rougeL": 0.4,
+    "gold_facts": {
+      "actor": "Paul",
+      "action": "draft and refine",
+      "object": "Q1 objectives",
+      "deadline": "Thursday"
+    },
+    "pred_facts": {
+      "actor": "Director paul needs to",
+      "action": "draft",
+      "object": null,
+      "deadline": "by Thursday"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Paul",
+        "pred": "Director paul needs to"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "draft and refine",
+        "pred": "draft"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "Q1 objectives",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Thursday",
+        "pred": "by Thursday"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 14
+  },
+  {
+    "id": "s020",
+    "subject": "Data Pipeline Outage",
+    "body": [
+      {
+        "from_": "Ops",
+        "clean_body": "Data pipeline is down. Engineering team investigating."
+      },
+      {
+        "from_": "Lead Engineer",
+        "clean_body": "Will provide status update by 2 PM."
+      }
+    ],
+    "sender": "Ops Center <ops@cloudinfra.net>",
+    "gold_summary": "The ops team reports a data pipeline outage, with engineering promising a status update by 2 PM.",
+    "predicted_summary": "Ops reports a data pipeline outage, and the lead engineer will provide a status update by 2 PM.",
+    "rouge1": 0.7647058823529411,
+    "rougeL": 0.7058823529411765,
+    "gold_facts": {
+      "actor": "Ops",
+      "action": "report outage",
+      "object": "data pipeline",
+      "deadline": "2 PM"
+    },
+    "pred_facts": {
+      "actor": "Ops",
+      "action": "report",
+      "object": null,
+      "deadline": "by 2 PM"
+    },
+    "fact_precision": 1.0,
+    "fact_recall": 0.75,
+    "fact_strict_tp": 3,
+    "fact_partial_tp": 0,
+    "fact_fp": 0,
+    "fact_fn": 1,
+    "fact_details": [
+      {
+        "fact_type": "actor",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "Ops",
+        "pred": "Ops"
+      },
+      {
+        "fact_type": "action",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "report outage",
+        "pred": "report"
+      },
+      {
+        "fact_type": "object",
+        "status": "missing_pred",
+        "similarity": 0.0,
+        "gold": "data pipeline",
+        "pred": ""
+      },
+      {
+        "fact_type": "deadline",
+        "status": "strict",
+        "similarity": 1.0,
+        "gold": "2 PM",
+        "pred": "by 2 PM"
+      }
+    ],
+    "has_action_verb": true,
+    "starts_with_sender": true,
+    "length_ok": true,
+    "ends_with_period": true,
+    "json_parse_ok": true,
+    "word_count": 18
+  }
+]

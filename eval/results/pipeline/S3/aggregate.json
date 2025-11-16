@@ -1,0 +1,14 @@
+{
+  "combo": "S3",
+  "latency_avg_ms": 4662.429106235504,
+  "latency_med_ms": 5069.915533065796,
+  "json_compliance_rate": 1.0,
+  "slot_actor_acc": 0.95,
+  "slot_action_acc": 0.1,
+  "slot_object_acc": 0.35,
+  "slot_deadline_acc": 0.8,
+  "task_precision": 0.7083333333333334,
+  "task_recall": 0.825,
+  "task_f1": 0.74,
+  "due_date_correctness": 0.8
+}

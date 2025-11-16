@@ -1,0 +1,14 @@
+{
+  "combo": "S1",
+  "latency_avg_ms": 8474.151194095612,
+  "latency_med_ms": 7837.46600151062,
+  "json_compliance_rate": 1.0,
+  "slot_actor_acc": 0.95,
+  "slot_action_acc": 0.1,
+  "slot_object_acc": 0.4,
+  "slot_deadline_acc": 0.85,
+  "task_precision": 0.6916666666666667,
+  "task_recall": 0.825,
+  "task_f1": 0.73,
+  "due_date_correctness": 0.8
+}

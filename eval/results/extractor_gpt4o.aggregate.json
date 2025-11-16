@@ -1,0 +1,9 @@
+{
+  "model": "openai:gpt-4o",
+  "task_precision": 0.6083333333333333,
+  "task_recall": 0.75,
+  "task_f1": 0.6566666666666666,
+  "due_date_correctness": 0.8,
+  "owner_match": 0.0,
+  "json_parse_rate": 1.0
+}

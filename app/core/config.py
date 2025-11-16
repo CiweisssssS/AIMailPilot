@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
+    openai_summary_model: Optional[str] = None
+    openai_extractor_model: Optional[str] = None
     max_input_tokens: int = 12000
     summary_max_words: int = 20
     work_end_hour: int = 17  # Default end-of-workday hour for EOD/date-only deadlines

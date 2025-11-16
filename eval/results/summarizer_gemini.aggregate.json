@@ -1,0 +1,15 @@
+{
+  "model": "google:gemini-flash",
+  "slot_actor_acc": 0.0,
+  "slot_action_acc": 0.05,
+  "slot_object_acc": 0.3,
+  "slot_deadline_acc": 0.8,
+  "json_parse_rate": 1.0,
+  "format_compliance": 1.0,
+  "rouge_like": 0.6956776960569531,
+  "fact_precision": 0.4136492673992674,
+  "fact_recall": 0.4572611457170281,
+  "fact_f1": 0.4120339526165344,
+  "latency_avg_ms": 3674.8122572898865,
+  "latency_med_ms": 3516.4794921875
+}

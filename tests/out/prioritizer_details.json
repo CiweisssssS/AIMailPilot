@@ -1,0 +1,467 @@
+[
+  {
+    "id": "p001",
+    "messages": [
+      {
+        "subject": "Brand Guidelines Review",
+        "from_": "Rebecca <rebecca@designhub.com>",
+        "clean_body": "Please review the updated brand guidelines and send feedback by Friday 6 PM."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "A specific request with a clear deadline makes it moderately urgent but not critical.",
+    "predicted_reason": "The email contains a request for feedback ('please review') and has a deadline of 'by Friday 6 PM', which is within a week.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p002",
+    "messages": [
+      {
+        "subject": "Invoice Submission Reminder",
+        "from_": "David <dchen@financepro.io>",
+        "clean_body": "Submit your September invoice by Nov 20 at 5 PM UTC."
+      }
+    ],
+    "gold_priority": "P1",
+    "predicted_priority": "P2",
+    "gold_reason": "A hard financial deadline with compliance implications elevates priority to P1.",
+    "predicted_reason": "The email contains a request to submit an invoice with a deadline of Nov 20, which is within a week. It does not contain any urgent terms or immediate action requirements.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P1->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p003",
+    "messages": [
+      {
+        "subject": "API Issue Sync",
+        "from_": "Alex <alexwu@devteam.com>",
+        "clean_body": "Meet tomorrow at 10 AM PT to resolve an API rate limit issue."
+      }
+    ],
+    "gold_priority": "P1",
+    "predicted_priority": "P2",
+    "gold_reason": "Live issue impacting product functionality; meeting scheduled for next day.",
+    "predicted_reason": "The email contains a request to meet to resolve an API issue, which is important but not urgent, with a deadline of tomorrow (within 24 hours).",
+    "reason_quality_score": 0.14285714285714285,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P1->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p004",
+    "messages": [
+      {
+        "subject": "Document Feedback",
+        "from_": "Nina <nina@marketinglab.org>",
+        "clean_body": "Review the attached campaign document and return comments by EOD Wednesday."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "Action required but typical review cycle; not emergency level.",
+    "predicted_reason": "The email contains a request for feedback with a deadline of EOD Wednesday, which is within a week, making it important but not urgent.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p005",
+    "messages": [
+      {
+        "subject": "Offsite Venue",
+        "from_": "Marcus <marcus@opscenter.co>",
+        "clean_body": "Send your venue preferences by Monday morning."
+      }
+    ],
+    "gold_priority": "P3",
+    "predicted_priority": "P2",
+    "gold_reason": "Planning task; no operational urgency.",
+    "predicted_reason": "The email contains a request for venue preferences with a deadline of Monday morning, which is within a week. It does not contain any urgent terms.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P3->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p006",
+    "messages": [
+      {
+        "subject": "Client Demo Prep",
+        "from_": "Ivy <ivy@productexperts.ai>",
+        "clean_body": "Prepare and upload demo slides before noon tomorrow."
+      }
+    ],
+    "gold_priority": "P1",
+    "predicted_priority": "P1",
+    "gold_reason": "Customer-facing deadline happening within 24 hours.",
+    "predicted_reason": "The email contains a deadline of 'before noon tomorrow', which is within 24 hours, indicating urgent action is required.",
+    "reason_quality_score": 0.25,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P1->P1",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.85
+  },
+  {
+    "id": "p007",
+    "messages": [
+      {
+        "subject": "Security Policy Update",
+        "from_": "Security Team <security@company.com>",
+        "clean_body": "Please review the updated password policy taking effect next week."
+      }
+    ],
+    "gold_priority": "P3",
+    "predicted_priority": "P2",
+    "gold_reason": "Informational policy update, no immediate action.",
+    "predicted_reason": "The email contains a request for review ('please review') and has a deadline of next week, making it important but not urgent.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P3->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p008",
+    "messages": [
+      {
+        "subject": "Weekly Report",
+        "from_": "Liam <liam@analyticsnow.io>",
+        "clean_body": "Submit your weekly report by 4 PM today."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P1",
+    "gold_reason": "Routine recurring task with a same-day deadline.",
+    "predicted_reason": "The email contains a deadline of 'by 4 PM today', which is within 24 hours, indicating urgent action is required.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P1",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.85
+  },
+  {
+    "id": "p009",
+    "messages": [
+      {
+        "subject": "Budget Approval",
+        "from_": "Grace <grace@financehub.net>",
+        "clean_body": "Review and approve the Q4 marketing budget by Thursday afternoon."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "Non-critical but time-bound review task.",
+    "predicted_reason": "The email contains a request for action ('review and approve') with a deadline of 'Thursday afternoon', which is within a week. This makes it important but not urgent.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p010",
+    "messages": [
+      {
+        "subject": "Design Sprint Kickoff",
+        "from_": "Hannah <hlee@uxcreators.com>",
+        "clean_body": "Read the attached brief before Monday’s sprint."
+      }
+    ],
+    "gold_priority": "P3",
+    "predicted_priority": "P2",
+    "gold_reason": "Preparation task with a non-urgent deadline.",
+    "predicted_reason": "The email contains a request to read the attached brief before Monday's sprint, indicating a deadline within a week. It does not contain urgent terms or immediate action requirements.",
+    "reason_quality_score": 0.25,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P3->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p011",
+    "messages": [
+      {
+        "subject": "Database Migration",
+        "from_": "Infra Team <infra@company.com>",
+        "clean_body": "We will perform migration on Nov 18 from 1–3 AM UTC."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P3",
+    "gold_reason": "Scheduled maintenance that may impact availability.",
+    "predicted_reason": "The email provides information about a scheduled database migration with no immediate action required and a deadline far in the future (Nov 18). It contains no urgent or request terms.",
+    "reason_quality_score": 0.2,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P3",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.25
+  },
+  {
+    "id": "p012",
+    "messages": [
+      {
+        "subject": "Internship Proposal",
+        "from_": "Olivia <olivia@hrpartners.org>",
+        "clean_body": "Review the internship proposal and send recommendations by next Tuesday."
+      }
+    ],
+    "gold_priority": "P3",
+    "predicted_priority": "P2",
+    "gold_reason": "Planning-oriented review with moderate timeline.",
+    "predicted_reason": "The email contains a request for feedback ('send recommendations') with a deadline of next Tuesday, which is within a week.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P3->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p013",
+    "messages": [
+      {
+        "subject": "Contract Renewal",
+        "from_": "Vendor Support <support@vendorsuite.com>",
+        "clean_body": "Confirm renewal intentions by Nov 25."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "Vendor contract deadlines typically carry business implications.",
+    "predicted_reason": "The email contains a request for confirmation of renewal intentions, with a deadline of Nov 25, which is within a week. It does not contain urgent terms or a short deadline.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p014",
+    "messages": [
+      {
+        "subject": "Slide Request",
+        "from_": "Tom <trivera@strategyteam.io>",
+        "clean_body": "Send the latest strategy deck before Thursday morning’s meeting."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "Deliverable needed for a scheduled meeting soon.",
+    "predicted_reason": "The email contains a request for action ('send the latest strategy deck') with a deadline of 'before Thursday morning', which is within a week. It does not contain urgent terms or immediate deadlines.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p015",
+    "messages": [
+      {
+        "subject": "Hiring Plan",
+        "from_": "Ella <ella@hrteam.co>",
+        "clean_body": "Review the hiring plan and provide suggestions by the end of the week."
+      }
+    ],
+    "gold_priority": "P3",
+    "predicted_priority": "P2",
+    "gold_reason": "Standard HR planning task with no operational urgency.",
+    "predicted_reason": "The email contains a request for feedback ('provide suggestions') and has a deadline of 'by the end of the week', which qualifies it for P2 classification.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P3->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p016",
+    "messages": [
+      {
+        "subject": "Project Alpha",
+        "from_": "Team Lead <lead@projectalpha.com>",
+        "clean_body": "Finalize Phase 2 tasks and review the draft timeline before Friday."
+      },
+      {
+        "subject": "Re: Project Alpha",
+        "from_": "Sam",
+        "clean_body": "I added comments; let's align tomorrow."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "Time-bounded planning task across multiple stakeholders.",
+    "predicted_reason": "Contains a request to finalize tasks and review a draft timeline by Friday, indicating a deadline within a week.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p017",
+    "messages": [
+      {
+        "subject": "Client Escalation",
+        "from_": "Support Manager",
+        "clean_body": "Client X reports login failures; need root-cause analysis today."
+      },
+      {
+        "subject": "Re: Escalation",
+        "from_": "Engineer Mike",
+        "clean_body": "Investigating; findings by 3 PM."
+      }
+    ],
+    "gold_priority": "P1",
+    "predicted_priority": "P1",
+    "gold_reason": "Active client escalation impacting customer access with immediate deadlines.",
+    "predicted_reason": "The email indicates a client escalation regarding login failures that requires a root-cause analysis today, which qualifies as urgent with a deadline of less than 24 hours. The sender is a Support Manager, which adds weight to the urgency.",
+    "reason_quality_score": 0.25,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P1->P1",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.85
+  },
+  {
+    "id": "p018",
+    "messages": [
+      {
+        "subject": "Product Launch",
+        "from_": "Tara",
+        "clean_body": "Upload social copy by Monday."
+      },
+      {
+        "subject": "Re: Launch",
+        "from_": "Designer",
+        "clean_body": "Images ready; need approval."
+      }
+    ],
+    "gold_priority": "P2",
+    "predicted_priority": "P2",
+    "gold_reason": "Launch prep with near-term deadlines.",
+    "predicted_reason": "The email contains a request for action ('need approval') with a deadline of 'by Monday', which is within a week, making it a P2 priority.",
+    "reason_quality_score": 0.0,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P2->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p019",
+    "messages": [
+      {
+        "subject": "Quarterly Planning",
+        "from_": "Paul",
+        "clean_body": "Draft Q1 objectives by Thursday."
+      },
+      {
+        "subject": "Re: Planning",
+        "from_": "Julia",
+        "clean_body": "Added ideas."
+      }
+    ],
+    "gold_priority": "P3",
+    "predicted_priority": "P2",
+    "gold_reason": "Strategic planning with non-urgent timeline.",
+    "predicted_reason": "The email contains a request to draft Q1 objectives by Thursday, which indicates a deadline within a week. It includes a request term 'draft' but does not contain urgent keywords, making it a P2.",
+    "reason_quality_score": 0.2,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P3->P2",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.55
+  },
+  {
+    "id": "p020",
+    "messages": [
+      {
+        "subject": "Pipeline Outage",
+        "from_": "Ops",
+        "clean_body": "Pipeline is down; engineering investigating."
+      },
+      {
+        "subject": "Re: Outage",
+        "from_": "Lead Engineer",
+        "clean_body": "Update by 2 PM."
+      }
+    ],
+    "gold_priority": "P1",
+    "predicted_priority": "P1",
+    "gold_reason": "Active outage affecting system availability and requiring immediate response.",
+    "predicted_reason": "The email indicates a pipeline outage, which is a critical issue requiring immediate attention. The deadline for an update is set for 2 PM, indicating urgency.",
+    "reason_quality_score": 0.375,
+    "has_urgency_signal": true,
+    "confusion_bucket": "P1->P1",
+    "label_valid": true,
+    "score_valid": true,
+    "json_parse_ok": true,
+    "fallback_used": false,
+    "raw_score": 0.85
+  }
+]
