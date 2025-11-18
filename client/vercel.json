@@ -1,7 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://aimailpilot-api.onrender.com/$1" },
-    { "source": "/oauth/(.*)", "destination": "https://aimailpilot-api.onrender.com/oauth/$1" },
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/api/(.*)",  "destination": "https://aimailpilot-api.onrender.com/$1" },
+    { "source": "/oauth/(.*)","destination": "https://aimailpilot-api.onrender.com/oauth/$1" },
+    { "source": "/auth/(.*)", "destination": "https://aimailpilot-api.onrender.com/oauth/$1" },
+    { "source": "/(.*)",      "destination": "/" }
   ]
 }
