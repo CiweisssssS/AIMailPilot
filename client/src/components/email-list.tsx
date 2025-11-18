@@ -1,17 +1,17 @@
 import { format, parseISO } from "date-fns";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import type { GmailEmail } from "@shared/schema";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface EmailListItemProps {
-  email: GmailEmail;
+  email: AnalyzedEmail;
   active?: boolean;
   onClick?: () => void;
 }
 
 function EmailListItem({ email, active, onClick }: EmailListItemProps) {
-  const fromName = email.from_.includes("<") 
-    ? email.from_.split("<")[0].trim() 
-    : email.from_;
+  const fromName = email.from.includes("<") 
+    ? email.from.split("<")[0].trim() 
+    : email.from;
   const fromInitial = fromName[0]?.toUpperCase() || "?";
   
   let formattedDate = "";
@@ -63,9 +63,9 @@ function EmailListItem({ email, active, onClick }: EmailListItemProps) {
 }
 
 interface EmailListProps {
-  emails: GmailEmail[];
+  emails: AnalyzedEmail[];
   selectedEmailId?: string;
-  onEmailClick?: (email: GmailEmail) => void;
+  onEmailClick?: (email: AnalyzedEmail) => void;
   isLoading?: boolean;
   error?: string | null;
 }

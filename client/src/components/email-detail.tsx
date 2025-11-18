@@ -2,20 +2,20 @@ import { ArrowLeft, Reply, ReplyAll, Forward, Archive, Trash, Star, MoreVertical
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format, parseISO } from "date-fns";
-import type { GmailEmail } from "@shared/schema";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface EmailDetailProps {
-  email: GmailEmail;
+  email: AnalyzedEmail;
   onBack: () => void;
 }
 
 export default function EmailDetail({ email, onBack }: EmailDetailProps) {
-  const fromName = email.from_.includes("<") 
-    ? email.from_.split("<")[0].trim() 
-    : email.from_;
-  const fromEmail = email.from_.includes("<")
-    ? email.from_.match(/<(.+)>/)?.[1] || email.from_
-    : email.from_;
+  const fromName = email.from.includes("<") 
+    ? email.from.split("<")[0].trim() 
+    : email.from;
+  const fromEmail = email.from.includes("<")
+    ? email.from.match(/<(.+)>/)?.[1] || email.from
+    : email.from;
   const fromInitial = fromName[0]?.toUpperCase() || "?";
   
   let formattedDate = "";
@@ -84,17 +84,20 @@ export default function EmailDetail({ email, onBack }: EmailDetailProps) {
             </div>
             
             <div className="text-xs text-muted-foreground mt-1">
-              to {email.to.join(", ")}
+              {email.summary && (
+                <div className="text-xs text-muted-foreground mb-2">
+                  Summary: {email.summary}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Email Body */}
         <div className="prose prose-sm max-w-none text-foreground">
-          <div 
-            className="whitespace-pre-wrap break-words"
-            dangerouslySetInnerHTML={{ __html: email.clean_body || email.body }}
-          />
+          <div className="whitespace-pre-wrap break-words">
+            {email.summary || email.snippet}
+          </div>
         </div>
       </div>
 
