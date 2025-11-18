@@ -9,9 +9,12 @@ interface EmailListItemProps {
 }
 
 function EmailListItem({ email, active, onClick }: EmailListItemProps) {
-  const fromName = email.from.includes("<") 
-    ? email.from.split("<")[0].trim() 
-    : email.from;
+  // Use from_name if available, otherwise parse from email field, fallback to email local part
+  const fromName = email.from_name || 
+    (email.from_email ? email.from_email.split("@")[0] : 
+     (email.from.includes("<") ? email.from.split("<")[0].trim() : email.from.split("@")[0] || email.from));
+  const fromEmail = email.from_email || 
+    (email.from.includes("<") ? email.from.match(/<(.+)>/)?.[1] : email.from) || "";
   const fromInitial = fromName[0]?.toUpperCase() || "?";
   
   let formattedDate = "";
@@ -48,14 +51,14 @@ function EmailListItem({ email, active, onClick }: EmailListItemProps) {
       
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2 mb-1">
-          <h3 className="font-medium text-sm truncate">{fromName}</h3>
+          <h3 className="font-medium text-sm truncate">{fromName || fromEmail || "Unknown"}</h3>
           <span className="text-xs text-muted-foreground flex-shrink-0">
             {formattedDate}
           </span>
         </div>
-        <p className="text-sm font-medium truncate mb-1">{email.subject}</p>
+        <p className="text-sm font-medium truncate mb-1">{email.subject || "(No subject)"}</p>
         <p className="text-xs text-muted-foreground line-clamp-2">
-          {email.snippet}
+          {email.snippet || ""}
         </p>
       </div>
     </div>
@@ -98,7 +101,9 @@ export default function EmailList({
   if (emails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4">
-        <p className="text-sm text-muted-foreground">No emails found</p>
+        <p className="text-sm text-muted-foreground">
+          No emails found in the last 30 days or filter returned 0 results
+        </p>
       </div>
     );
   }

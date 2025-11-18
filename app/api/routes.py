@@ -382,12 +382,13 @@ async def triage_emails(
         
         # Fetch messages from Gmail API
         async with httpx.AsyncClient() as client:
-            # Primary query: INBOX label only, no query filter
+            # Primary query: INBOX label, use time window for better results
+            # Use newer_than:30d to get recent emails (more reliable than no filter)
             primary_params = {
                 "labelIds": ["INBOX"],
                 "maxResults": max_results,
-                "includeSpamTrash": False
-                # NO q parameter - omit it entirely to avoid filtering
+                "includeSpamTrash": False,
+                "q": "newer_than:30d"  # Get emails from last 30 days
             }
             if page_token:
                 primary_params["pageToken"] = page_token
@@ -412,8 +413,9 @@ async def triage_emails(
                 logger.info("Primary query returned 0 messages, trying fallback (no label filter)")
                 fallback_params = {
                     "maxResults": max_results,
-                    "includeSpamTrash": False
-                    # NO labelIds and NO q parameter - get all messages
+                    "includeSpamTrash": False,
+                    "q": "newer_than:30d"  # Still use time window for fallback
+                    # NO labelIds - get from all labels
                 }
                 if page_token:
                     fallback_params["pageToken"] = page_token
@@ -443,52 +445,54 @@ async def triage_emails(
                     }
                 }
             
-            # Fetch full message details for each message ID
-            messages = []
+            # Fetch full message details for each message ID and parse with MIME decoder
+            from app.services.gmail_parser import parse_gmail_message
+            from app.models.schemas import EmailAttachment
+            
+            analyzed_emails = []
             for msg_ref in message_list[:max_results]:  # Limit to max_results
                 msg_id = msg_ref.get("id")
                 if not msg_id:
                     continue
                 
-                # Get message details
+                # Get full message details (format=full to get body and attachments)
                 msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}"
                 msg_response = await client.get(
                     msg_url,
-                    params={"format": "metadata", "metadataHeaders": "From,Subject,Date"},
+                    params={"format": "full"},
                     headers={"Authorization": f"Bearer {access_token}"}
                 )
                 msg_response.raise_for_status()
                 msg_data = msg_response.json()
                 
-                # Extract headers
-                headers = {h["name"]: h["value"] for h in msg_data.get("payload", {}).get("headers", [])}
+                # Parse message with MIME decoder
+                parsed = parse_gmail_message(msg_data, access_token)
                 
-                messages.append({
-                    "id": msg_id,
-                    "threadId": msg_data.get("threadId", ""),
-                    "from_": headers.get("From", "unknown"),
-                    "subject": headers.get("Subject", ""),
-                    "date": headers.get("Date", ""),
-                    "snippet": msg_data.get("snippet", ""),
-                    "internalDate": msg_data.get("internalDate", "")
+                # Convert attachments to EmailAttachment models
+                attachments = [
+                    EmailAttachment(**att) for att in parsed["attachments"]
+                ]
+                
+                # Build analyzed email entry
+                analyzed_emails.append({
+                    "id": parsed["id"],
+                    "threadId": parsed["thread_id"],
+                    "from_name": parsed["from_name"],
+                    "from_email": parsed["from_email"],
+                    "from": parsed["from_email"],  # Keep for backward compatibility
+                    "subject": parsed["subject"],
+                    "date": parsed["date"],
+                    "snippet": parsed["snippet"],
+                    "body_html": parsed["body_html"],
+                    "body_text": parsed["body_text"],
+                    "inline_images": parsed["inline_images"],
+                    "attachments": [att.dict() for att in attachments],
+                    "summary": parsed["snippet"][:100] if parsed["snippet"] else "",  # Use snippet as summary for now
+                    "priority": {"label": "P3 - FYI", "score": 0.0, "reasons": []},  # Default priority
+                    "tasks": [],
+                    "task_extracted": None,
+                    "is_flagged": False
                 })
-        
-        # Return minimal analyzed_emails structure (hotfix: skip AI analysis for now)
-        analyzed_emails = []
-        for msg in messages:
-            analyzed_emails.append({
-                "id": msg["id"],
-                "threadId": msg["threadId"],
-                "from": msg["from_"],
-                "subject": msg["subject"],
-                "date": msg["date"],
-                "snippet": msg["snippet"][:100] if msg["snippet"] else "",
-                "summary": msg["snippet"][:100] if msg["snippet"] else "",  # Use snippet as summary for now
-                "priority": {"label": "P3 - FYI", "score": 0.0, "reasons": []},  # Default priority
-                "tasks": [],
-                "task_extracted": None,
-                "is_flagged": False
-            })
         
         return {
             "analyzed_emails": analyzed_emails,
@@ -689,4 +693,169 @@ async def delete_deadline_override_route(email_id: str, task_index: int, user_em
         raise
     except Exception as e:
         logger.error(f"Error deleting deadline override: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# Attachment & Image Proxy Routes
+# ==========================================
+
+@router.get("/api/message/{message_id}/attachment/{attachment_id}")
+async def get_attachment(
+    message_id: str,
+    attachment_id: str,
+    request: Request,
+    session_id: Optional[str] = None
+):
+    """
+    Download attachment from Gmail and proxy it to frontend.
+    Sets proper Content-Type and Content-Disposition headers.
+    """
+    try:
+        from app.api.oauth import get_session
+        
+        # Get session_id from query param or cookie
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated - no session_id")
+        
+        # Get session to retrieve access token
+        session = get_session(actual_session_id)
+        if not session or not session.get("tokens"):
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
+        
+        access_token = session["tokens"].get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=401, detail="No access token in session")
+        
+        # Fetch attachment from Gmail API
+        async with httpx.AsyncClient() as client:
+            attachment_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}/attachments/{attachment_id}"
+            attachment_response = await client.get(
+                attachment_url,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            attachment_response.raise_for_status()
+            attachment_data = attachment_response.json()
+            
+            # Decode base64 data
+            data = attachment_data.get("data", "")
+            if not data:
+                raise HTTPException(status_code=404, detail="Attachment data not found")
+            
+            import base64
+            attachment_bytes = base64.urlsafe_b64decode(data + '==')
+            
+            # Get message to find attachment metadata (filename, mime type)
+            msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}"
+            msg_response = await client.get(
+                msg_url,
+                params={"format": "full"},
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            msg_response.raise_for_status()
+            msg_data = msg_response.json()
+            
+            # Find attachment metadata
+            filename = f"attachment_{attachment_id}"
+            mime_type = "application/octet-stream"
+            
+            def find_attachment_in_parts(parts, att_id):
+                for part in parts:
+                    body = part.get("body", {})
+                    if body.get("attachmentId") == att_id:
+                        headers = part.get("headers", [])
+                        for header in headers:
+                            name = header.get("name", "").lower()
+                            value = header.get("value", "")
+                            if name == "content-disposition":
+                                # Extract filename
+                                import re
+                                filename_match = re.search(r'filename[^;=\n]*=(([\'"]).*?\2|[^;\n]*)', value, re.IGNORECASE)
+                                if filename_match:
+                                    from app.services.gmail_parser import decode_mime_header
+                                    filename = decode_mime_header(filename_match.group(1).strip('"\''))
+                            elif name == "content-type":
+                                # Extract mime type
+                                mime_match = re.search(r'^([^;]+)', value)
+                                if mime_match:
+                                    mime_type = mime_match.group(1).strip()
+                        return part.get("mimeType", mime_type), filename
+                    if "parts" in part:
+                        result = find_attachment_in_parts(part["parts"], att_id)
+                        if result:
+                            return result
+                return None
+            
+            payload = msg_data.get("payload", {})
+            parts = payload.get("parts", [])
+            if parts:
+                result = find_attachment_in_parts(parts, attachment_id)
+                if result:
+                    mime_type, filename = result
+            
+            # Return attachment with proper headers
+            from fastapi.responses import Response
+            return Response(
+                content=attachment_bytes,
+                media_type=mime_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Access-Control-Allow-Origin": "https://ai-mail-pilot.vercel.app",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Cache-Control": "public, max-age=3600"
+                }
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching attachment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/proxy-image")
+async def proxy_image(
+    url: str,
+    request: Request
+):
+    """
+    Proxy external images to avoid CORS and mixed content issues.
+    """
+    try:
+        import urllib.parse
+        
+        # Decode URL
+        image_url = urllib.parse.unquote(url)
+        
+        # Validate URL
+        if not image_url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail="Invalid image URL")
+        
+        # Fetch image
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            image_response = await client.get(image_url, follow_redirects=True)
+            image_response.raise_for_status()
+            
+            # Get content type
+            content_type = image_response.headers.get("Content-Type", "image/jpeg")
+            
+            # Return proxied image
+            from fastapi.responses import Response
+            return Response(
+                content=image_response.content,
+                media_type=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "https://ai-mail-pilot.vercel.app",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Cache-Control": "public, max-age=86400"  # 24 hours
+                }
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error proxying image: {e}")
         raise HTTPException(status_code=500, detail=str(e))

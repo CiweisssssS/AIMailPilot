@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format, parseISO } from "date-fns";
 import type { AnalyzedEmail } from "@shared/schema";
+import { processEmailHtml, textToHtml } from "@/lib/html";
+import { useEffect, useState } from "react";
 
 interface EmailDetailProps {
   email: AnalyzedEmail;
@@ -10,12 +12,12 @@ interface EmailDetailProps {
 }
 
 export default function EmailDetail({ email, onBack }: EmailDetailProps) {
-  const fromName = email.from.includes("<") 
-    ? email.from.split("<")[0].trim() 
-    : email.from;
-  const fromEmail = email.from.includes("<")
-    ? email.from.match(/<(.+)>/)?.[1] || email.from
-    : email.from;
+  // Use from_name/from_email if available, otherwise parse from email field
+  const fromName = email.from_name || 
+    (email.from_email ? email.from_email.split("@")[0] : 
+     (email.from.includes("<") ? email.from.split("<")[0].trim() : email.from.split("@")[0] || email.from));
+  const fromEmail = email.from_email || 
+    (email.from.includes("<") ? email.from.match(/<(.+)>/)?.[1] : email.from) || "";
   const fromInitial = fromName[0]?.toUpperCase() || "?";
   
   let formattedDate = "";
@@ -25,6 +27,25 @@ export default function EmailDetail({ email, onBack }: EmailDetailProps) {
   } catch (e) {
     formattedDate = email.date;
   }
+
+  // Process HTML body for safe rendering
+  const [processedHtml, setProcessedHtml] = useState<string>("");
+  
+  useEffect(() => {
+    if (email.body_html) {
+      const processed = processEmailHtml(
+        email.body_html,
+        email.inline_images || {}
+      );
+      setProcessedHtml(processed);
+    } else if (email.body_text) {
+      const html = textToHtml(email.body_text);
+      setProcessedHtml(html);
+    } else {
+      // Fallback to snippet
+      setProcessedHtml(textToHtml(email.snippet || ""));
+    }
+  }, [email.body_html, email.body_text, email.snippet, email.inline_images]);
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -75,29 +96,30 @@ export default function EmailDetail({ email, onBack }: EmailDetailProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-foreground">{fromName}</p>
-                <p className="text-xs text-muted-foreground truncate">{fromEmail}</p>
+                <p className="font-medium text-sm text-foreground">{fromName || fromEmail || "Unknown"}</p>
+                {fromEmail && (
+                  <p className="text-xs text-muted-foreground truncate">{fromEmail}</p>
+                )}
               </div>
               <span className="text-xs text-muted-foreground flex-shrink-0">
                 {formattedDate}
               </span>
-            </div>
-            
-            <div className="text-xs text-muted-foreground mt-1">
-              {email.summary && (
-                <div className="text-xs text-muted-foreground mb-2">
-                  Summary: {email.summary}
-                </div>
-              )}
             </div>
           </div>
         </div>
 
         {/* Email Body */}
         <div className="prose prose-sm max-w-none text-foreground">
-          <div className="whitespace-pre-wrap break-words">
-            {email.summary || email.snippet}
-          </div>
+          {processedHtml ? (
+            <div 
+              className="email-body"
+              dangerouslySetInnerHTML={{ __html: processedHtml }}
+            />
+          ) : (
+            <div className="text-muted-foreground">
+              No content available
+            </div>
+          )}
         </div>
       </div>
 

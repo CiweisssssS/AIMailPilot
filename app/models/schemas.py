@@ -23,6 +23,32 @@ class EmailMessage(BaseModel):
         populate_by_name = True
 
 
+class EmailAttachment(BaseModel):
+    """Email attachment model for Gmail API"""
+    id: str
+    filename: str
+    mime_type: str
+    size: Optional[int] = None
+    content_id: Optional[str] = None  # CID without < >
+    is_inline: bool = False
+    download_url: str  # Backend proxy URL
+
+
+class ParsedEmailMessage(BaseModel):
+    """Normalized email message with proper MIME decoding"""
+    id: str
+    thread_id: str
+    from_name: str  # Extracted name from From header
+    from_email: str  # Extracted email from From header
+    subject: str  # Decoded subject
+    snippet: str  # Email snippet
+    date: str  # ISO8601 format
+    body_html: Optional[str] = None  # Decoded HTML body
+    body_text: Optional[str] = None  # Decoded text body
+    inline_images: dict[str, str] = {}  # cid -> download_url mapping
+    attachments: List[EmailAttachment] = []
+
+
 class ProcessThreadRequest(BaseModel):
     user_id: str
     personalized_keywords: List[PersonalizedKeyword] = []
