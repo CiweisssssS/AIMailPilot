@@ -11,9 +11,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https://(script\.google\.com|script\.googleusercontent\.com|mail\.google\.com|(?:[\w-]+\.)*replit\.(dev|app))$|^http://localhost:5000$",
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.vercel.app"
+    ],
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"]
 )
@@ -21,9 +25,9 @@ app.add_middleware(
 app.include_router(router)
 
 
-@app.get("/healthz")
+@app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"ok": True}
 
 
 @app.get("/version")

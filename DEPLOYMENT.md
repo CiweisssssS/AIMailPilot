@@ -1,173 +1,106 @@
-# Gmail Add-on Deployment Guide
+# Deployment Guide
 
-## Overview
+This guide covers deploying the AI Mail Pilot application to Render (backend) and Vercel (frontend).
 
-Your AI Email Assistant Gmail Add-on is now complete! This guide will walk you through deploying and testing the 4-layer sidebar interface.
+## Architecture
 
-## Architecture Summary
+- **Backend**: FastAPI (Python) on Render
+- **Frontend**: React/TypeScript on Vercel
+- **Database**: Supabase (PostgreSQL)
 
-### Backend (FastAPI on Port 8000)
-- **Heuristic-based analysis** (no paid LLM APIs required)
-- Endpoints:
-  - `POST /api/batch-analyze` - Processes multiple threads in chunks of 5
-  - `POST /api/prioritize` - Calculates P1/P2/P3 priority using deadline proximity, sender importance, and keyword matching
-  - `POST /api/summarize` - Generates quick summaries from subject + last sentence
-  - `POST /api/extract-tasks` - Extracts tasks with regex + natural language date parsing
-  - `POST /api/update-user-settings` - Syncs keyword preferences
+## Backend Deployment (Render)
 
-### Frontend (Google Apps Script)
-- **4-Layer Sidebar Interface**:
-  1. **Inbox Reminder** - Category overview (Urgent/To-do/FYI) with display mode toggle
-  2. **Category Expanded** - Filtered email list with actions (Open/Done/Snooze/Dismiss)
-  3. **Chatbot Q&A** - Context-aware questions using already-extracted data
-  4. **Keyword Settings** - Customize priority keywords with High/Medium/Low weights
+### Prerequisites
+- Render account
+- GitHub repository connected to Render
 
-- **State Management**:
-  - Delta fetch (only new emails since last open)
-  - Unresolved pool (tracks in-progress threads)
-  - Persistent storage via PropertiesService
-  - In-memory cache with 5-minute TTL
+### Steps
 
-## Deployment Steps
+1. **Create a new Web Service** in Render
+   - Connect your GitHub repository
+   - Select the repository branch
 
-### 1. Deploy Replit Backend
+2. **Configure Build Settings**:
+   - **Root Directory**: (leave empty)
+   - **Environment**: Python 3
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
-Your Replit app is already running! To get the public URL:
+3. **Set Environment Variables**:
+   ```
+   OPENAI_API_KEY=your_openai_api_key
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   SUPABASE_KEY=your_anon_key
+   SESSION_SECRET=your_random_session_secret
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   GOOGLE_REDIRECT_URI=https://your-render-app.onrender.com/auth/callback
+   PORT=10000
+   ```
 
-1. Click the **Publish** button in the top-right corner
-2. Choose "Reserved VM" deployment (required for multi-process Node.js + Python)
-3. Wait for deployment to complete
-4. Copy your deployment URL (e.g., `https://your-app.replit.app`)
+4. **Deploy**
+   - Render will automatically build and deploy
+   - Note your deployment URL (e.g., `https://your-app.onrender.com`)
 
-### 2. Configure Apps Script Backend URL
+5. **Verify Deployment**:
+   - Check health endpoint: `https://your-app.onrender.com/health`
+   - Should return: `{"ok": true}`
 
-Update the backend URL in `apps-script/Config.gs`:
+## Frontend Deployment (Vercel)
 
-```javascript
-const BACKEND_BASE_URL = 'https://your-app.replit.app';
-```
+### Prerequisites
+- Vercel account
+- GitHub repository connected to Vercel
 
-Replace `your-app.replit.app` with your actual Replit deployment URL.
+### Steps
 
-### 3. Deploy Google Apps Script
+1. **Import Project** in Vercel
+   - Connect your GitHub repository
+   - Select the repository
 
-1. Open [Google Apps Script](https://script.google.com/)
-2. Create a new project called "AI Email Assistant"
-3. Copy all files from `apps-script/` folder to the project:
-   - Code.gs
-   - StateManager.gs
-   - GmailFetcher.gs
-   - CacheManager.gs
-   - BackendClient.gs
-   - Config.gs
-   - InboxReminderCard.gs
-   - TaskScheduleCard.gs
-   - CategoryExpandedCard.gs
-   - ChatbotCardNew.gs
-   - SettingsCard.gs
-   - appsscript.json
+2. **Configure Project Settings**:
+   - **Root Directory**: `client`
+   - **Framework Preset**: Vite
+   - **Build Command**: `npm run build` (or `pnpm build` / `yarn build`)
+   - **Output Directory**: `dist`
 
-4. Enable Advanced Services:
-   - Click on the "+" next to Services
-   - Add "Gmail API"
+3. **Set Environment Variables**:
+   ```
+   NEXT_PUBLIC_API_BASE=https://your-render-app.onrender.com
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-5. Deploy as Gmail Add-on:
-   - Click **Deploy** > **Test Deployments**
-   - Select "Gmail Add-on"
-   - Click **Install**
+4. **Deploy**
+   - Vercel will automatically build and deploy
+   - Your app will be available at `https://your-app.vercel.app`
 
-### 4. Test in Gmail
+## Post-Deployment
 
-1. Open Gmail in your browser
-2. Look for the add-on icon in the right sidebar
-3. Click to open the AI Email Assistant
+1. **Update CORS in Backend** (if needed):
+   - If your Vercel URL changes, update the CORS origins in `app/main.py`
+   - Or use environment variables for dynamic CORS configuration
 
-**Expected Flow:**
+2. **Test Endpoints**:
+   - Backend health: `GET https://your-render-app.onrender.com/health`
+   - Frontend should connect to backend API
 
-1. **Sidebar Opens** → Shows Inbox Reminder with category breakdown
-   - Toggle between "New since last open" / "Unresolved only" / "All"
-   - See counts for Urgent (P1), To-do (P2), FYI (P3)
-
-2. **Click a Category** → Opens expanded view with email list
-   - Each email shows: Subject, Summary, Priority, Timestamp
-   - Actions: Open, Mark as Done, Snooze, Dismiss
-
-3. **Click "Ask Assistant"** → Opens chatbot interface
-   - Quick questions: "What are my top 3 urgent tasks?"
-   - Custom questions: "Any deadlines this week?"
-
-4. **Click "Settings"** → Opens keyword customization
-   - Add keywords with High/Medium/Low weights
-   - Choose scope: Subject / Body / Everywhere
-   - Delete individual keywords or clear all
-
-## Key Features
-
-### Delta Fetch Strategy
-- First run: Fetches last 7 days of threads
-- Subsequent runs: Only fetches threads since last sidebar open
-- Merges with unresolved pool to ensure nothing is missed
-- Updates `LAST_OPEN_TS` timestamp after each fetch
-
-### Priority Scoring
-- **P1 (Urgent)**: Score ≥ 0.75
-  - Deadlines within 48 hours
-  - High-priority keywords in subject/body
-  - Important senders (boss, executives)
-
-- **P2 (To-do)**: Score ≥ 0.45
-  - Deadlines this week
-  - Meeting invitations
-  - Medium-priority keywords
-
-- **P3 (FYI)**: Score < 0.45
-  - No urgent keywords or deadlines
-  - Informational emails
-
-### Thread Actions
-- **Mark as Done**: Removes from unresolved pool, clears cache
-- **Snooze**: Hides until selected time (1h/3h/Tomorrow/Next week)
-- **Dismiss**: Removes from view permanently
-
-### Caching
-- In-memory cache with 5-minute TTL
-- Reduces redundant backend calls
-- Cleared on thread actions (Done/Snooze/Dismiss)
+3. **Monitor Logs**:
+   - Render: View logs in Render dashboard
+   - Vercel: View logs in Vercel dashboard
 
 ## Troubleshooting
 
-### Backend Not Responding
-1. Check Replit deployment status
-2. Verify URL in `Config.gs` matches deployment URL
-3. Check CORS configuration in `app/main.py`
+### Backend Issues
+- **Build fails**: Check `requirements.txt` is at repo root
+- **Import errors**: Verify Python path includes `app/` directory
+- **Port binding**: Ensure using `$PORT` environment variable
 
-### No Emails Showing
-1. Check Gmail API permissions are granted
-2. Verify you have unread emails in your inbox
-3. Try clicking "Refresh" button in the sidebar
+### Frontend Issues
+- **API connection fails**: Verify `NEXT_PUBLIC_API_BASE` points to Render URL
+- **CORS errors**: Check CORS configuration in `app/main.py` includes Vercel domain
 
-### Priority Scoring Seems Off
-1. Check keyword settings - add relevant terms
-2. Use High/Medium/Low weights to adjust importance
-3. Backend uses heuristics, not LLMs - results are deterministic
-
-### Navigation Issues
-1. Use back button provided by Gmail Add-on host
-2. If stuck, close and reopen sidebar
-3. Check browser console for JavaScript errors
-
-## Next Steps
-
-1. **Test thoroughly** - Open sidebar, navigate all 4 layers, test actions
-2. **Customize keywords** - Add your specific urgent/important terms
-3. **Monitor performance** - Check backend logs for errors
-4. **Iterate** - Adjust priority thresholds if needed
-
-## Architecture Notes
-
-- **Stateless backend** - No email storage, only analysis results
-- **Persistent frontend state** - PropertiesService stores timestamps, thread IDs, keywords
-- **No LLM costs** - Fully heuristic-based analysis
-- **Gmail Add-on limits** - Maximum 30-second execution time per function
-
-Enjoy your AI Email Assistant! 🎉
+### Database Issues
+- **Connection errors**: Verify Supabase credentials are correct
+- **Table not found**: Run database migrations from `database/schema.sql`
