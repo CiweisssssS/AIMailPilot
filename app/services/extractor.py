@@ -1,8 +1,9 @@
 """
-Task Extractor Service - Extract tasks using GPT-4o-mini
+Task Extractor Service - Extract tasks using Gemini Flash (default and fallback to GPT-4o-mini for complex time)
 """
 
 import json
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -14,9 +15,38 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _has_complex_time_expression(text: str) -> bool:
+    """
+    Detect complex time expressions that may require a more powerful model.
+    Returns True if the text contains complex time expressions that might need GPT-4o-mini fallback.
+    """
+    text_lower = text.lower()
+    
+    # Complex time patterns that may need better model
+    complex_patterns = [
+        r'\b(?:next|this)\s+(?:week|month|quarter|year)\b',  # "next week", "this month"
+        r'\b(?:early|mid|late)\s+(?:next\s+)?(?:week|month|quarter|year)\b',  # "early next week"
+        r'\b(?:in\s+)?\d+\s+(?:weeks?|months?|days?)\s+(?:from\s+now|later)\b',  # "in 2 weeks", "3 months later"
+        r'\b(?:end\s+of|beginning\s+of|middle\s+of)\s+(?:next\s+)?(?:week|month|quarter)\b',  # "end of next week"
+        r'\b(?:first|second|third|fourth|last)\s+(?:week|month)\s+of\s+\w+\b',  # "first week of October"
+        r'\b(?:before|after)\s+(?:the\s+)?(?:end|start|beginning)\s+of\b',  # "before the end of"
+        r'\b(?:by|until|before)\s+(?:the\s+)?(?:end|start)\s+of\s+(?:next\s+)?(?:week|month|quarter)\b',  # "by the end of next week"
+        r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+(?:at\s+)?\d{1,2}:\d{2}',  # "10/15/2024 at 3:30pm"
+        r'\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:morning|afternoon|evening|night)\b',  # "Friday morning"
+        r'\b(?:next|this|coming)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:morning|afternoon|evening|night)?\b',  # "next Friday evening"
+    ]
+    
+    for pattern in complex_patterns:
+        if re.search(pattern, text_lower):
+            logger.debug(f"Complex time expression detected: pattern '{pattern}' matched in text")
+            return True
+    
+    return False
+
+
 async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optional[str] = None) -> Dict[str, Any]:
     """
-    Extract tasks using GPT-4o-mini
+    Extract tasks using Gemini Flash (default and fallback to GPT-4o-mini for complex time expressions)
     
     Input: { text: string, subject?: string, sent_date?: string }
     Output: { tasks: [{ title, owner, due_iso, source_span }] }
@@ -43,13 +73,22 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
             logger.warning(f"Failed to parse sent_date '{sent_date}': {e}")
     
     try:
-        # Call LLM extractor (returns list of dicts)
+        # Check if text contains complex time expressions
+        use_fallback = _has_complex_time_expression(combined_text)
+        if use_fallback:
+            logger.info("Complex time expression detected, using fallback model (GPT-4o-mini)")
+        else:
+            logger.info("Using default extractor model (Gemini Flash)")
+        
+        # Call LLM extractor with fallback flag (returns list of dicts)
         tasks = await llm_provider.extract_tasks([{
             'id': 'msg1',
             'subject': subject,
-            'clean_body': text,
-            'from_': 'Unknown'
-        }])
+            'clean_body': combined_text,
+            'body': combined_text,
+            'from_': 'Unknown',
+            'date': sent_date
+        }], use_fallback=use_fallback)
         
         # Convert to expected format with source_span and normalize deadlines
         formatted_tasks = []
@@ -74,11 +113,12 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
                 "source_span": {"start": 0, "end": len(text)}  # Placeholder span
             })
         
-        logger.info(f"GPT-4o-mini extracted {len(formatted_tasks)} tasks with normalized deadlines")
+        model_used = "GPT-4o-mini" if use_fallback else "Gemini Flash"
+        logger.info(f"{model_used} extracted {len(formatted_tasks)} tasks with normalized deadlines")
         return {"tasks": formatted_tasks[:10]}
         
     except Exception as e:
-        logger.error(f"GPT-4o-mini task extraction failed: {e}")
+        logger.error(f"Task extraction failed: {e}")
         return {"tasks": []}
 
 
@@ -91,8 +131,19 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
         return []
     
     try:
-        # Use LLM provider's extract_tasks
-        tasks_data = await llm_provider.extract_tasks(messages)
+        # Check if text contains complex time expressions
+        primary_subject = messages[0].get('subject', '') if messages else ''
+        primary_body = messages[0].get('clean_body', messages[0].get('body', '')) if messages else ''
+        primary_text = f"Subject: {primary_subject}\n\n{primary_body}" if primary_subject else primary_body
+        
+        use_fallback = _has_complex_time_expression(primary_text)
+        if use_fallback:
+            logger.info("Complex time expression detected, using fallback model (GPT-4o-mini)")
+        else:
+            logger.info("Using default extractor model (Gemini Flash)")
+        
+        # Use LLM provider's extract_tasks with fallback flag
+        tasks_data = await llm_provider.extract_tasks(messages, use_fallback=use_fallback)
         
         # Get reference datetime from email date or use current time as fallback
         ref_datetime = datetime.now(ZoneInfo("UTC"))

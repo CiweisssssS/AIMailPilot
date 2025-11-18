@@ -1,5 +1,5 @@
 """
-Summarizer Service - Generate summaries using GPT-4o-mini
+Summarizer Service - Generate summaries using Claude 3.5 Haiku (default)
 """
 
 import json
@@ -55,7 +55,7 @@ def extract_sender_name(sender_email: str) -> str:
 
 async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_length: int = 80) -> Dict[str, Any]:
     """
-    Summarize text using GPT-4o-mini with strict word-based control
+    Summarize text using Claude 3.5 Haiku with strict word-based control
     
     Args:
         subject: Email subject line
@@ -99,7 +99,7 @@ async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_l
                 "confidence": 0.95
             }
     except Exception as e:
-        logger.error(f"GPT-4o-mini summarization failed: {e}")
+        logger.error(f"Summarization failed: {e}")
     
     # Fallback: return subject or truncated text
     fallback_summary = subject if subject else email_body[:200]
@@ -143,7 +143,7 @@ Return JSON only."""
     # Add user message
     messages.append({"role": "user", "content": user_message})
     
-    # Call LLM with JSON mode and temperature 0.2
+    # Call LLM with JSON mode and temperature 0.2 (uses Claude Haiku by default)
     response = await llm_provider.call_with_json_mode(
         messages=messages,
         temperature=0.2
@@ -248,7 +248,7 @@ Return JSON only."""
 
 async def summarize_thread(messages: List[Dict[str, Any]]) -> str:
     """
-    Summarize a thread of messages using GPT-4o-mini
+    Summarize a thread of messages using Claude 3.5 Haiku
     
     Args:
         messages: List of message dicts with 'subject', 'body', 'clean_body'
