@@ -24,15 +24,19 @@ interface AuthStatus {
 export default function Home() {
   // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
   
-  // Extract session_id from URL on mount (from OAuth callback)
-  useEffect(() => {
-    getSessionId(); // This will extract from URL and store in localStorage
-  }, []);
-  
   // Check authentication status
   const { data: authStatus, isLoading: authLoading, refetch: refetchAuth } = useQuery<AuthStatus>({
     queryKey: ["/api/auth/status"],
   });
+  
+  // Extract session_id from URL on mount (from OAuth callback) and refetch auth
+  useEffect(() => {
+    const sessionId = getSessionId(); // This will extract from URL and store in localStorage
+    if (sessionId) {
+      // If we got a session_id from URL, refetch auth status
+      refetchAuth();
+    }
+  }, [refetchAuth]);
 
   // State hooks
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
