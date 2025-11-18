@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
+from app.api.oauth import router as oauth_router
 
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -23,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(oauth_router)
 
 
 @app.get("/health")
