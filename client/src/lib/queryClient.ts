@@ -68,11 +68,10 @@ type UnauthorizedBehavior = "returnNull" | "throw";
 
 // Check if queryKey represents a triage request
 function isTriageRequest(queryKey: unknown[]): boolean {
-  return queryKey.length >= 2 && 
-         queryKey[0] === 'emails' && 
-         typeof queryKey[1] === 'object' && 
-         queryKey[1] !== null &&
-         'label' in (queryKey[1] as Record<string, unknown>);
+  // Check if this is a triage endpoint request
+  return queryKey.length >= 1 && 
+         (queryKey[0] === ENDPOINTS.triage || 
+          (typeof queryKey[0] === 'string' && queryKey[0].includes('/api/triage')));
 }
 
 export const getQueryFn: <T>(options: {
@@ -82,23 +81,27 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const sessionId = getSessionId();
     
-    // Handle triage endpoint (POST /triage - NO /api prefix per backend)
+    // Handle triage endpoint (GET /api/triage - returns new tasks only)
     if (isTriageRequest(queryKey)) {
-      const params = queryKey[1] as { label: string; pageToken?: string };
+      const params = queryKey[1] as { label?: string; pageToken?: string } | undefined;
       const triageUrl = apiUrl(ENDPOINTS.triage);
-      const urlWithSession = sessionId 
-        ? `${triageUrl}${triageUrl.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
-        : triageUrl;
+      let urlWithParams = triageUrl;
       
+      // Add query params
+      const queryParams = new URLSearchParams();
+      if (params?.label) queryParams.append('label', params.label);
+      if (params?.pageToken) queryParams.append('pageToken', params.pageToken);
+      queryParams.append('limit', '50');
+      if (queryParams.toString()) {
+        urlWithParams += `?${queryParams.toString()}`;
+      }
+      
+      const urlWithSession = sessionId
+        ? `${urlWithParams}${urlWithParams.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
+        : urlWithParams;
+
       const res = await fetch(urlWithSession, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          label: params.label,
-          pageToken: params.pageToken,
-        }),
+        method: 'GET',
         credentials: "include",
       });
 
