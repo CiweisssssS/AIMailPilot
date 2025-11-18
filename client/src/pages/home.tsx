@@ -193,7 +193,10 @@ export default function Home() {
               <Button 
                 className="w-full" 
                 size="lg"
-                onClick={() => window.location.href = "/auth/google"}
+                onClick={() => {
+                  // OAuth redirect goes through Vercel rewrites, so use relative path
+                  window.location.href = "/auth/google";
+                }}
                 data-testid="button-google-login"
               >
                 <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">

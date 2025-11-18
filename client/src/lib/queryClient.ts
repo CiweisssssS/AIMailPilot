@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { apiUrl } from "./api";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -14,10 +15,13 @@ export async function apiRequest(
 ): Promise<Response> {
   const sessionId = getSessionId();
   
+  // Convert relative URL to absolute using API_BASE
+  const absoluteUrl = apiUrl(url);
+  
   // Add session_id as query param if available
   const urlWithSession = sessionId 
-    ? `${url}${url.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
-    : url;
+    ? `${absoluteUrl}${absoluteUrl.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
+    : absoluteUrl;
   
   const res = await fetch(urlWithSession, {
     method,
@@ -57,13 +61,15 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const url = queryKey.join("/") as string;
+    // Query key is array like ["/api/auth/status"] - join and convert to absolute URL
+    const relativeUrl = queryKey.join("/") as string;
+    const absoluteUrl = apiUrl(relativeUrl);
     const sessionId = getSessionId();
     
     // Add session_id as query param if available
     const urlWithSession = sessionId 
-      ? `${url}${url.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
-      : url;
+      ? `${absoluteUrl}${absoluteUrl.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
+      : absoluteUrl;
     
     const res = await fetch(urlWithSession, {
       credentials: "include",
