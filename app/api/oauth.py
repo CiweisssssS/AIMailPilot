@@ -191,15 +191,15 @@ async def auth_status(session_id: Optional[str] = Cookie(None)):
 
 
 @router.post("/api/auth/logout")
-async def logout(session_id: Optional[str] = Cookie(None), response: Response = None):
+async def logout(session_id: Optional[str] = Cookie(None)):
     """
     Logout and clear session
     """
     delete_session(session_id)
     
-    # Clear cookie
-    if response:
-        response.delete_cookie("session_id")
-    
-    return {"success": True}
+    # Return response with cookie cleared
+    from fastapi.responses import JSONResponse
+    response = JSONResponse({"success": True})
+    response.delete_cookie("session_id")
+    return response
 
