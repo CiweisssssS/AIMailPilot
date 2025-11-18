@@ -92,36 +92,32 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const sessionId = getSessionId();
     
-    // Handle triage endpoint (POST /triage - returns new tasks only)
+    // Handle triage endpoint (GET /api/triage - returns { summary, items })
     if (isTriageRequest(queryKey)) {
-      const params = queryKey[1] as { label?: string; pageToken?: string; limit?: number } | undefined;
       const triageUrl = apiUrl(ENDPOINTS.triage);
       
-      // Build query params (keep label/limit in query for compatibility)
-      const queryParams = new URLSearchParams();
-      if (params?.label) queryParams.append('label', params.label);
-      if (params?.pageToken) queryParams.append('pageToken', params.pageToken);
-      if (params?.limit) queryParams.append('limit', params.limit.toString());
-      else queryParams.append('limit', '50');
-      
+      // No query params - backend doesn't depend on label/limit
       const urlWithSession = sessionId
-        ? `${triageUrl}?${queryParams.toString()}&session_id=${encodeURIComponent(sessionId)}`
-        : `${triageUrl}?${queryParams.toString()}`;
+        ? `${triageUrl}?session_id=${encodeURIComponent(sessionId)}`
+        : triageUrl;
 
-      // Try POST first (standard method)
+      // Use GET (backend accepts both GET and POST)
       let res = await fetch(urlWithSession, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}), // Empty body, params in query
+        method: 'GET',
         credentials: "include",
       });
 
-      // Defensive auto-retry: if 405, log warning (shouldn't happen since we're using POST)
+      // Defensive auto-retry: if 405, retry with POST
       if (res.status === 405) {
-        console.error('[API] Triage returned 405 even with POST method - backend may not be updated');
-        // Don't retry since we're already using POST
+        console.warn('[API] Triage returned 405 for GET, retrying with POST');
+        res = await fetch(urlWithSession, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+          credentials: "include",
+        });
       }
 
       if (res.status === 401) {

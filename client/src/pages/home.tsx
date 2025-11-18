@@ -45,17 +45,41 @@ export default function Home() {
   const [currentLabel, setCurrentLabel] = useState<GmailLabel>("IMPORTANT");
   const { toast } = useToast();
   
-  // Fetch emails using triage endpoint (returns analyzed emails directly)
-  const { data: triageData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(
-    currentLabel,
-    undefined,
+  // Fetch Inbox Reminder tasks using GET /api/triage (returns { summary, items })
+  const { data: triageData, isLoading: emailsLoading, error: emailsError, refetch: refetchTriage } = useGmailEmails(
+    undefined, // label not used
+    undefined, // pageToken not used
     {
       enabled: authStatus?.authenticated === true,
     }
   );
 
-  // Extract analyzed emails from triage response
-  const analyzedEmails = triageData?.analyzed_emails || [];
+  // Extract items from triage response (new API contract)
+  const triageItems = triageData?.items || [];
+  
+  // Convert items to AnalyzedEmail format for backward compatibility with components
+  const analyzedEmails: AnalyzedEmail[] = triageItems.map((item: any) => ({
+    id: item.message_id,
+    threadId: item.thread_id,
+    from_name: item.from_name,
+    from_email: item.from_email,
+    from: item.from_email,
+    subject: item.subject,
+    date: item.date,
+    snippet: item.snippet,
+    body_html: item.body_html,
+    body_text: item.body_text,
+    summary: item.snippet,
+    priority: { 
+      label: item.priority === "urgent" ? "P1" : item.priority === "todo" ? "P2" : "P3",
+      score: 0.0,
+      reasons: []
+    },
+    tasks: [{ title: item.title, type: "action" }],
+    task_extracted: item.title,
+    is_flagged: false,
+    task_id: item.task_id
+  }));
   
   // Mutations
   const logoutMutation = useMutation({
@@ -132,21 +156,46 @@ export default function Home() {
 
   const handleRefresh = async () => {
     try {
-      // Call POST /api/refresh to sync emails and process tasks
-      await refreshMutation.mutateAsync();
+      // Step 1: POST /api/refresh
+      const refreshResponse = await apiRequest("POST", ENDPOINTS.refresh);
+      if (!refreshResponse.ok) {
+        const errorText = await refreshResponse.text();
+        console.error(`[Refresh] POST /api/refresh failed: ${refreshResponse.status} | ${refreshResponse.url} | ${errorText}`);
+        throw new Error(`Refresh failed: ${refreshResponse.status} ${errorText}`);
+      }
+      const refreshData = await refreshResponse.json();
+      console.log(`[Refresh] Sync completed: mode=${refreshData.mode}, added_tasks=${refreshData.added_tasks}, total_new=${refreshData.total_new_count}`);
       
-      // Then refetch triage to get updated tasks
-      await refetch();
+      // Step 2: GET /api/triage
+      const triageResponse = await apiRequest("GET", ENDPOINTS.triage);
+      if (!triageResponse.ok) {
+        const errorText = await triageResponse.text();
+        console.error(`[Refresh] GET /api/triage failed: ${triageResponse.status} | ${triageResponse.url} | ${errorText}`);
+        throw new Error(`Triage fetch failed: ${triageResponse.status} ${errorText}`);
+      }
+      await refetchTriage();
+      
+      // Step 3: GET /api/tasks (optional, for Task & Schedule)
+      try {
+        const tasksResponse = await apiRequest("GET", `${ENDPOINTS.tasks}?state=open`);
+        if (!tasksResponse.ok) {
+          console.warn(`[Refresh] GET /api/tasks failed: ${tasksResponse.status}`);
+        }
+        queryClient.invalidateQueries({ queryKey: [ENDPOINTS.tasks] });
+      } catch (tasksError) {
+        console.warn("[Refresh] Failed to fetch tasks (non-critical):", tasksError);
+      }
       
       toast({
         title: "Refreshed",
-        description: "Emails synced and refreshed successfully",
+        description: `Synced ${refreshData.added_tasks} new tasks from ${refreshData.scanned_messages} emails`,
       });
-    } catch (error) {
-      console.error("Refresh error:", error);
+    } catch (error: any) {
+      console.error("[Refresh] Error:", error);
+      const errorMessage = error?.message || "Failed to refresh emails";
       toast({
         title: "Error",
-        description: "Failed to refresh emails",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -163,13 +212,8 @@ export default function Home() {
     }
   };
 
-  // Calculate summary statistics
-  const summary = analyzedEmails.length > 0 ? {
-    total: analyzedEmails.length,
-    urgent: analyzedEmails.filter(e => e.priority.label.includes("P1")).length,
-    todo: analyzedEmails.filter(e => e.priority.label.includes("P2")).length,
-    fyi: analyzedEmails.filter(e => e.priority.label.includes("P3")).length,
-  } : { total: 0, urgent: 0, todo: 0, fyi: 0 };
+  // Use summary from triage response (new API contract)
+  const summary = triageData?.summary || { total: 0, urgent: 0, todo: 0, fyi: 0 };
 
   // CONDITIONAL RENDERING - After all hooks
   // Show loading state while checking auth
@@ -250,13 +294,27 @@ export default function Home() {
           onBack={handleBackToList}
         />
       ) : (
-        <EmailList 
-          emails={analyzedEmails}
-          selectedEmailId={selectedEmailId}
-          onEmailClick={handleEmailClick}
-          isLoading={emailsLoading}
-          error={emailsError?.message || null}
-        />
+        <>
+          {!emailsLoading && analyzedEmails.length === 0 && triageData?.message && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
+              <p className="text-sm text-muted-foreground text-center">
+                {triageData.message}
+              </p>
+              <Button onClick={handleRefresh} variant="outline">
+                Refresh
+              </Button>
+            </div>
+          )}
+          {(!triageData?.message || analyzedEmails.length > 0) && (
+            <EmailList 
+              emails={analyzedEmails}
+              selectedEmailId={selectedEmailId}
+              onEmailClick={handleEmailClick}
+              isLoading={emailsLoading}
+              error={emailsError?.message || null}
+            />
+          )}
+        </>
       )}
     </MailLayout>
   );

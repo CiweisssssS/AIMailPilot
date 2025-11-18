@@ -11,8 +11,15 @@ export const ENDPOINTS = {
   oauthCallback: '/oauth/google/callback',
   logout: '/api/auth/logout',
 
-  // Email triage (POST endpoint, backend accepts both GET and POST for compatibility)
-  triage: '/triage',
+  // Email triage - Inbox Reminder (GET /api/triage returns { summary, items })
+  triage: '/api/triage',
+  
+  // Sync & Task Management
+  refresh: '/api/refresh',
+  tasks: '/api/tasks',
+  taskViewed: (taskId: number) => `/api/tasks/${taskId}/viewed`,
+  taskSave: (taskId: number) => `/api/tasks/${taskId}/save`,
+  taskDone: (taskId: number) => `/api/tasks/${taskId}/done`,
 
   // Thread processing
   processThread: '/api/process-thread',

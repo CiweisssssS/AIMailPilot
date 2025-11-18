@@ -121,7 +121,36 @@ export const analyzedEmailSchema = z.object({
   is_flagged: z.boolean().optional(),
 });
 
+// Triage item schema (from /api/triage items array)
+export const triageItemSchema = z.object({
+  task_id: z.number(),
+  message_id: z.string(),
+  thread_id: z.string(),
+  priority: z.enum(["urgent", "todo", "fyi"]),
+  title: z.string(),
+  snippet: z.string(),
+  from_name: z.string(),
+  from_email: z.string(),
+  subject: z.string(),
+  date: z.string(),
+  body_html: z.string().nullable().optional(),
+  body_text: z.string().nullable().optional(),
+});
+
+// Triage response schema (new API contract)
 export const triageResponseSchema = z.object({
+  summary: z.object({
+    total: z.number(),
+    urgent: z.number(),
+    todo: z.number(),
+    fyi: z.number(),
+  }),
+  items: z.array(triageItemSchema),
+  message: z.string().optional(), // Helpful message when empty
+});
+
+// Legacy triage response (for backward compatibility)
+export const triageResponseLegacySchema = z.object({
   analyzed_emails: z.array(analyzedEmailSchema),
   summary: z.object({
     total: z.number(),
