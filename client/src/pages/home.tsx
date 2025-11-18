@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
-import { apiRequest, queryClient, clearSessionId } from "@/lib/queryClient";
+import { apiRequest, queryClient, clearSessionId, getSessionId } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
@@ -23,6 +23,12 @@ interface AuthStatus {
 
 export default function Home() {
   // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
+  
+  // Extract session_id from URL on mount (from OAuth callback)
+  useEffect(() => {
+    getSessionId(); // This will extract from URL and store in localStorage
+  }, []);
+  
   // Check authentication status
   const { data: authStatus, isLoading: authLoading, refetch: refetchAuth } = useQuery<AuthStatus>({
     queryKey: ["/api/auth/status"],
