@@ -336,11 +336,16 @@ async def prioritize_email(request: PrioritizeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/triage")
-async def triage_emails(
+@router.api_route("/triage", methods=["GET", "POST"])
+async def triage_emails_legacy(
     request: Request,
     session_id: Optional[str] = None
 ):
+    """
+    LEGACY: Direct Gmail fetch endpoint (kept for backward compatibility)
+    Accepts both GET and POST for compatibility.
+    New code should use GET /api/triage which returns tasks from database
+    """
     """
     Fetch Gmail emails from INBOX and return minimal analyzed_emails structure.
     Frontend expects: { analyzed_emails: [], summary: {}, debug: {} }
@@ -369,13 +374,15 @@ async def triage_emails(
         
         user_email = session.get("user", {}).get("email")
         
-        # Get request body for label and pageToken
+        # Get request body for label and pageToken (support both GET query params and POST body)
         try:
-            body = await request.json()
+            body = await request.json() if request.method == "POST" else {}
         except:
             body = {}
-        label = body.get("label", "IMPORTANT")  # Default to IMPORTANT
-        page_token = body.get("pageToken")
+        
+        # Also check query params (for GET requests or query-based POST)
+        label = body.get("label") or request.query_params.get("label", "IMPORTANT")
+        page_token = body.get("pageToken") or request.query_params.get("pageToken")
         
         # Configurable max results (default 50)
         max_results = int(os.getenv("TRIAGE_MAX_RESULTS", "50"))
@@ -922,7 +929,7 @@ async def refresh_emails(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/triage")
+@router.api_route("/api/triage", methods=["GET", "POST"])
 async def get_triage_tasks(
     request: Request,
     limit: int = 50,
@@ -931,14 +938,23 @@ async def get_triage_tasks(
     """
     Get Inbox Reminder: tasks with state="new" only
     Returns summary counts and new tasks
+    Accepts both GET and POST for compatibility
     """
     try:
         from app.api.oauth import get_session
         from app.db.supabase_client import get_tasks, get_email_by_id
         
-        # Get session
+        # Get session_id from query params (works for both GET and POST)
         session_id_param = request.query_params.get("session_id")
         actual_session_id = session_id or session_id_param
+        
+        # Also support limit from query params
+        limit_param = request.query_params.get("limit")
+        if limit_param:
+            try:
+                limit = int(limit_param)
+            except:
+                pass
         
         if not actual_session_id:
             raise HTTPException(status_code=401, detail="Not authenticated")

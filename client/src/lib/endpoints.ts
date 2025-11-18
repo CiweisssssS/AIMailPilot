@@ -11,7 +11,7 @@ export const ENDPOINTS = {
   oauthCallback: '/oauth/google/callback',
   logout: '/api/auth/logout',
 
-  // Email triage (NO /api prefix per backend)
+  // Email triage (POST endpoint, backend accepts both GET and POST for compatibility)
   triage: '/triage',
 
   // Thread processing
