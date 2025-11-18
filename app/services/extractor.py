@@ -1,5 +1,5 @@
 """
-Task Extractor Service - Extract tasks using Gemini Flash (default and fallback to GPT-4o-mini for complex time)
+Task Extractor Service - Extract tasks using Gemini Flash (default and fallback to GPT-4o base for complex time)
 """
 
 import json
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def _has_complex_time_expression(text: str) -> bool:
     """
     Detect complex time expressions that may require a more powerful model.
-    Returns True if the text contains complex time expressions that might need GPT-4o-mini fallback.
+    Returns True if the text contains complex time expressions that might need GPT-4o base fallback.
     """
     text_lower = text.lower()
     
@@ -46,7 +46,7 @@ def _has_complex_time_expression(text: str) -> bool:
 
 async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optional[str] = None) -> Dict[str, Any]:
     """
-    Extract tasks using Gemini Flash (default and fallback to GPT-4o-mini for complex time expressions)
+    Extract tasks using Gemini Flash (default and fallback to GPT-4o base for complex time expressions)
     
     Input: { text: string, subject?: string, sent_date?: string }
     Output: { tasks: [{ title, owner, due_iso, source_span }] }
@@ -76,7 +76,7 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
         # Check if text contains complex time expressions
         use_fallback = _has_complex_time_expression(combined_text)
         if use_fallback:
-            logger.info("Complex time expression detected, using fallback model (GPT-4o-mini)")
+            logger.info("Complex time expression detected, using fallback model (GPT-4o base)")
         else:
             logger.info("Using default extractor model (Gemini Flash)")
         
@@ -113,7 +113,7 @@ async def extract_tasks_from_text(text: str, subject: str = "", sent_date: Optio
                 "source_span": {"start": 0, "end": len(text)}  # Placeholder span
             })
         
-        model_used = "GPT-4o-mini" if use_fallback else "Gemini Flash"
+        model_used = "GPT-4o base" if use_fallback else "Gemini Flash"
         logger.info(f"{model_used} extracted {len(formatted_tasks)} tasks with normalized deadlines")
         return {"tasks": formatted_tasks[:10]}
         
@@ -138,7 +138,7 @@ async def extract_tasks(messages: List[Dict[str, Any]]) -> List[Task]:
         
         use_fallback = _has_complex_time_expression(primary_text)
         if use_fallback:
-            logger.info("Complex time expression detected, using fallback model (GPT-4o-mini)")
+            logger.info("Complex time expression detected, using fallback model (GPT-4o base)")
         else:
             logger.info("Using default extractor model (Gemini Flash)")
         

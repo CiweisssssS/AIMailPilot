@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Default models for each service
     summarizer_model: str = "anthropic:claude-3-5-haiku"  # Default: Claude 3.5 Haiku
     extractor_model: str = "google:gemini-flash"  # Default: Gemini Flash
-    extractor_fallback_model: str = "openai:gpt-4o-mini"  # Fallback for complex time: GPT-4o-mini
+    extractor_fallback_model: str = "openai:gpt-4o"  # Fallback for complex time: GPT-4o base
     
     max_input_tokens: int = 12000
     summary_max_words: int = 20
