@@ -13,6 +13,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "https://ai-mail-pilot.vercel.app",
         "https://*.vercel.app"
     ],
     allow_origin_regex=r"^https://.*\.vercel\.app$",
