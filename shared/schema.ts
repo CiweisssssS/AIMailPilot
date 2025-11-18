@@ -105,10 +105,16 @@ export const analyzedEmailSchema = z.object({
   id: z.string(),
   threadId: z.string(),
   subject: z.string(),
-  from: z.string(),
+  from: z.string(), // Keep for backward compatibility
+  from_name: z.string().optional(), // Extracted name from From header
+  from_email: z.string().optional(), // Extracted email from From header
   snippet: z.string(),
   date: z.string(),
   summary: z.string(),
+  body_html: z.string().nullable().optional(), // Decoded HTML body
+  body_text: z.string().nullable().optional(), // Decoded text body
+  inline_images: z.record(z.string()).optional(), // cid -> download_url mapping
+  attachments: z.array(z.any()).optional(), // Attachment list
   priority: prioritySchema,
   tasks: z.array(taskSchema),
   task_extracted: z.string().nullable().optional(),
