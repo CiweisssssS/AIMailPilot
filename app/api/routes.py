@@ -1,4 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
+from typing import Optional
+import httpx
 from app.models.schemas import (
     ProcessThreadRequest,
     ProcessThreadResponse,
@@ -335,182 +337,171 @@ async def prioritize_email(request: PrioritizeRequest):
 
 
 @router.post("/triage")
-async def triage_emails(request: dict):
+async def triage_emails(
+    request: Request,
+    session_id: Optional[str] = None
+):
     """
-    Analyze multiple Gmail emails in parallel and return priorities, summaries, and tasks.
-    Also enriches results with Supabase data (flag status, deadline overrides).
-    Frontend expects: { analyzed_emails: [], summary: {} }
+    Fetch Gmail emails from INBOX and return minimal analyzed_emails structure.
+    Frontend expects: { analyzed_emails: [], summary: {}, debug: {} }
     
-    Note: user_email is optional for unauthenticated analysis. When provided, 
-    persistent data (flags, deadline overrides) will be loaded and merged.
+    HOTFIX: Relaxed Gmail query with fallback to ensure emails are returned.
     """
     try:
-        from app.models.schemas import Priority
+        import os
+        from app.api.oauth import get_session
         
-        messages = request.get('messages', [])
-        user_email = request.get('user_email')
+        # Get session_id from query param or cookie
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
         
-        if not messages:
-            return {"analyzed_emails": [], "summary": {"total": 0, "urgent": 0, "todo": 0, "fyi": 0}}
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated - no session_id")
         
-        # Prefetch Supabase data for all emails (batch query)
-        # Only query database if user is authenticated
-        email_ids = [msg.get('id', 'unknown') for msg in messages]
-        flag_status_dict = {}
-        deadline_overrides_dict = {}
+        # Get session to retrieve access token
+        session = get_session(actual_session_id)
+        if not session or not session.get("tokens"):
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
         
-        if user_email:
-            logger.info(f"Fetching Supabase data for user={user_email}, {len(email_ids)} emails")
-            # Run Supabase queries in thread pool to avoid blocking event loop
-            from app.db.supabase_client import get_flag_status_for_emails, get_deadline_overrides_for_emails
-            try:
-                flag_status_dict, deadline_overrides_dict = await asyncio.gather(
-                    asyncio.to_thread(get_flag_status_for_emails, user_email, email_ids),
-                    asyncio.to_thread(get_deadline_overrides_for_emails, user_email, email_ids)
+        access_token = session["tokens"].get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=401, detail="No access token in session")
+        
+        user_email = session.get("user", {}).get("email")
+        
+        # Get request body for label and pageToken
+        try:
+            body = await request.json()
+        except:
+            body = {}
+        label = body.get("label", "IMPORTANT")  # Default to IMPORTANT
+        page_token = body.get("pageToken")
+        
+        # Configurable max results (default 50)
+        max_results = int(os.getenv("TRIAGE_MAX_RESULTS", "50"))
+        
+        # Fetch messages from Gmail API
+        async with httpx.AsyncClient() as client:
+            # Primary query: INBOX label only, no query filter
+            primary_params = {
+                "labelIds": ["INBOX"],
+                "maxResults": max_results,
+                "includeSpamTrash": False,
+                "q": ""  # NO query initially
+            }
+            if page_token:
+                primary_params["pageToken"] = page_token
+            
+            primary_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+            primary_response = await client.get(
+                primary_url,
+                params=primary_params,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            primary_response.raise_for_status()
+            primary_data = primary_response.json()
+            primary_messages = primary_data.get("messages", [])
+            primary_query_count = len(primary_messages)
+            
+            logger.info(f"Primary Gmail query returned {primary_query_count} messages")
+            
+            # Fallback query if primary returns 0 messages
+            fallback_messages = []
+            fallback_query_count = 0
+            if primary_query_count == 0:
+                logger.info("Primary query returned 0 messages, trying fallback (no label filter)")
+                fallback_params = {
+                    "labelIds": [],  # No label filter
+                    "maxResults": max_results,
+                    "includeSpamTrash": False,
+                    "q": ""  # NO query
+                }
+                if page_token:
+                    fallback_params["pageToken"] = page_token
+                
+                fallback_response = await client.get(
+                    primary_url,
+                    params=fallback_params,
+                    headers={"Authorization": f"Bearer {access_token}"}
                 )
-            except Exception as db_error:
-                # Log but don't fail the entire request if Supabase is unavailable
-                logger.error(f"Supabase query failed: {db_error}")
-        else:
-            logger.info("No user_email provided, skipping Supabase data fetch")
-        
-        # Parallel processing function for a single email
-        async def analyze_single_email(msg):
-            try:
-                # Convert to format expected by services
-                msg_dict = {
-                    'id': msg.get('id', 'unknown'),
-                    'from_': msg.get('from_', 'unknown'),
-                    'subject': msg.get('subject', ''),
-                    'clean_body': msg.get('clean_body', msg.get('body', '')),
-                    'body': msg.get('body', ''),
-                    'to': msg.get('to', []),
-                    'cc': msg.get('cc', []),
-                    'date': msg.get('date', '')  # CRITICAL: Pass email date for deadline normalization
-                }
-                
-                # Process all three operations in parallel for each email
-                summary_task = summarize_thread([msg_dict])
-                tasks_task = extract_tasks([msg_dict])
-                
-                # Wait for both to complete
-                summary, tasks = await asyncio.gather(summary_task, tasks_task)
-                
-                # Apply deadline overrides from Supabase
-                email_id = msg.get('id', 'unknown')
-                for task_index, task in enumerate(tasks):
-                    override_key = (email_id, task_index)
-                    if override_key in deadline_overrides_dict:
-                        task.due = deadline_overrides_dict[override_key]
-                
-                # Calculate priority (needs tasks result)
-                priority = await calculate_priority([msg_dict], tasks, [])
-                
+                fallback_response.raise_for_status()
+                fallback_data = fallback_response.json()
+                fallback_messages = fallback_data.get("messages", [])
+                fallback_query_count = len(fallback_messages)
+                logger.info(f"Fallback Gmail query returned {fallback_query_count} messages")
+            
+            # Use fallback if primary was empty, otherwise use primary
+            message_list = fallback_messages if primary_query_count == 0 else primary_messages
+            
+            if not message_list:
+                logger.warning("Both primary and fallback queries returned 0 messages")
                 return {
-                    'summary': summary,
-                    'tasks': tasks,
-                    'priority': priority.dict()
+                    "analyzed_emails": [],
+                    "summary": {"total": 0, "urgent": 0, "todo": 0, "fyi": 0},
+                    "debug": {
+                        "primaryQueryCount": primary_query_count,
+                        "fallbackQueryCount": fallback_query_count
+                    }
                 }
-            except Exception as e:
-                # Fallback for failed analysis
-                return {
-                    'summary': f"Error analyzing email: {str(e)[:100]}",
-                    'tasks': [],
-                    'priority': {'label': 'P3 - FYI', 'score': 0.0, 'reasons': ['Analysis failed']}
-                }
+            
+            # Fetch full message details for each message ID
+            messages = []
+            for msg_ref in message_list[:max_results]:  # Limit to max_results
+                msg_id = msg_ref.get("id")
+                if not msg_id:
+                    continue
+                
+                # Get message details
+                msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}"
+                msg_response = await client.get(
+                    msg_url,
+                    params={"format": "metadata", "metadataHeaders": "From,Subject,Date"},
+                    headers={"Authorization": f"Bearer {access_token}"}
+                )
+                msg_response.raise_for_status()
+                msg_data = msg_response.json()
+                
+                # Extract headers
+                headers = {h["name"]: h["value"] for h in msg_data.get("payload", {}).get("headers", [])}
+                
+                messages.append({
+                    "id": msg_id,
+                    "threadId": msg_data.get("threadId", ""),
+                    "from_": headers.get("From", "unknown"),
+                    "subject": headers.get("Subject", ""),
+                    "date": headers.get("Date", ""),
+                    "snippet": msg_data.get("snippet", ""),
+                    "internalDate": msg_data.get("internalDate", "")
+                })
         
-        # Process all emails in parallel with batching for better performance
-        batch_size = 5  # Process 5 emails at a time to avoid overwhelming the API
-        all_results = []
-        
-        for i in range(0, len(messages), batch_size):
-            batch = messages[i:i + batch_size]
-            batch_results = await asyncio.gather(*[analyze_single_email(msg) for msg in batch])
-            all_results.extend(batch_results)
-        
-        # Transform into frontend-expected format
+        # Return minimal analyzed_emails structure (hotfix: skip AI analysis for now)
         analyzed_emails = []
-        urgent_count = 0
-        todo_count = 0
-        fyi_count = 0
-        
-        for i, result in enumerate(all_results):
-            msg = messages[i]
-            priority = result['priority']
-            
-            logger.info(f"Email {i}: subject={msg.get('subject', 'N/A')}, tasks_count={len(result.get('tasks', []))}")
-            
-            # Count by priority level
-            if 'P1' in priority['label']:
-                urgent_count += 1
-            elif 'P2' in priority['label']:
-                todo_count += 1
-            else:
-                fyi_count += 1
-            
-            # Extract first task as task_extracted string (clean title without ISO dates)
-            task_extracted = None
-            if result['tasks'] and len(result['tasks']) > 0:
-                first_task = result['tasks'][0]
-                logger.info(f"  First task: {first_task}")
-                # Tasks are Pydantic objects, not dicts - access attribute directly
-                if hasattr(first_task, 'title'):
-                    title = first_task.title
-                    # Remove ISO date suffixes like "2023-10-25T16:00:00"
-                    import re
-                    title = re.sub(r'\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*$', '', title)
-                    task_extracted = title.strip()
-                elif isinstance(first_task, dict):
-                    title = first_task.get('title', None)
-                    if title:
-                        import re
-                        title = re.sub(r'\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*$', '', title)
-                        task_extracted = title.strip()
-            
-            # Safe snippet handling
-            snippet = msg.get('snippet', '') or ''
-            if snippet and len(snippet) > 100:
-                snippet = snippet[:100]
-            
-            # Convert tasks to dicts if they are Pydantic objects
-            tasks_list = []
-            for task in result['tasks']:
-                if hasattr(task, 'dict'):
-                    task_dict = task.dict()
-                    logger.info(f"Task dict for frontend: {task_dict}")
-                    tasks_list.append(task_dict)
-                elif isinstance(task, dict):
-                    logger.info(f"Task dict (already dict) for frontend: {task}")
-                    tasks_list.append(task)
-                else:
-                    logger.info(f"Task (unknown type): {task}")
-                    tasks_list.append({'title': str(task)})
-            
-            # Get flag status from Supabase
-            email_id = msg.get('id', 'unknown')
-            is_flagged = flag_status_dict.get(email_id, False)
-            
+        for msg in messages:
             analyzed_emails.append({
-                'id': email_id,
-                'threadId': msg.get('threadId', msg.get('thread_id', '')),
-                'subject': msg.get('subject', ''),
-                'from': msg.get('from_', 'unknown'),
-                'snippet': snippet,
-                'date': msg.get('date', ''),
-                'summary': result['summary'],
-                'priority': priority,
-                'tasks': tasks_list,
-                'task_extracted': task_extracted,
-                'is_flagged': is_flagged
+                "id": msg["id"],
+                "threadId": msg["threadId"],
+                "from": msg["from_"],
+                "subject": msg["subject"],
+                "date": msg["date"],
+                "snippet": msg["snippet"][:100] if msg["snippet"] else "",
+                "summary": msg["snippet"][:100] if msg["snippet"] else "",  # Use snippet as summary for now
+                "priority": {"label": "P3 - FYI", "score": 0.0, "reasons": []},  # Default priority
+                "tasks": [],
+                "task_extracted": None,
+                "is_flagged": False
             })
         
         return {
             "analyzed_emails": analyzed_emails,
             "summary": {
                 "total": len(analyzed_emails),
-                "urgent": urgent_count,
-                "todo": todo_count,
-                "fyi": fyi_count
+                "urgent": 0,  # Set to 0 for hotfix
+                "todo": 0,    # Set to 0 for hotfix
+                "fyi": 0      # Set to 0 for hotfix
+            },
+            "debug": {
+                "primaryQueryCount": primary_query_count,
+                "fallbackQueryCount": fallback_query_count
             }
         }
     
