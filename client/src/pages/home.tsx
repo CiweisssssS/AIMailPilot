@@ -7,10 +7,10 @@ import { apiRequest, queryClient, clearSessionId, getSessionId } from "@/lib/que
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
-import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
+import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY, GmailLabel, LABEL_MAP } from "@/hooks/use-emails";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { GmailEmail, AnalyzedEmail } from "@shared/schema";
+import type { AnalyzedEmail } from "@shared/schema";
 
 interface AuthStatus {
   authenticated: boolean;
@@ -41,15 +41,20 @@ export default function Home() {
   // State hooks
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<{ emailId: string; taskIndex: number } | undefined>();
+  const [currentLabel, setCurrentLabel] = useState<GmailLabel>("IMPORTANT");
   const { toast } = useToast();
   
-  // Get analyzed emails from React Query cache
-  const { data: analyzedEmails = [] } = useAnalyzedEmails();
+  // Fetch emails using triage endpoint (returns analyzed emails directly)
+  const { data: triageData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(
+    currentLabel,
+    undefined,
+    {
+      enabled: authStatus?.authenticated === true,
+    }
+  );
 
-  // Fetch Gmail emails (only if authenticated) - reduced to 15 for faster analysis
-  const { data: gmailData, isLoading: emailsLoading, error: emailsError, refetch } = useGmailEmails(15, {
-    enabled: authStatus?.authenticated === true,
-  });
+  // Extract analyzed emails from triage response
+  const analyzedEmails = triageData?.analyzed_emails || [];
   
   // Mutations
   const logoutMutation = useMutation({
@@ -69,43 +74,21 @@ export default function Home() {
   const analyzeMutation = useAnalyzeEmails();
   const refreshMutation = useRefreshEmails();
 
-  // Auto-analyze emails when they are loaded (only if authenticated)
+  // Triage endpoint already returns analyzed emails, so no need for separate analysis step
+  // But we can still show loading/error states
   useEffect(() => {
-    if (authStatus?.authenticated && gmailData?.emails && gmailData.emails.length > 0 && analyzedEmails.length === 0 && !analyzeMutation.isPending) {
-      console.log(`Starting analysis for ${gmailData.emails.length} emails...`);
-      
-      // Set a timeout to detect stuck analysis
-      const timeoutId = setTimeout(() => {
-        if (analyzeMutation.isPending) {
-          console.error("Analysis timeout - request taking too long");
-          toast({
-            title: "Analysis Timeout",
-            description: "Analysis is taking longer than expected. Please try refreshing with fewer emails.",
-            variant: "destructive",
-          });
-        }
-      }, 30000); // 30 second timeout
-      
-      analyzeMutation.mutate(gmailData.emails, {
-        onSuccess: (data) => {
-          clearTimeout(timeoutId);
-          console.log(`Analysis complete: ${data.analyzed_emails.length} emails analyzed`);
-        },
-        onError: (error) => {
-          clearTimeout(timeoutId);
-          console.error("Analysis failed:", error);
-          toast({
-            title: "Analysis Failed",
-            description: "Failed to analyze emails. You can try refreshing.",
-            variant: "destructive",
-          });
-        },
+    if (emailsError) {
+      console.error("Failed to fetch emails:", emailsError);
+      toast({
+        title: "Failed to Load Emails",
+        description: emailsError.message || "Failed to fetch emails. Please try refreshing.",
+        variant: "destructive",
       });
     }
-  }, [gmailData?.emails, authStatus?.authenticated]);
+  }, [emailsError, toast]);
 
   // Event handlers
-  const handleEmailClick = (email: GmailEmail) => {
+  const handleEmailClick = (email: AnalyzedEmail) => {
     setSelectedEmailId(email.id);
   };
 
@@ -121,27 +104,19 @@ export default function Home() {
     setSelectedTaskId({ emailId, taskIndex });
   };
 
-  // Find selected email
+  // Find selected email from analyzed emails
   const selectedEmail = selectedEmailId 
-    ? gmailData?.emails.find(e => e.id === selectedEmailId)
+    ? analyzedEmails.find(e => e.id === selectedEmailId)
     : undefined;
 
   const handleRefresh = async () => {
     try {
-      // Clear analyzed emails first
-      queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, []);
-      
-      // Refetch emails from Gmail
-      const result = await refetch();
-      
-      // Re-analyze the emails (even if they're the same from cache)
-      if (result.data?.emails && result.data.emails.length > 0) {
-        await analyzeMutation.mutateAsync(result.data.emails);
-      }
+      // Refetch emails using triage endpoint (already returns analyzed emails)
+      await refetch();
       
       toast({
         title: "Refreshed",
-        description: "Emails refreshed and analyzed successfully",
+        description: "Emails refreshed successfully",
       });
     } catch (error) {
       console.error("Refresh error:", error);
@@ -150,6 +125,17 @@ export default function Home() {
         description: "Failed to refresh emails",
         variant: "destructive",
       });
+    }
+  };
+
+  // Handle label/tab switching
+  const handleLabelChange = (labelName: string) => {
+    const label = LABEL_MAP[labelName];
+    if (label) {
+      setCurrentLabel(label);
+      // Clear selected email when switching tabs
+      setSelectedEmailId(undefined);
+      setSelectedTaskId(undefined);
     }
   };
 
@@ -228,9 +214,11 @@ export default function Home() {
       onRefresh={handleRefresh}
       analyzedEmails={analyzedEmails}
       summary={summary}
-      isAnalyzing={analyzeMutation.isPending}
+      isAnalyzing={emailsLoading}
       onTaskClick={handleTaskClick}
       selectedTaskId={selectedTaskId}
+      currentLabel={currentLabel}
+      onLabelChange={handleLabelChange}
     >
       {selectedEmail ? (
         <EmailDetail 
@@ -239,7 +227,7 @@ export default function Home() {
         />
       ) : (
         <EmailList 
-          emails={gmailData?.emails || []}
+          emails={analyzedEmails}
           selectedEmailId={selectedEmailId}
           onEmailClick={handleEmailClick}
           isLoading={emailsLoading}

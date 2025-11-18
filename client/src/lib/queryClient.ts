@@ -4,7 +4,9 @@ import { apiUrl } from "./api";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const error = new Error(`${res.status}: ${text}`);
+    console.warn('API request failed:', res.status, text);
+    throw error;
   }
 }
 
@@ -29,6 +31,12 @@ export async function apiRequest(
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  if (res.status === 401) {
+    // Redirect to login on 401
+    window.location.href = '/auth/google';
+    throw new Error('Unauthorized');
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -56,15 +64,60 @@ export function clearSessionId(): void {
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+// Check if queryKey represents a triage request
+function isTriageRequest(queryKey: unknown[]): boolean {
+  return queryKey.length >= 2 && 
+         queryKey[0] === 'emails' && 
+         typeof queryKey[1] === 'object' && 
+         queryKey[1] !== null &&
+         'label' in (queryKey[1] as Record<string, unknown>);
+}
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const sessionId = getSessionId();
+    
+    // Handle triage endpoint (POST /api/triage)
+    if (isTriageRequest(queryKey)) {
+      const params = queryKey[1] as { label: string; pageToken?: string };
+      const triageUrl = apiUrl('/api/triage');
+      const urlWithSession = sessionId 
+        ? `${triageUrl}${triageUrl.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
+        : triageUrl;
+      
+      const res = await fetch(urlWithSession, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          label: params.label,
+          pageToken: params.pageToken,
+        }),
+        credentials: "include",
+      });
+
+      if (res.status === 401) {
+        if (unauthorizedBehavior === "returnNull") {
+          return null;
+        }
+        // Redirect to login on 401
+        window.location.href = '/auth/google';
+        throw new Error('Unauthorized');
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    }
+    
+    // Default: GET request for other endpoints
     // Query key is array like ["/api/auth/status"] - join and convert to absolute URL
     const relativeUrl = queryKey.join("/") as string;
     const absoluteUrl = apiUrl(relativeUrl);
-    const sessionId = getSessionId();
     
     // Add session_id as query param if available
     const urlWithSession = sessionId 
@@ -75,8 +128,13 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
+      // Redirect to login on 401
+      window.location.href = '/auth/google';
+      throw new Error('Unauthorized');
     }
 
     await throwIfResNotOk(res);

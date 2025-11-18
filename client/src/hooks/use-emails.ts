@@ -1,14 +1,28 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { FetchGmailResponse, TriageResponse, GmailEmail, AnalyzedEmail } from "@shared/schema";
+import type { TriageResponse, GmailEmail, AnalyzedEmail } from "@shared/schema";
 
 // Cache key for analyzed emails
 export const ANALYZED_EMAILS_CACHE_KEY = ["/api/analyzed-emails"];
 
-// Fetch Gmail emails
-export function useGmailEmails(maxResults = 50, options?: { enabled?: boolean }) {
-  return useQuery<FetchGmailResponse>({
-    queryKey: ["/api/fetch-gmail-emails", maxResults],
+// Gmail label types
+export type GmailLabel = "IMPORTANT" | "CATEGORY_UPDATES" | "CATEGORY_PROMOTIONS";
+
+// Map UI tab names to Gmail labels
+export const LABEL_MAP: Record<string, GmailLabel> = {
+  "Important": "IMPORTANT",
+  "Updates": "CATEGORY_UPDATES",
+  "Promotions": "CATEGORY_PROMOTIONS",
+};
+
+// Fetch Gmail emails using POST /api/triage
+export function useGmailEmails(
+  label: GmailLabel = "IMPORTANT",
+  pageToken?: string,
+  options?: { enabled?: boolean }
+) {
+  return useQuery<TriageResponse>({
+    queryKey: ["emails", { label, pageToken }],
     refetchInterval: 60000, // Refetch every 60 seconds
     retry: 1,
     enabled: options?.enabled ?? true, // Default to enabled if not specified
@@ -24,7 +38,7 @@ export function useAnalyzedEmails() {
   });
 }
 
-// Analyze emails with AI
+// Analyze emails with AI (legacy - may not be needed if triage already analyzes)
 export function useAnalyzeEmails() {
   return useMutation({
     mutationFn: async (emails: GmailEmail[]) => {
@@ -35,8 +49,8 @@ export function useAnalyzeEmails() {
     onSuccess: (data) => {
       // Store analyzed emails in cache
       queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, data.analyzed_emails);
-      // Invalidate and refetch Gmail emails
-      queryClient.invalidateQueries({ queryKey: ["/api/fetch-gmail-emails"] });
+      // Invalidate all email queries
+      queryClient.invalidateQueries({ queryKey: ["emails"] });
     },
   });
 }
@@ -45,7 +59,7 @@ export function useAnalyzeEmails() {
 export function useRefreshEmails() {
   return useMutation({
     mutationFn: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/fetch-gmail-emails"] });
+      await queryClient.invalidateQueries({ queryKey: ["emails"] });
       return { success: true };
     },
   });

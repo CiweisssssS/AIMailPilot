@@ -33,6 +33,8 @@ interface MailLayoutProps {
   isAnalyzing?: boolean;
   onTaskClick?: (emailId: string, taskIndex: number) => void;
   selectedTaskId?: { emailId: string; taskIndex: number };
+  currentLabel?: "IMPORTANT" | "CATEGORY_UPDATES" | "CATEGORY_PROMOTIONS";
+  onLabelChange?: (labelName: string) => void;
 }
 
 export default function MailLayout({ 
@@ -44,7 +46,9 @@ export default function MailLayout({
   summary = { total: 0, urgent: 0, todo: 0, fyi: 0 },
   isAnalyzing = false,
   onTaskClick,
-  selectedTaskId
+  selectedTaskId,
+  currentLabel = "IMPORTANT",
+  onLabelChange
 }: MailLayoutProps) {
   const [currentLayer, setCurrentLayer] = useState<Layer>({ type: "inbox-reminder" });
 
@@ -212,14 +216,44 @@ export default function MailLayout({
         </header>
         
         <div className="flex gap-1 px-4 py-2 border-b border-border">
-          <button className="px-3 py-1 text-sm font-medium rounded-md bg-primary text-primary-foreground" data-testid="button-filter-important">
-            Important <span className="ml-1">11</span>
+          <button 
+            onClick={() => onLabelChange?.("Important")}
+            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+              currentLabel === "IMPORTANT" 
+                ? "bg-primary text-primary-foreground font-medium" 
+                : "hover-elevate"
+            }`}
+            data-testid="button-filter-important"
+          >
+            Important <span className={`ml-1 ${currentLabel === "IMPORTANT" ? "" : "text-muted-foreground"}`}>
+              {summary.urgent}
+            </span>
           </button>
-          <button className="px-3 py-1 text-sm rounded-md hover-elevate" data-testid="button-filter-updates">
-            Updates <span className="ml-1 text-muted-foreground">552</span>
+          <button 
+            onClick={() => onLabelChange?.("Updates")}
+            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+              currentLabel === "CATEGORY_UPDATES" 
+                ? "bg-primary text-primary-foreground font-medium" 
+                : "hover-elevate"
+            }`}
+            data-testid="button-filter-updates"
+          >
+            Updates <span className={`ml-1 ${currentLabel === "CATEGORY_UPDATES" ? "" : "text-muted-foreground"}`}>
+              {summary.todo}
+            </span>
           </button>
-          <button className="px-3 py-1 text-sm rounded-md hover-elevate" data-testid="button-filter-promotions">
-            Promotions <span className="ml-1 text-muted-foreground">115</span>
+          <button 
+            onClick={() => onLabelChange?.("Promotions")}
+            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+              currentLabel === "CATEGORY_PROMOTIONS" 
+                ? "bg-primary text-primary-foreground font-medium" 
+                : "hover-elevate"
+            }`}
+            data-testid="button-filter-promotions"
+          >
+            Promotions <span className={`ml-1 ${currentLabel === "CATEGORY_PROMOTIONS" ? "" : "text-muted-foreground"}`}>
+              {summary.fyi}
+            </span>
           </button>
         </div>
 
