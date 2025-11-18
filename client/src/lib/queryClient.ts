@@ -26,12 +26,23 @@ export async function apiRequest(
     ? `${absoluteUrl}${absoluteUrl.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
     : absoluteUrl;
   
-  const res = await fetch(urlWithSession, {
+  let res = await fetch(urlWithSession, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // Defensive auto-retry: if 405 and method was GET, retry with POST
+  if (res.status === 405 && method === "GET") {
+    console.warn(`[API] ${url} returned 405 for GET, retrying with POST`);
+    res = await fetch(urlWithSession, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: data ? JSON.stringify(data) : JSON.stringify({}),
+      credentials: "include",
+    });
+  }
 
   if (res.status === 401) {
     // Redirect to login on 401
@@ -81,29 +92,37 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const sessionId = getSessionId();
     
-    // Handle triage endpoint (GET /api/triage - returns new tasks only)
+    // Handle triage endpoint (POST /triage - returns new tasks only)
     if (isTriageRequest(queryKey)) {
-      const params = queryKey[1] as { label?: string; pageToken?: string } | undefined;
+      const params = queryKey[1] as { label?: string; pageToken?: string; limit?: number } | undefined;
       const triageUrl = apiUrl(ENDPOINTS.triage);
-      let urlWithParams = triageUrl;
       
-      // Add query params
+      // Build query params (keep label/limit in query for compatibility)
       const queryParams = new URLSearchParams();
       if (params?.label) queryParams.append('label', params.label);
       if (params?.pageToken) queryParams.append('pageToken', params.pageToken);
-      queryParams.append('limit', '50');
-      if (queryParams.toString()) {
-        urlWithParams += `?${queryParams.toString()}`;
-      }
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      else queryParams.append('limit', '50');
       
       const urlWithSession = sessionId
-        ? `${urlWithParams}${urlWithParams.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
-        : urlWithParams;
+        ? `${triageUrl}?${queryParams.toString()}&session_id=${encodeURIComponent(sessionId)}`
+        : `${triageUrl}?${queryParams.toString()}`;
 
-      const res = await fetch(urlWithSession, {
-        method: 'GET',
+      // Try POST first (standard method)
+      let res = await fetch(urlWithSession, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}), // Empty body, params in query
         credentials: "include",
       });
+
+      // Defensive auto-retry: if 405, log warning (shouldn't happen since we're using POST)
+      if (res.status === 405) {
+        console.error('[API] Triage returned 405 even with POST method - backend may not be updated');
+        // Don't retry since we're already using POST
+      }
 
       if (res.status === 401) {
         if (unauthorizedBehavior === "returnNull") {

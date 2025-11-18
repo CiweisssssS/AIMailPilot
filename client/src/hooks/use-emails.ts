@@ -44,7 +44,7 @@ export function useAnalyzedEmails() {
 export function useAnalyzeEmails() {
   return useMutation({
     mutationFn: async (emails: GmailEmail[]) => {
-      // Using triage endpoint instead of analyze-emails if that doesn't exist
+      // Using triage endpoint with POST (standard method)
       const response = await apiRequest("POST", ENDPOINTS.triage, { 
         label: "IMPORTANT",
         emails 
