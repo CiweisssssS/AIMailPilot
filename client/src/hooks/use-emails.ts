@@ -16,14 +16,14 @@ export const LABEL_MAP: Record<string, GmailLabel> = {
   "Promotions": "CATEGORY_PROMOTIONS",
 };
 
-// Fetch Gmail emails using POST /triage (NO /api prefix per backend Swagger)
+// Fetch Gmail emails using GET /api/triage (returns new tasks only)
 export function useGmailEmails(
   label: GmailLabel = "IMPORTANT",
   pageToken?: string,
   options?: { enabled?: boolean }
 ) {
   return useQuery<TriageResponse>({
-    queryKey: ["emails", { label, pageToken }],
+    queryKey: [ENDPOINTS.triage, { label, pageToken }],
     refetchInterval: 60000, // Refetch every 60 seconds
     retry: 1,
     enabled: options?.enabled ?? true, // Default to enabled if not specified
@@ -61,12 +61,61 @@ export function useAnalyzeEmails() {
   });
 }
 
-// Manually refresh emails
+// Manually refresh emails - calls POST /api/refresh to sync
 export function useRefreshEmails() {
   return useMutation({
     mutationFn: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["emails"] });
-      return { success: true };
+      const response = await apiRequest("POST", ENDPOINTS.refresh);
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: () => {
+      // Invalidate all email and task queries
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.triage] });
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.tasks] });
+      queryClient.invalidateQueries({ queryKey: ["emails"] });
+    },
+  });
+}
+
+// Mark task as viewed
+export function useMarkTaskViewed() {
+  return useMutation({
+    mutationFn: async (taskId: number) => {
+      const response = await apiRequest("POST", ENDPOINTS.taskViewed(taskId));
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidate triage to remove from Inbox Reminder
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.triage] });
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.tasks] });
+    },
+  });
+}
+
+// Mark task as saved
+export function useMarkTaskSaved() {
+  return useMutation({
+    mutationFn: async (taskId: number) => {
+      const response = await apiRequest("POST", ENDPOINTS.taskSave(taskId));
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.tasks] });
+    },
+  });
+}
+
+// Mark task as done
+export function useMarkTaskDone() {
+  return useMutation({
+    mutationFn: async (taskId: number) => {
+      const response = await apiRequest("POST", ENDPOINTS.taskDone(taskId));
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.triage] });
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.tasks] });
     },
   });
 }

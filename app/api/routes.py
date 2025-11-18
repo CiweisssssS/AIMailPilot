@@ -859,3 +859,315 @@ async def proxy_image(
     except Exception as e:
         logger.error(f"Error proxying image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# Sync & Task Management Routes
+# ==========================================
+
+@router.post("/api/refresh")
+async def refresh_emails(
+    request: Request,
+    session_id: Optional[str] = None
+):
+    """
+    Refresh emails: run incremental sync or cold start backfill
+    Returns sync result with mode, counts, and latest_history_id
+    """
+    try:
+        from app.api.oauth import get_session
+        from app.services.gmail_sync import sync_emails
+        from app.services.task_extractor import process_unprocessed_emails
+        from app.db.supabase_client import get_sync_meta
+        
+        # Get session
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        session = get_session(actual_session_id)
+        if not session or not session.get("tokens"):
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        access_token = session["tokens"].get("access_token")
+        user_email = session.get("user", {}).get("email")
+        
+        if not access_token or not user_email:
+            raise HTTPException(status_code=401, detail="Missing credentials")
+        
+        # Get last_history_id
+        sync_meta = await get_sync_meta(user_email)
+        last_history_id = sync_meta.get("last_history_id") if sync_meta else None
+        
+        # Run sync
+        sync_result = await sync_emails(access_token, user_email, last_history_id)
+        
+        # Process unprocessed emails for tasks
+        added_tasks = await process_unprocessed_emails(user_email, limit=50)
+        
+        return {
+            "mode": sync_result["mode"],
+            "scanned_messages": sync_result["scanned_messages"],
+            "added_emails": sync_result["added_emails"],
+            "added_tasks": added_tasks,
+            "latest_history_id": sync_result["latest_history_id"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Refresh failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/triage")
+async def get_triage_tasks(
+    request: Request,
+    limit: int = 50,
+    session_id: Optional[str] = None
+):
+    """
+    Get Inbox Reminder: tasks with state="new" only
+    Returns summary counts and new tasks
+    """
+    try:
+        from app.api.oauth import get_session
+        from app.db.supabase_client import get_tasks, get_email_by_id
+        
+        # Get session
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        session = get_session(actual_session_id)
+        if not session or not session.get("user"):
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        user_email = session.get("user", {}).get("email")
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Missing user email")
+        
+        # Get new tasks only
+        new_tasks = await get_tasks(user_email, state="new", limit=limit)
+        
+        # Get all tasks for summary counts
+        all_tasks = await get_tasks(user_email, state="all", limit=1000)
+        urgent_count = sum(1 for t in all_tasks if t.get("priority") == "urgent" and t.get("state") != "done")
+        todo_count = sum(1 for t in all_tasks if t.get("priority") == "todo" and t.get("state") != "done")
+        fyi_count = sum(1 for t in all_tasks if t.get("priority") == "fyi" and t.get("state") != "done")
+        
+        # Build analyzed_emails from tasks (for frontend compatibility)
+        analyzed_emails = []
+        for task in new_tasks:
+            message_id = task.get("message_id")
+            email = await get_email_by_id(user_email, message_id)
+            
+            if email:
+                analyzed_emails.append({
+                    "id": message_id,
+                    "threadId": email.get("thread_id", ""),
+                    "from_name": email.get("from_name", ""),
+                    "from_email": email.get("from_email", ""),
+                    "from": email.get("from_email", ""),
+                    "subject": email.get("subject", ""),
+                    "date": email.get("date_iso", ""),
+                    "snippet": email.get("snippet", ""),
+                    "body_html": email.get("normalized_html"),
+                    "body_text": email.get("normalized_text"),
+                    "summary": email.get("snippet", "")[:100],
+                    "priority": {"label": f"P{1 if task.get('priority') == 'urgent' else 2 if task.get('priority') == 'todo' else 3}", "score": 0.0, "reasons": []},
+                    "tasks": [{"title": task.get("normalized_title", ""), "type": "action"}],
+                    "task_extracted": task.get("normalized_title", ""),
+                    "is_flagged": False,
+                    "task_id": task.get("task_id")  # Include task_id for state transitions
+                })
+        
+        return {
+            "analyzed_emails": analyzed_emails,
+            "summary": {
+                "total": len(analyzed_emails),
+                "urgent": urgent_count,
+                "todo": todo_count,
+                "fyi": fyi_count
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get triage failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/tasks")
+async def get_tasks_route(
+    request: Request,
+    state: str = "open",
+    limit: int = 50,
+    offset: int = 0,
+    session_id: Optional[str] = None
+):
+    """
+    Get tasks with state filter
+    state: "all" | "open" | "new" | "viewed" | "saved" | "done"
+    """
+    try:
+        from app.api.oauth import get_session
+        from app.db.supabase_client import get_tasks, get_email_by_id
+        
+        # Get session
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        session = get_session(actual_session_id)
+        if not session or not session.get("user"):
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        user_email = session.get("user", {}).get("email")
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Missing user email")
+        
+        # Get tasks
+        tasks = await get_tasks(user_email, state=state, limit=limit, offset=offset)
+        
+        # Enrich with email data
+        enriched_tasks = []
+        for task in tasks:
+            message_id = task.get("message_id")
+            email = await get_email_by_id(user_email, message_id)
+            
+            enriched_tasks.append({
+                **task,
+                "email": {
+                    "id": message_id,
+                    "thread_id": email.get("thread_id", "") if email else "",
+                    "from_name": email.get("from_name", "") if email else "",
+                    "from_email": email.get("from_email", "") if email else "",
+                    "subject": email.get("subject", "") if email else "",
+                    "date": email.get("date_iso", "") if email else "",
+                    "snippet": email.get("snippet", "") if email else ""
+                } if email else None
+            })
+        
+        return {"tasks": enriched_tasks}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get tasks failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/tasks/{task_id}/viewed")
+async def mark_task_viewed(
+    task_id: int,
+    request: Request,
+    session_id: Optional[str] = None
+):
+    """Mark task as viewed (new → viewed)"""
+    try:
+        from app.api.oauth import get_session
+        from app.db.supabase_client import update_task_state
+        
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        session = get_session(actual_session_id)
+        user_email = session.get("user", {}).get("email") if session else None
+        
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        task = await update_task_state(user_email, task_id, "viewed")
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        return {"success": True, "task_id": task_id, "state": "viewed"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark task viewed failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/tasks/{task_id}/save")
+async def mark_task_saved(
+    task_id: int,
+    request: Request,
+    session_id: Optional[str] = None
+):
+    """Mark task as saved (→ saved)"""
+    try:
+        from app.api.oauth import get_session
+        from app.db.supabase_client import update_task_state
+        
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        session = get_session(actual_session_id)
+        user_email = session.get("user", {}).get("email") if session else None
+        
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        task = await update_task_state(user_email, task_id, "saved")
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        return {"success": True, "task_id": task_id, "state": "saved"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark task saved failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/tasks/{task_id}/done")
+async def mark_task_done(
+    task_id: int,
+    request: Request,
+    session_id: Optional[str] = None
+):
+    """Mark task as done (→ done)"""
+    try:
+        from app.api.oauth import get_session
+        from app.db.supabase_client import update_task_state
+        
+        session_id_param = request.query_params.get("session_id")
+        actual_session_id = session_id or session_id_param
+        
+        if not actual_session_id:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        session = get_session(actual_session_id)
+        user_email = session.get("user", {}).get("email") if session else None
+        
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Invalid session")
+        
+        task = await update_task_state(user_email, task_id, "done")
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        return {"success": True, "task_id": task_id, "state": "done"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark task done failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

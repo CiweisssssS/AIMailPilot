@@ -59,6 +59,84 @@ CREATE TRIGGER update_deadline_overrides_updated_at BEFORE UPDATE ON deadline_ov
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ==========================================
+-- Table: emails
+-- Purpose: Store normalized email messages with MIME-decoded content
+-- ==========================================
+CREATE TABLE IF NOT EXISTS emails (
+    message_id VARCHAR(255) PRIMARY KEY,
+    thread_id VARCHAR(255) NOT NULL,
+    user_email VARCHAR(255) NOT NULL,
+    from_name VARCHAR(500),
+    from_email VARCHAR(500) NOT NULL,
+    subject TEXT,
+    date_iso TIMESTAMP WITH TIME ZONE,
+    snippet TEXT,
+    first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    normalized_html TEXT,
+    normalized_text TEXT,
+    processed BOOLEAN DEFAULT false,
+    last_history_id_at_create VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_emails_user_email ON emails(user_email);
+CREATE INDEX IF NOT EXISTS idx_emails_thread_id ON emails(thread_id);
+CREATE INDEX IF NOT EXISTS idx_emails_user_processed ON emails(user_email, processed);
+CREATE INDEX IF NOT EXISTS idx_emails_date_iso ON emails(date_iso DESC);
+
+CREATE TRIGGER update_emails_updated_at BEFORE UPDATE ON emails
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ==========================================
+-- Table: tasks
+-- Purpose: Store extracted tasks with state machine (new|viewed|saved|done)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS tasks (
+    task_id SERIAL PRIMARY KEY,
+    message_id VARCHAR(255) NOT NULL,
+    user_email VARCHAR(255) NOT NULL,
+    priority VARCHAR(20) NOT NULL CHECK (priority IN ('urgent', 'todo', 'fyi')),
+    state VARCHAR(20) NOT NULL DEFAULT 'new' CHECK (state IN ('new', 'viewed', 'saved', 'done')),
+    rule_key VARCHAR(255),
+    normalized_title TEXT NOT NULL,
+    snooze_until TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT unique_task_per_message UNIQUE(message_id, rule_key, normalized_title, user_email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_user_email ON tasks(user_email);
+CREATE INDEX IF NOT EXISTS idx_tasks_message_id ON tasks(message_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_user_state ON tasks(user_email, state);
+CREATE INDEX IF NOT EXISTS idx_tasks_user_priority ON tasks(user_email, priority);
+CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
+
+CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ==========================================
+-- Table: sync_meta
+-- Purpose: Store sync state per user (last_history_id, sync timestamps)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS sync_meta (
+    user_id VARCHAR(255) PRIMARY KEY,
+    user_email VARCHAR(255) NOT NULL UNIQUE,
+    last_history_id VARCHAR(100),
+    last_sync_at TIMESTAMP WITH TIME ZONE,
+    last_backfill_from TIMESTAMP WITH TIME ZONE,
+    latest_profile_history_id VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_meta_user_email ON sync_meta(user_email);
+
+CREATE TRIGGER update_sync_meta_updated_at BEFORE UPDATE ON sync_meta
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ==========================================
 -- Row Level Security (RLS) Policies
 -- ==========================================
 -- NOTE: RLS is DISABLED for this application because we use application-layer

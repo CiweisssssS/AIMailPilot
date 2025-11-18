@@ -8,7 +8,7 @@ import { ENDPOINTS } from "@/lib/endpoints";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
-import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY, GmailLabel, LABEL_MAP } from "@/hooks/use-emails";
+import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY, GmailLabel, LABEL_MAP, useMarkTaskViewed } from "@/hooks/use-emails";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AnalyzedEmail } from "@shared/schema";
@@ -95,9 +95,22 @@ export default function Home() {
     }
   }, [authStatus?.authenticated, emailsLoading, triageData]);
 
+  // Task state mutations
+  const markTaskViewedMutation = useMarkTaskViewed();
+
   // Event handlers
   const handleEmailClick = (email: AnalyzedEmail) => {
     setSelectedEmailId(email.id);
+    
+    // Mark task as viewed if task_id exists (fire-and-forget, optimistic UI)
+    if ((email as any).task_id) {
+      markTaskViewedMutation.mutate((email as any).task_id, {
+        onError: (error) => {
+          console.warn("Failed to mark task as viewed:", error);
+          // Don't show error toast - this is fire-and-forget
+        }
+      });
+    }
   };
 
   const handleBackToList = () => {
@@ -119,12 +132,15 @@ export default function Home() {
 
   const handleRefresh = async () => {
     try {
-      // Refetch emails using triage endpoint (already returns analyzed emails)
+      // Call POST /api/refresh to sync emails and process tasks
+      await refreshMutation.mutateAsync();
+      
+      // Then refetch triage to get updated tasks
       await refetch();
       
       toast({
         title: "Refreshed",
-        description: "Emails refreshed successfully",
+        description: "Emails synced and refreshed successfully",
       });
     } catch (error) {
       console.error("Refresh error:", error);
