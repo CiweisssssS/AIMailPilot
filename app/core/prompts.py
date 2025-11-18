@@ -1,37 +1,77 @@
 def get_summary_system_prompt(max_words: int = 20) -> str:
     """Generate summary system prompt with configurable word limit"""
-    return f"""You are an email summarizer. Return ONE sentence that captures the actor (sender), the required action and object, and the deadline if present. Use active voice. Exclude greetings and niceties. Keep it under {max_words} words for English; never break words. If a deadline exists (e.g., EOD/COB/tomorrow/Fri 5pm), include it as text (deadline normalization is handled downstream). Output JSON only: {{"summary": "..."}}."""
+    return f"""You are an email summarizer. Extract key facts from the email and return structured JSON.
+
+**Output Format:**
+Return JSON with keys: summary, actor, action, object, deadline.
+
+**Field Requirements:**
+
+1. **summary**: ONE sentence that captures the actor (sender), the required action and object, and the deadline if present. Use active voice. Exclude greetings and niceties. Keep it under {max_words} words for English; never break words.
+
+2. **actor**: The sender's name (first name or full name, extracted from email address if needed)
+   - DO NOT include "Team", "Department", "Group" suffixes
+   - Examples: "Alice" (not "Alice Team"), "Legal" (not "Legal Team"), "John" (not "john@example.com")
+
+3. **action**: Use intent labels, NOT task verbs
+   - Use "request" for: send, submit, share, review, check, approve, schedule, prepare, update, etc.
+   - Use "remind" for: remind, prepare (when it's a reminder)
+   - Use "notify" or "inform" for: notify, inform, alert, announce, approve (when notifying about approval)
+   - Examples: "request" (not "send"), "remind" (not "prepare"), "notify" (not "approve")
+
+4. **object**: The core thing being requested/mentioned (be concise, avoid extra details)
+   - Extract the main noun phrase, not the full description
+   - Examples: "project draft" (not "project draft and sync"), "contract feedback" (not "client contract and sales alignment"), "slide deck review" (not just "slide deck")
+
+5. **deadline**: MUST be in ISO format (YYYY-MM-DD) or null
+   - If email has "Received at (UTC): YYYY-MM-DDTHH:MM:SSZ", use it as reference for relative time
+   - Convert relative time expressions to ISO dates:
+     * "EOD"/"COB"/"end of day" → same day as received_at
+     * "tomorrow" → received_at + 1 day
+     * "EOW"/"end of week" → Friday of the week containing received_at
+     * "next Monday"/"next Wednesday" → calculate from received_at
+   - If NO deadline mentioned in email, use null (NOT a date)
+   - Examples: "2025-11-14" (not "EOW"), "2025-11-11" (not "tomorrow"), null (if no deadline)
+
+**Examples:**
+- Email: "Could you send the draft by EOW?" → {{"summary": "Alice requests draft by 2025-11-14.", "actor": "Alice", "action": "request", "object": "draft", "deadline": "2025-11-14"}}
+- Email: "Please prepare status update for tomorrow" → {{"summary": "PM reminds status update by 2025-11-11.", "actor": "PM", "action": "remind", "object": "status update", "deadline": "2025-11-11"}}
+
+Output JSON only."""
 
 SUMMARY_FEW_SHOT_EXAMPLES = [
     {
         "role": "user",
         "content": """Subject: Deck Review Needed by EOD
 From: Rebecca
+Received at (UTC): 2025-11-10T09:00:00Z
 Body (trimmed): Could you please review the updated pitch deck and share feedback by the end of today?"""
     },
     {
         "role": "assistant",
-        "content": """{"summary": "Rebecca needs you to review the updated pitch deck and share your feedback by EOD."}"""
+        "content": """{"summary": "Rebecca requests pitch deck review by 2025-11-10.", "actor": "Rebecca", "action": "request", "object": "pitch deck review", "deadline": "2025-11-10"}"""
     },
     {
         "role": "user",
         "content": """Subject: Banner Design Review
 From: Tyler
+Received at (UTC): 2025-11-10T10:00:00Z
 Body (trimmed): When you have time this week, please look at the new banner designs."""
     },
     {
         "role": "assistant",
-        "content": """{"summary": "Tyler asks you to review the new banner designs this week."}"""
+        "content": """{"summary": "Tyler requests banner design review this week.", "actor": "Tyler", "action": "request", "object": "banner design review", "deadline": null}"""
     },
     {
         "role": "user",
-        "content": """Subject: Q4 Product Updates
-From: Product Team
-Body (trimmed): Newsletter: Q4 product updates and policy changes."""
+        "content": """Subject: Status Update Tomorrow
+From: PM
+Received at (UTC): 2025-11-10T11:00:00Z
+Body (trimmed): Please prepare status update for tomorrow's standup."""
     },
     {
         "role": "assistant",
-        "content": """{"summary": "The product team shares Q4 updates and policy changes."}"""
+        "content": """{"summary": "PM reminds status update by 2025-11-11.", "actor": "PM", "action": "remind", "object": "status update", "deadline": "2025-11-11"}"""
     }
 ]
 

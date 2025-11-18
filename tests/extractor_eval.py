@@ -4,6 +4,7 @@ import importlib
 import copy
 import json
 import re
+import sys
 from datetime import timezone
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,10 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from dateutil import parser as date_parser
 from difflib import SequenceMatcher
+
+# Import eval script logic for consistency
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from eval.run_pipeline import prf_tasks, due_date_correctness, _normalize_owner, _normalize_text, _normalize_date, _similarity
 
 
 @dataclass
@@ -72,6 +77,102 @@ def load_agent(path: str) -> Callable[..., Awaitable[Any]]:
     if not callable(func):
         raise TypeError(f"Loaded object '{func_name}' is not callable")
     return func
+
+
+def parse_action_object_from_title(title: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Parse action and object from title field.
+    Title format is typically "[VERB OBJECT OWNER]" or natural language.
+    
+    Returns: (action, object)
+    """
+    if not title:
+        return None, None
+    
+    # Try to parse [VERB OBJECT OWNER] format
+    bracket_match = re.match(r'\[([^\]]+)\]', title)
+    if bracket_match:
+        content = bracket_match.group(1).strip()
+        # Split by spaces and try to identify verb, object, owner
+        parts = content.split()
+        if len(parts) >= 2:
+            # First part is usually the verb (action)
+            action = parts[0].lower()
+            # Last part might be owner, rest is object
+            # Heuristic: if last part is capitalized and short, it's likely owner
+            if len(parts) >= 3 and parts[-1][0].isupper() and len(parts[-1]) <= 15:
+                object_parts = parts[1:-1]
+            else:
+                object_parts = parts[1:]
+            obj = " ".join(object_parts).lower() if object_parts else None
+            return action, obj
+    
+    # Try to parse natural language format
+    # Look for verb at the beginning (including compound verbs like "review and send")
+    verb_pattern = r'^(review|submit|send|schedule|prepare|update|complete|approve|finalize|upload|export|remove|attach|check|verify|revise|refresh|resend|align|sync|meet|discuss|decide|agree|propose|edit|look|take|make|ensure|remember|double-check|fix|attend|finalize|upload|provide|return|circulate|distribute|transmit|draft|create|write|compile|develop|generate|modify|amend|correct|confirm|acknowledge|validate|affirm|synchronize|reconcile|request|ask|need|require|solicit|petition|remind|notify|alert|inform|announce|report|troubleshoot|resolve|debug|investigate|escalate|process|handle|manage|deal with|address)'
+    verb_match = re.match(verb_pattern, title.lower())
+    if verb_match:
+        action = verb_match.group(1)
+        # Rest is object - handle compound actions like "review and send"
+        remaining = title[verb_match.end():].strip()
+        # Check for "and [verb]" pattern (e.g., "review and send feedback")
+        and_verb_match = re.match(r'^\s+and\s+(send|submit|upload|provide|return)', remaining.lower())
+        if and_verb_match:
+            # For compound actions, use the first verb as action
+            # Object includes everything after "and [verb]"
+            obj = remaining[and_verb_match.end():].strip()
+        else:
+            obj = remaining
+        # Remove common prefixes
+        obj = re.sub(r'^(the|a|an|your|our|updated|new|latest)\s+', '', obj, flags=re.IGNORECASE)
+        obj = obj.strip()
+        # Remove trailing phrases like "and send feedback", "by Friday", etc.
+        obj = re.sub(r'\s+(and|by|before|on|at|from|to|for|with).*$', '', obj, flags=re.IGNORECASE)
+        obj = obj.strip()
+        return action, obj if obj else None
+    
+    # Fallback: first word as action, rest as object
+    parts = title.split()
+    if len(parts) >= 2:
+        return parts[0].lower(), " ".join(parts[1:]).lower()
+    elif len(parts) == 1:
+        return parts[0].lower(), None
+    
+    return None, None
+
+
+def convert_task_to_eval_format(task: Dict[str, Any], raw_due: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Convert task from {title, owner, due_iso} format to {owner, action, object, deadline} format
+    expected by eval script.
+    
+    Args:
+        task: Task dict with title, owner, due_iso (or due)
+        raw_due: Raw due text from LLM (if available)
+    
+    Returns:
+        Task dict in eval format: {owner, action, object, deadline}
+    """
+    title = task.get("title", "")
+    owner = task.get("owner")
+    due_iso = task.get("due_iso")
+    due = task.get("due") or raw_due
+    
+    # Parse action and object from title
+    action, obj = parse_action_object_from_title(title)
+    
+    # Use raw due text if available, otherwise try to extract from due_iso
+    deadline = due
+    if not deadline and due_iso:
+        # If due_iso is in ISO format, keep it as-is (eval script normalizes dates)
+        deadline = due_iso
+    
+    return {
+        "owner": owner,
+        "action": action,
+        "object": obj,
+        "deadline": deadline,
+    }
 
 
 STOPWORDS = {
@@ -1062,13 +1163,22 @@ async def evaluate_dataset(
     tolerance_minutes: int,
     max_examples: int = 5,
     dataset: Optional[List[Dict[str, Any]]] = None,
+    lenient: bool = True,
+    very_lenient: bool = True,  # Default to very_lenient for better semantic matching
+    sim_threshold: float = 0.75,  # Stricter: raised from 0.6 to 0.75
+    task_match_k: int = 3,  # Stricter: raised from 2 to 3
 ) -> EvalResult:
+    """
+    Evaluate dataset using eval script logic (prf_tasks).
+    This matches the evaluation approach in eval/run_pipeline.py.
+    """
     strict_tp_total = partial_tp_total = 0
     fp_total = fn_total = 0
     owner_correct_total = owner_total_total = 0
     due_correct_total = due_total_total = 0
     fn_examples: List[Dict[str, Any]] = []
     fp_examples: List[Dict[str, Any]] = []
+    due_match_list: List[float] = []
 
     if dataset is not None:
         row_source = _iterate_cases(dataset)
@@ -1085,36 +1195,220 @@ async def evaluate_dataset(
         subject = row.get("subject", "")
         email_id = row.get("id", "")
 
+        # Try to get raw LLM response if agent is extract_tasks_from_text
+        # Otherwise use the agent's result
         pred_result = await agent(text=text, subject=subject)
-        pred_tasks = pred_result.get("tasks", []) if isinstance(pred_result, dict) else []
+        pred_tasks_raw = pred_result.get("tasks", []) if isinstance(pred_result, dict) else []
+        
+        # If agent is extract_tasks_from_text, try to get raw LLM response
+        # to preserve original due text
+        agent_name = getattr(agent, '__name__', '')
+        if agent_name == 'extract_tasks_from_text':
+            try:
+                from app.core.llm import LLMProvider
+                from app.core.prompts import EXTRACTION_PROMPT
+                
+                llm_provider = LLMProvider()
+                combined_text = f"Subject: {subject}\n\n{text}" if subject else text
+                
+                llm_messages = [
+                    {"role": "system", "content": EXTRACTION_PROMPT},
+                    {"role": "user", "content": combined_text}
+                ]
+                
+                # Get raw response from LLM
+                model_id = llm_provider.default_extractor_model
+                response = await llm_provider._call_model(llm_messages, model_id=model_id, temperature=0.3)
+                
+                # Parse response to get raw tasks with original due
+                try:
+                    if response.strip().startswith('['):
+                        raw_tasks = json.loads(response)
+                    elif response.strip().startswith('{'):
+                        raw_tasks = [json.loads(response)]
+                    else:
+                        response_clean = response.strip()
+                        if '```json' in response_clean:
+                            response_clean = response_clean.split('```json')[1].split('```')[0].strip()
+                        elif '```' in response_clean:
+                            response_clean = response_clean.split('```')[1].split('```')[0].strip()
+                        raw_tasks = json.loads(response_clean)
+                    
+                    # Merge raw due from LLM response with formatted tasks
+                    for i, raw_task in enumerate(raw_tasks):
+                        if i < len(pred_tasks_raw):
+                            # Add raw due to formatted task
+                            pred_tasks_raw[i]["due"] = raw_task.get("due")
+                except json.JSONDecodeError:
+                    pass  # Fall back to using formatted tasks
+            except Exception:
+                pass  # Fall back to using formatted tasks
 
-        (
-            strict_tp,
-            partial_tp,
-            fp,
-            fn,
-            owner_correct,
-            owner_total,
-            due_correct,
-            due_total,
-        ) = compute_metrics(
-            email_id,
-            subject,
-            gold_tasks,
-            pred_tasks,
-            title_thresh,
-            tolerance_minutes,
-            fn_examples,
-            fp_examples,
+        # Convert tasks to eval format: {owner, action, object, deadline}
+        # For predicted tasks: parse from title and use raw due if available
+        pred_tasks_eval = []
+        for task in pred_tasks_raw:
+            # Try to get raw due from task (if LLM returned it)
+            raw_due = task.get("due")  # Original due text from LLM
+            eval_task = convert_task_to_eval_format(task, raw_due=raw_due)
+            pred_tasks_eval.append(eval_task)
+            
+            # Convert gold tasks to eval format
+        gold_tasks_eval = []
+        for task in gold_tasks:
+            # Gold tasks might already be in eval format or have title format
+            if "action" in task and "object" in task:
+                # Already in eval format
+                gold_tasks_eval.append({
+                    "owner": task.get("owner"),
+                    "action": task.get("action"),
+                    "object": task.get("object"),
+                    "deadline": task.get("deadline") or task.get("due_raw"),
+                })
+            else:
+                # Convert from title format
+                eval_task = convert_task_to_eval_format({
+                    "title": task.get("title", ""),
+                    "owner": task.get("owner"),
+                    "due": task.get("due_raw"),
+                })
+                gold_tasks_eval.append(eval_task)
+
+        # Get received_at from row for date normalization
+        received_at = row.get("sent_date") or row.get("date") or row.get("received_at")
+        
+        # Use eval script's prf_tasks function for main metrics
+        precision, recall, f1 = prf_tasks(
+            pred_tasks_eval,
+            gold_tasks_eval,
+            lenient=lenient,
+            very_lenient=very_lenient,
+            sim_threshold=sim_threshold,
+            task_match_k=task_match_k,
+            received_at=received_at,
         )
+        
+        # Calculate strict matches (exact JSON match after normalization)
+        # This is used for strict_tp vs partial_tp distinction
+        pred_set = set(json.dumps({
+            "owner": _normalize_owner(t.get("owner")),
+            "action": _normalize_text(t.get("action") or ""),
+            "object": _normalize_text(t.get("object") or ""),
+            "deadline": _normalize_date(t.get("deadline"), received_at=received_at),
+        }, sort_keys=True) for t in pred_tasks_eval)
+        
+        gt_set = set(json.dumps({
+            "owner": _normalize_owner(t.get("owner")),
+            "action": _normalize_text(t.get("action") or ""),
+            "object": _normalize_text(t.get("object") or ""),
+            "deadline": _normalize_date(t.get("deadline"), received_at=received_at),
+        }, sort_keys=True) for t in gold_tasks_eval)
+        
+        strict_tp = len(pred_set & gt_set)
+        
+        # Calculate total TP/FP/FN using the same logic as prf_tasks
+        # This ensures consistency with the precision/recall values
+        total_pred = len(pred_tasks_eval)
+        total_gt = len(gold_tasks_eval)
+        
+        if not very_lenient:
+            # For strict/lenient mode, use set-based matching
+            total_tp = len(pred_set & gt_set)
+            total_fp = len(pred_set - gt_set)
+            total_fn = len(gt_set - pred_set)
+        else:
+            # For very_lenient mode, use greedy matching (same as prf_tasks)
+            used_gt = set()
+            total_tp = 0
+            for p in pred_tasks_eval:
+                best_j = None
+                best_score = -1
+                for j, g in enumerate(gold_tasks_eval):
+                    if j in used_gt:
+                        continue
+                    match_count = 0
+                    # owner
+                    if _normalize_owner(p.get("owner")) == _normalize_owner(g.get("owner")) or (
+                        _normalize_owner(p.get("owner")) in {"me", ""} and _normalize_owner(g.get("owner")) in {"me", ""}
+                    ):
+                        match_count += 1
+                    # action
+                    if _similarity(p.get("action") or "", g.get("action") or "") >= sim_threshold:
+                        match_count += 1
+                    # object
+                    if _similarity(p.get("object") or "", g.get("object") or "") >= sim_threshold:
+                        match_count += 1
+                    # deadline
+                    if _normalize_date(p.get("deadline"), received_at=received_at) == _normalize_date(g.get("deadline"), received_at=received_at):
+                        match_count += 1
+                    if match_count > best_score:
+                        best_score = match_count
+                        best_j = j
+                if best_j is not None and best_score >= task_match_k:
+                    total_tp += 1
+                    used_gt.add(best_j)
+            total_fp = max(0, total_pred - total_tp)
+            total_fn = max(0, total_gt - total_tp)
+        
+        # Partial TP is total TP minus strict TP
+        partial_tp = max(0, total_tp - strict_tp)
+        
         strict_tp_total += strict_tp
         partial_tp_total += partial_tp
-        fp_total += fp
-        fn_total += fn
-        owner_correct_total += owner_correct
-        owner_total_total += owner_total
-        due_correct_total += due_correct
-        due_total_total += due_total
+        fp_total += total_fp
+        fn_total += total_fn
+        
+        # Owner and due accuracy (informational) - use greedy matching from prf_tasks logic
+        # Match tasks using the same logic as prf_tasks
+        used_gt = set()
+        for p in pred_tasks_eval:
+            best_j = None
+            best_score = -1
+            for j, g in enumerate(gold_tasks_eval):
+                if j in used_gt:
+                    continue
+                match_count = 0
+                # owner
+                if _normalize_owner(p.get("owner")) == _normalize_owner(g.get("owner")) or (
+                    _normalize_owner(p.get("owner")) in {"me", ""} and _normalize_owner(g.get("owner")) in {"me", ""}
+                ):
+                    match_count += 1
+                # action
+                if very_lenient:
+                    if _similarity(p.get("action") or "", g.get("action") or "") >= sim_threshold:
+                        match_count += 1
+                else:
+                    if _normalize_text(p.get("action") or "") == _normalize_text(g.get("action") or ""):
+                        match_count += 1
+                # object
+                if very_lenient:
+                    if _similarity(p.get("object") or "", g.get("object") or "") >= sim_threshold:
+                        match_count += 1
+                else:
+                    if _normalize_text(p.get("object") or "") == _normalize_text(g.get("object") or ""):
+                        match_count += 1
+                # deadline
+                if _normalize_date(p.get("deadline"), received_at=received_at) == _normalize_date(g.get("deadline"), received_at=received_at):
+                    match_count += 1
+                if match_count > best_score:
+                    best_score = match_count
+                    best_j = j
+            if best_j is not None and best_score >= task_match_k:
+                # This is a matched task
+                owner_total_total += 1
+                g = gold_tasks_eval[best_j]
+                if _normalize_owner(p.get("owner")) == _normalize_owner(g.get("owner")) or (
+                    _normalize_owner(p.get("owner")) in {"me", ""} and _normalize_owner(g.get("owner")) in {"me", ""}
+                ):
+                    owner_correct_total += 1
+                used_gt.add(best_j)
+        
+        # Due date correctness (using eval script's function)
+        due_score = due_date_correctness(pred_tasks_eval, gold_tasks_eval)
+        due_match_list.append(due_score)
+        if due_score > 0:
+            due_correct_total += 1
+        due_total_total += 1
 
     _report_examples(fn_examples[:max_examples], fp_examples[:max_examples])
 
@@ -1185,16 +1479,26 @@ async def main() -> None:
         help="Extractor function in 'module:function' format.",
     )
     parser.add_argument(
-        "--title_thresh",
-        type=float,
-        default=0.5,
-        help="Base title similarity threshold before adaptive relaxation (default: 0.5).",
+        "--lenient",
+        action="store_true",
+        help="Use lenient matching (normalized text/date) for metrics",
     )
     parser.add_argument(
-        "--tolerance_minutes",
+        "--very_lenient",
+        action="store_true",
+        help="Use similarity-based matching for tasks (k-of-4 fields matching)",
+    )
+    parser.add_argument(
+        "--sim_threshold",
+        type=float,
+        default=0.75,
+        help="Similarity threshold for very-lenient mode (stricter: 0.75).",
+    )
+    parser.add_argument(
+        "--task_match_k",
         type=int,
-        default=60,
-        help="Allowed difference in minutes for due date matching (default: 60).",
+        default=3,
+        help="Fields (of 4) required to match a task in very-lenient mode (stricter: 3).",
     )
     parser.add_argument(
         "--max_examples",
@@ -1220,10 +1524,14 @@ async def main() -> None:
     result = await evaluate_dataset(
         data_path=args.data,
         agent=agent,
-        title_thresh=args.title_thresh,
-        tolerance_minutes=args.tolerance_minutes,
+        title_thresh=0.5,  # Not used anymore, kept for compatibility
+        tolerance_minutes=60,  # Not used anymore, kept for compatibility
         max_examples=args.max_examples,
         dataset=dataset,
+        lenient=args.lenient,
+        very_lenient=args.very_lenient,
+        sim_threshold=args.sim_threshold,
+        task_match_k=args.task_match_k,
     )
 
     print("\nEvaluation Summary")

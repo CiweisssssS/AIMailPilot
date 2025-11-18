@@ -4,7 +4,7 @@ import json
 import time
 from statistics import mean, median
 
-from .pipeline import load_dataset
+from .pipeline import load_dataset, postprocess_summary
 from .models.registry import get_model_client
 from .run_pipeline import slot_acc
 from .metrics.summarizer import rouge_l_like, fact_prf, format_compliance
@@ -35,6 +35,7 @@ def main():
     fact_r_list = []
     fact_f1_list = []
     latency = []
+    processed_summaries = []  # Store processed summaries for error reporting
 
     for s in samples:
         prompt_text = f"Received at (UTC): {s.received_at}\n\nEmail:\n{s.body_text}"
@@ -43,6 +44,10 @@ def main():
         latency.append((time.time() - start) * 1000.0)
         ok = isinstance(summary_json, dict)
         json_ok.append(1.0 if ok else 0.0)
+        # Apply same postprocessing as pipeline to ensure consistency
+        if ok:
+            summary_json = postprocess_summary(summary_json, s)
+        processed_summaries.append(summary_json if ok else {})
         gt_sum = (s.ground_truth or {}).get("summary", {})
         sa = slot_acc(
             summary_json if ok else {},
@@ -50,6 +55,7 @@ def main():
             lenient=args.lenient,
             very_lenient=args.very_lenient,
             sim_threshold=args.sim_threshold,
+            received_at=s.received_at,
         )
         slot_actor.append(sa["actor"])
         slot_action.append(sa["action"])
@@ -112,8 +118,9 @@ def main():
 
     err_path = args.output.replace(".csv", ".errors.jsonl")
     with open(err_path, "w", encoding="utf-8") as ef:
-        for row, s in zip(rows, samples):
+        for row, s, pred_sum in zip(rows, samples, processed_summaries):
             if row["slot_actor"] < 1.0 or row["slot_action"] < 1.0 or row["slot_object"] < 1.0 or row["slot_deadline"] < 1.0:
+                gt_sum = (s.ground_truth or {}).get("summary", {})
                 ef.write(json.dumps({
                     "id": s.id,
                     "summary_slots": {
@@ -121,7 +128,9 @@ def main():
                         "action": row["slot_action"],
                         "object": row["slot_object"],
                         "deadline": row["slot_deadline"],
-                    }
+                    },
+                    "pred_summary": pred_sum,
+                    "gt_summary": gt_sum,
                 }, ensure_ascii=False) + "\n")
 
 

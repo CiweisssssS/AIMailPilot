@@ -4,7 +4,7 @@ import json
 import time
 from statistics import mean, median
 
-from .pipeline import load_dataset
+from .pipeline import load_dataset, postprocess_summary
 from .models.registry import get_model_client
 from .run_pipeline import slot_acc
 from .metrics.summarizer import rouge_l_like, fact_prf, format_compliance
@@ -43,6 +43,9 @@ def main():
         latency.append((time.time() - start) * 1000.0)
         ok = isinstance(summary_json, dict)
         json_ok.append(1.0 if ok else 0.0)
+        # Apply same postprocessing as pipeline to ensure consistency
+        if ok:
+            summary_json = postprocess_summary(summary_json, s)
         gt_sum = (s.ground_truth or {}).get("summary", {})
         sa = slot_acc(
             summary_json if ok else {},
@@ -50,6 +53,7 @@ def main():
             lenient=args.lenient,
             very_lenient=args.very_lenient,
             sim_threshold=args.sim_threshold,
+            received_at=s.received_at,
         )
         slot_actor.append(sa["actor"])
         slot_action.append(sa["action"])

@@ -269,7 +269,7 @@ async def summarize_text(request: SummarizeRequest):
 
 @router.post("/api/extract-tasks", response_model=ExtractTasksResponse)
 async def extract_tasks_from_text(request: ExtractTasksRequest):
-    """Extract tasks using GPT-4o-mini with rule-based fallback"""
+    """Extract tasks using GPT-4o-mini (default and fallback for complex time)"""
     try:
         subject = getattr(request, 'subject', '')
         tasks = await extract_tasks([{

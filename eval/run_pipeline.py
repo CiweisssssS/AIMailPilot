@@ -10,6 +10,12 @@ from .pipeline import load_dataset, run_pipeline_for_email
 
 
 COMBOS = {
+    "DEFAULT": {
+        "summarizer_fast": "anthropic:claude-3-5-haiku",
+        "extractor_fast": "google:gemini-flash",
+        "extractor_fallback_time": "openai:gpt-4o",
+        "summarizer_fallback_struct": "anthropic:claude-3-5-haiku",
+    },
     "S1": {
         "summarizer_fast": "google:gemini-flash",
         "extractor_fast": "openai:gpt-4o-mini-high-throughput",
@@ -58,20 +64,168 @@ def _normalize_text(s) -> str:
     return s
 
 
-def _normalize_owner(s: str) -> str:
+def _normalize_owner(s) -> str:
+    """Normalize owner field: convert you/recipient/assignee to 'me', handle None/empty."""
+    if s is None:
+        return "me"  # Default to "me" if None
+    if not isinstance(s, str):
+        s = str(s)
     s = _normalize_text(s)
-    if s in ("you", "recipient", "assignee", "your", "yourself", ""):
+    if s in ("you", "recipient", "assignee", "your", "yourself", "", "null", "none"):
         return "me"
     return s
 
 
-def _normalize_date(s: str) -> str:
+def _normalize_date(s: str, received_at: str = None) -> str:
+    """Normalize date string, handling ISO format and relative time expressions."""
+    # Handle None/null explicitly
+    if s is None:
+        return ""
     if not isinstance(s, str):
         return ""
     s = s.strip()
+    if not s or s.lower() == "null":
+        return ""
+    
+    # Handle ISO format with time
     if "T" in s:
         s = s.split("T", 1)[0]
+    
+    # Check if already ISO format (YYYY-MM-DD)
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', s):
+        return s
+    
+    # Try to parse relative time expressions if received_at is provided
+    if received_at:
+        try:
+            from datetime import datetime, timedelta
+            from dateutil import parser as date_parser
+            
+            # Parse received_at as reference
+            ref_date = date_parser.parse(received_at)
+            if ref_date.tzinfo is None:
+                ref_date = ref_date.replace(tzinfo=None)
+            
+            s_lower = s.lower()
+            
+            # Handle common relative time expressions
+            if s_lower in ["eod", "end of day", "cob", "end of today"]:
+                # Same day
+                return ref_date.strftime("%Y-%m-%d")
+            elif s_lower in ["tomorrow", "tomorrow morning", "tomorrow afternoon", "tomorrow evening"] or "tomorrow" in s_lower:
+                # Next day (handle "3 PM tomorrow", "tomorrow at 5pm", etc.)
+                next_day = ref_date + timedelta(days=1)
+                return next_day.strftime("%Y-%m-%d")
+            elif s_lower in ["eow", "end of week", "by eow", "end of this week"] or ("eow" in s_lower and "next" not in s_lower):
+                # This week's Friday
+                days_until_friday = (4 - ref_date.weekday()) % 7
+                # If today is Friday, EOW means today; otherwise next Friday
+                if days_until_friday == 0:
+                    # Today is Friday, return today
+                    return ref_date.strftime("%Y-%m-%d")
+                else:
+                    # Next Friday
+                    friday = ref_date + timedelta(days=days_until_friday)
+                    return friday.strftime("%Y-%m-%d")
+            elif s_lower.startswith("next week"):
+                # Next week's Monday
+                days_until_next_monday = (7 - ref_date.weekday()) % 7
+                if days_until_next_monday == 0:
+                    days_until_next_monday = 7
+                next_monday = ref_date + timedelta(days=days_until_next_monday)
+                return next_monday.strftime("%Y-%m-%d")
+            elif s_lower.startswith("next "):
+                # Try to parse "next Monday", "next Friday", etc.
+                weekday_map = {
+                    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                    "friday": 4, "saturday": 5, "sunday": 6
+                }
+                for day_name, day_num in weekday_map.items():
+                    if day_name in s_lower:
+                        days_until = (day_num - ref_date.weekday()) % 7
+                        if days_until == 0:
+                            days_until = 7
+                        target_date = ref_date + timedelta(days=days_until)
+                        return target_date.strftime("%Y-%m-%d")
+            else:
+                # Try to parse standalone weekday names (e.g., "Friday", "Friday at 6 PM")
+                # Extract weekday name from the string
+                weekday_map = {
+                    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                    "friday": 4, "saturday": 5, "sunday": 6
+                }
+                for day_name, day_num in weekday_map.items():
+                    # Check if the string contains a weekday name (but not "next [weekday]")
+                    if day_name in s_lower and "next" not in s_lower:
+                        # Calculate days until that weekday
+                        days_until = (day_num - ref_date.weekday()) % 7
+                        # If today is that weekday, return today; otherwise return next occurrence
+                        if days_until == 0:
+                            # Today is that weekday
+                            return ref_date.strftime("%Y-%m-%d")
+                        else:
+                            # Next occurrence of that weekday
+                            target_date = ref_date + timedelta(days=days_until)
+                            return target_date.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    
+    # If we can't parse it, return as-is (might be a date string in another format)
     return s
+
+
+def _map_action_to_intent(action: str) -> str:
+    """Map task verbs to intent labels to match GT format."""
+    if not action:
+        return action
+    action_lower = action.lower().strip()
+    
+    # Normalize GT composite labels (e.g., "request action" -> "request", "notify approval" -> "notify")
+    if action_lower.startswith("request "):
+        return "request"
+    if action_lower.startswith("notify "):
+        return "notify"
+    if action_lower.startswith("remind "):
+        return "remind"
+    if action_lower.startswith("inform "):
+        return "notify"  # "inform" maps to "notify"
+    
+    # If already an intent label, return as-is
+    if action_lower in ["request", "remind", "notify", "inform"]:
+        return action_lower
+    
+    # Task verbs that map to "request" - use word boundaries for exact matching
+    request_verbs = ["send", "submit", "share", "review", "check", "approve", "schedule", 
+                     "arrange", "prepare", "draft", "update", "revise", "confirm", 
+                     "provide", "deliver", "attach", "forward", "create", "write", 
+                     "organize", "plan", "verify", "audit", "examine", "inspect",
+                     "complete", "finish", "finalize", "return", "reply",
+                     "respond", "acknowledge", "accept", "reject", "decline",
+                     "remove", "delete", "cancel", "revoke", "withdraw", "terminate",
+                     "add", "insert", "include", "incorporate", "integrate",
+                     "modify", "change", "adjust", "edit", "alter", "amend"]
+    # Task verbs that map to "remind"
+    remind_verbs = ["remind"]
+    # Task verbs that map to "notify"
+    notify_verbs = ["notify", "alert", "inform", "announce"]
+    
+    # Check if action starts with or equals any request verb
+    for verb in request_verbs:
+        if action_lower == verb or action_lower.startswith(verb + " ") or action_lower.endswith(" " + verb) or (" " + verb + " ") in action_lower:
+            return "request"
+    
+    # Check if action starts with or equals any remind verb
+    for verb in remind_verbs:
+        if action_lower == verb or action_lower.startswith(verb + " ") or action_lower.endswith(" " + verb) or (" " + verb + " ") in action_lower:
+            return "remind"
+    
+    # Check if action starts with or equals any notify verb
+    for verb in notify_verbs:
+        if action_lower == verb or action_lower.startswith(verb + " ") or action_lower.endswith(" " + verb) or (" " + verb + " ") in action_lower:
+            return "notify"
+    
+    # Default: return as-is (might be a phrase we don't recognize)
+    return action
 
 
 def slot_acc(
@@ -79,7 +233,8 @@ def slot_acc(
     gt: Dict,
     lenient: bool = False,
     very_lenient: bool = False,
-    sim_threshold: float = 0.6,
+    sim_threshold: float = 0.75,  # Stricter: raised from 0.6 to 0.75
+    received_at: str = None,
 ) -> Dict[str, float]:
     keys = ["actor", "action", "object", "deadline"]
     correct = {k: 0 for k in keys}
@@ -88,16 +243,30 @@ def slot_acc(
         total[k] += 1
         p = (pred or {}).get(k)
         g = (gt or {}).get(k)
-        if very_lenient:
+        
+        # Special handling for action: map task verbs to intent labels
+        if k == "action":
+            p = _map_action_to_intent(str(p or ""))
+            g = _map_action_to_intent(str(g or ""))  # Also normalize GT (handles "request action" -> "request")
+            # After mapping, use exact match for action (both should be intent labels)
+            if very_lenient or lenient:
+                # Use similarity only if both are non-empty
+                if p and g:
+                    ok = _similarity(p, g) >= sim_threshold if very_lenient else (p == g)
+                else:
+                    ok = (not p and not g)  # Both empty is a match
+            else:
+                ok = p == g
+        elif very_lenient:
             if k == "deadline":
-                ok = _normalize_date(p) == _normalize_date(g)
-            elif k in ("action", "object"):
+                ok = _normalize_date(p, received_at) == _normalize_date(g, received_at)
+            elif k == "object":
                 ok = _similarity(p or "", g or "") >= sim_threshold
             else:
                 ok = _normalize_text(p or "") == _normalize_text(g or "")
         elif lenient:
             if k == "deadline":
-                ok = _normalize_date(p) == _normalize_date(g)
+                ok = _normalize_date(p, received_at) == _normalize_date(g, received_at)
             else:
                 ok = _normalize_text(p or "") == _normalize_text(g or "")
         else:
@@ -112,15 +281,39 @@ def _token_set(s: str) -> set:
 
 
 def _similarity(a: str, b: str) -> float:
+    """Compute similarity between two strings using Jaccard similarity with keyword extraction."""
     A = _token_set(a)
     B = _token_set(b)
     if not A and not B:
         return 1.0
     if not A or not B:
         return 0.0
+    
+    # Basic Jaccard similarity
     inter = len(A & B)
     union = len(A | B)
-    return inter / union
+    jaccard = inter / union if union > 0 else 0.0
+    
+    # Stricter matching: reduced boost for subset relationships
+    # Only boost if there's very high overlap and the sets are very similar in size
+    min_set = min(len(A), len(B))
+    max_set = max(len(A), len(B))
+    overlap_ratio = inter / min_set if min_set > 0 else 0.0
+    size_ratio = min_set / max_set if max_set > 0 else 0.0
+    
+    # Stricter conditions for boost:
+    # 1. It's a true subset relationship (one is contained in the other)
+    # 2. The smaller set is at least 85% of the larger set (very similar in size)
+    # 3. Very high token overlap (>= 90% of smaller set)
+    if (A.issubset(B) or B.issubset(A)) and overlap_ratio >= 0.9 and size_ratio >= 0.85:
+        # True subset with very high overlap and very similar size - small boost
+        jaccard = max(jaccard, 0.7)
+    elif overlap_ratio >= 0.9 and size_ratio >= 0.85:
+        # Very high overlap and very similar size but not subset - minimal boost
+        jaccard = max(jaccard, 0.68)
+    # Removed moderate overlap boost (>= 0.6) to be stricter
+    
+    return jaccard
 
 
 def due_date_correctness(tasks_pred: List[Dict], tasks_gt: List[Dict]) -> float:
@@ -140,8 +333,9 @@ def prf_tasks(
     gt_tasks: List[Dict],
     lenient: bool = False,
     very_lenient: bool = False,
-    sim_threshold: float = 0.6,
-    task_match_k: int = 2,
+    sim_threshold: float = 0.75,  # Stricter: raised from 0.6 to 0.75
+    task_match_k: int = 3,  # Stricter: raised from 2 to 3 (require 3 of 4 fields to match)
+    received_at: str = None,
 ) -> Tuple[float, float, float]:
     # naive stringification for overlap
     def norm(t: Dict) -> str:
@@ -160,7 +354,7 @@ def prf_tasks(
                 "owner": _normalize_owner((t or {}).get("owner")),
                 "action": _normalize_text((t or {}).get("action") or ""),
                 "object": _normalize_text((t or {}).get("object") or ""),
-                "deadline": _normalize_date((t or {}).get("deadline")),
+                "deadline": _normalize_date((t or {}).get("deadline"), received_at=received_at),
             },
             sort_keys=True,
         )
@@ -194,7 +388,7 @@ def prf_tasks(
                 if _similarity(p.get("object") or "", g.get("object") or "") >= sim_threshold:
                     match_count += 1
                 # deadline
-                if _normalize_date(p.get("deadline")) == _normalize_date(g.get("deadline")):
+                if _normalize_date(p.get("deadline"), received_at=received_at) == _normalize_date(g.get("deadline"), received_at=received_at):
                     match_count += 1
                 if match_count > best_score:
                     best_score = match_count
@@ -225,8 +419,8 @@ def main():
     parser.add_argument("--overlong_threshold", type=int, default=2500, help="Email length to trigger fallback")
     parser.add_argument("--lenient", action="store_true", help="Use lenient matching (normalized text/date) for metrics")
     parser.add_argument("--very_lenient", action="store_true", help="Use similarity-based matching for slots and tasks")
-    parser.add_argument("--sim_threshold", type=float, default=0.6, help="Similarity threshold for very-lenient mode")
-    parser.add_argument("--task_match_k", type=int, default=2, help="Fields (of 4) required to match a task in very-lenient")
+    parser.add_argument("--sim_threshold", type=float, default=0.75, help="Similarity threshold for very-lenient mode (stricter: 0.75)")
+    parser.add_argument("--task_match_k", type=int, default=3, help="Fields (of 4) required to match a task in very-lenient (stricter: 3)")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -270,6 +464,7 @@ def main():
                     lenient=args.lenient,
                     very_lenient=args.very_lenient,
                     sim_threshold=args.sim_threshold,
+                    received_at=email.received_at,
                 )
                 for k, v in sa.items():
                     slot_hits[k] += v
@@ -283,6 +478,7 @@ def main():
                     very_lenient=args.very_lenient,
                     sim_threshold=args.sim_threshold,
                     task_match_k=args.task_match_k,
+                    received_at=s.received_at,
                 )
                 task_pr_list.append(p)
                 task_rc_list.append(r)

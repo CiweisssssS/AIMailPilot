@@ -1,0 +1,9 @@
+{
+  "model": "app.services.extractor:extract_tasks_from_text",
+  "task_precision": 0.5166666666666667,
+  "task_recall": 0.55,
+  "task_f1": 0.52,
+  "due_date_correctness": 0.15,
+  "owner_match": 0.0,
+  "json_parse_rate": 1.0
+}

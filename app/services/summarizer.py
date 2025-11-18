@@ -1,10 +1,12 @@
 """
-Summarizer Service - Generate summaries using GPT-4o-mini
+Summarizer Service - Generate summaries using Claude 3.5 Haiku (default)
 """
 
 import json
 import re
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+from dateutil import parser as date_parser
 from app.core.llm import llm_provider
 from app.core.config import settings
 from app.core.prompts import get_summary_system_prompt, SUMMARY_FEW_SHOT_EXAMPLES
@@ -80,15 +82,98 @@ def enforce_sender_prefix(summary: str, sender_name: str) -> str:
     return f"{sender_name} {summary[0].lower()}{summary[1:]}"
 
 
-async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_length: int = 80) -> Dict[str, Any]:
+def _normalize_deadline(deadline: Any, received_at: str = None) -> Optional[str]:
     """
-    Summarize text using GPT-4o-mini with strict word-based control
+    Normalize deadline to ISO format (YYYY-MM-DD) or null.
+    
+    Args:
+        deadline: Raw deadline value from LLM (could be string, null, or relative time)
+        received_at: Email received timestamp (ISO format) for relative time calculation
+    
+    Returns:
+        Normalized deadline in ISO format (YYYY-MM-DD) or None
+    """
+    if deadline is None or deadline == "" or str(deadline).lower().strip() in ("null", "none", ""):
+        return None
+    
+    deadline_str = str(deadline).strip()
+    
+    # If already in ISO format (YYYY-MM-DD), return as-is
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_str):
+        return deadline_str
+    
+    # If contains time (YYYY-MM-DDTHH:MM:SS), extract date part
+    if "T" in deadline_str:
+        deadline_str = deadline_str.split("T", 1)[0]
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_str):
+            return deadline_str
+    
+    # Try to parse relative time expressions if received_at is provided
+    if received_at:
+        try:
+            # Parse received_at as reference
+            ref_date = date_parser.parse(received_at)
+            if ref_date.tzinfo:
+                ref_date = ref_date.replace(tzinfo=None)
+            
+            deadline_lower = deadline_str.lower()
+            
+            # Handle common relative time expressions
+            if deadline_lower in ["eod", "end of day", "cob", "end of today"]:
+                return ref_date.strftime("%Y-%m-%d")
+            elif deadline_lower in ["tomorrow", "tomorrow morning", "tomorrow afternoon", "tomorrow evening"] or "tomorrow" in deadline_lower:
+                next_day = ref_date + timedelta(days=1)
+                return next_day.strftime("%Y-%m-%d")
+            elif deadline_lower in ["eow", "end of week", "by eow", "end of this week"] or ("eow" in deadline_lower and "next" not in deadline_lower):
+                # This week's Friday
+                days_until_friday = (4 - ref_date.weekday()) % 7
+                if days_until_friday == 0:
+                    return ref_date.strftime("%Y-%m-%d")
+                else:
+                    friday = ref_date + timedelta(days=days_until_friday)
+                    return friday.strftime("%Y-%m-%d")
+            elif deadline_lower.startswith("next week"):
+                days_until_next_monday = (7 - ref_date.weekday()) % 7
+                if days_until_next_monday == 0:
+                    days_until_next_monday = 7
+                next_monday = ref_date + timedelta(days=days_until_next_monday)
+                return next_monday.strftime("%Y-%m-%d")
+            elif deadline_lower.startswith("next "):
+                weekday_map = {
+                    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                    "friday": 4, "saturday": 5, "sunday": 6
+                }
+                for day_name, day_num in weekday_map.items():
+                    if day_name in deadline_lower:
+                        days_until = (day_num - ref_date.weekday()) % 7
+                        if days_until == 0:
+                            days_until = 7
+                        target_date = ref_date + timedelta(days=days_until)
+                        return target_date.strftime("%Y-%m-%d")
+        except Exception as e:
+            logger.warning(f"Failed to parse relative deadline '{deadline_str}' with received_at '{received_at}': {e}")
+    
+    # If we can't parse it, try to extract date from the string
+    # Look for YYYY-MM-DD pattern
+    date_match = re.search(r'\d{4}-\d{2}-\d{2}', deadline_str)
+    if date_match:
+        return date_match.group(0)
+    
+    # If still can't parse, return None (invalid deadline)
+    logger.warning(f"Could not normalize deadline: '{deadline_str}'")
+    return None
+
+
+async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_length: int = 80, received_at: str = None) -> Dict[str, Any]:
+    """
+    Summarize text using Claude 3.5 Haiku with strict word-based control
     
     Args:
         subject: Email subject line
         text: Cleaned email text (signatures/quotes removed)
         sender: Email sender (for extracting actor name)
         max_length: Deprecated - using SUMMARY_MAX_WORDS from env
+        received_at: Email received timestamp (ISO format) for deadline calculation
     
     Returns:
         { "summary": str, "confidence": float }
@@ -114,7 +199,8 @@ async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_l
             subject=subject,
             sender_name=sender_name,
             body=email_body,
-            max_words=max_words
+            max_words=max_words,
+            received_at=received_at
         )
         
         if summary and len(summary.strip()) > 5:
@@ -126,7 +212,7 @@ async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_l
                 "confidence": 0.95
             }
     except Exception as e:
-        logger.error(f"GPT-4o-mini summarization failed: {e}")
+        logger.error(f"Summarization failed: {e}")
     
     # Fallback: return subject or truncated text
     fallback_summary = subject if subject else email_body[:200]
@@ -136,7 +222,7 @@ async def summarize_text(subject: str, text: str, sender: str = "Unknown", max_l
     }
 
 
-async def _generate_summary_with_retry(subject: str, sender_name: str, body: str, max_words: int, retry_count: int = 0) -> str:
+async def _generate_summary_with_retry(subject: str, sender_name: str, body: str, max_words: int, retry_count: int = 0, received_at: str = None) -> str:
     """
     Generate summary with retry logic for word limit and action verb validation
     
@@ -146,15 +232,17 @@ async def _generate_summary_with_retry(subject: str, sender_name: str, body: str
         body: Email body
         max_words: Maximum word count
         retry_count: Current retry attempt (max 1)
+        received_at: Email received timestamp (ISO format) for deadline calculation
     
     Returns:
         Summary string
     """
     system_prompt = get_summary_system_prompt(max_words)
     
-    # Build user message
+    # Build user message with received_at for deadline calculation
+    received_at_str = f"\nReceived at (UTC): {received_at}" if received_at else ""
     user_message = f"""Subject: {subject}
-From: {sender_name}
+From: {sender_name}{received_at_str}
 Body (trimmed): {body}
 
 Return JSON only with keys: summary, actor, action, object, deadline."""
@@ -187,7 +275,10 @@ Return JSON only with keys: summary, actor, action, object, deadline."""
         actor = (response_data.get("actor") or sender_name).strip()
         action = (response_data.get("action") or "").strip()
         obj = (response_data.get("object") or "").strip()
-        deadline = response_data.get("deadline")
+        deadline_raw = response_data.get("deadline")
+        
+        # Normalize deadline: convert to ISO format (YYYY-MM-DD) or null
+        deadline = _normalize_deadline(deadline_raw, received_at)
 
         if not summary:
             summary = build_summary(sender_name, actor, action, obj, deadline)
@@ -233,7 +324,9 @@ Return JSON only with keys: summary, actor, action, object, deadline."""
             actor = (retry_data.get("actor") or actor).strip()
             action = (retry_data.get("action") or action).strip()
             obj = (retry_data.get("object") or obj).strip()
-            deadline = retry_data.get("deadline") or deadline
+            # Use retry deadline if available, otherwise keep original
+            deadline_raw = retry_data.get("deadline") if retry_data.get("deadline") is not None else deadline_raw
+            deadline = _normalize_deadline(deadline_raw, received_at)
 
             if not summary:
                 summary = build_summary(sender_name, actor, action, obj, deadline)
@@ -291,7 +384,7 @@ Return JSON only with keys: summary, actor, action, object, deadline."""
 
 async def summarize_thread(messages: List[Dict[str, Any]]) -> str:
     """
-    Summarize a thread of messages using GPT-4o-mini
+    Summarize a thread of messages using Claude 3.5 Haiku
     
     Args:
         messages: List of message dicts with 'subject', 'body', 'clean_body'
@@ -309,7 +402,8 @@ async def summarize_thread(messages: List[Dict[str, Any]]) -> str:
             result = await summarize_text(
                 subject=msg.get('subject', ''),
                 text=msg.get('clean_body', msg.get('body', '')),
-                sender=msg.get('from_', 'Unknown')
+                sender=msg.get('from_', 'Unknown'),
+                received_at=msg.get('date', None)  # Pass email date for deadline calculation
             )
             return result['summary']
         

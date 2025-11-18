@@ -1,0 +1,15 @@
+{
+  "model": "app.services.summarizer:summarize_text",
+  "slot_actor_acc": 0.8,
+  "slot_action_acc": 0.9,
+  "slot_object_acc": 0.6,
+  "slot_deadline_acc": 0.65,
+  "json_parse_rate": 1.0,
+  "format_compliance": 1.0,
+  "rouge_like": 0.6686308196447516,
+  "fact_precision": 0.8696854941035975,
+  "fact_recall": 0.8837918264531168,
+  "fact_f1": 0.8732815387688193,
+  "latency_avg_ms": 1916.9365644454956,
+  "latency_med_ms": 1738.9048337936401
+}

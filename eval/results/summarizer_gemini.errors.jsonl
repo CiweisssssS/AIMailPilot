@@ -1,20 +1,9 @@
-{"id": "email_001", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 1.0, "deadline": 1.0}}
-{"id": "email_002", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_003", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 1.0, "deadline": 0.0}}
-{"id": "email_004", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_005", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_006", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 0.0}}
-{"id": "email_007", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_008", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_009", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 0.0}}
-{"id": "email_010", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_011", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_012", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_013", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 1.0, "deadline": 1.0}}
-{"id": "email_014", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 1.0, "deadline": 0.0}}
-{"id": "email_015", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_016", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_017", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
-{"id": "email_018", "summary_slots": {"actor": 0.0, "action": 1.0, "object": 1.0, "deadline": 1.0}}
-{"id": "email_019", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 1.0, "deadline": 1.0}}
-{"id": "email_020", "summary_slots": {"actor": 0.0, "action": 0.0, "object": 0.0, "deadline": 1.0}}
+{"id": "email_003", "summary_slots": {"actor": 1.0, "action": 1.0, "object": 1.0, "deadline": 0.0}, "pred_summary": {"actor": "John", "action": "send", "object": "Leadership meeting slide deck", "deadline": "2025-11-19", "notes": "Ensure metrics and KPI charts are accurate."}, "gt_summary": {"actor": "John", "action": "request", "object": "slide deck review", "deadline": "2025-11-12", "notes": "Verify KPI charts accuracy"}}
+{"id": "email_005", "summary_slots": {"actor": 1.0, "action": 0.0, "object": 0.0, "deadline": 1.0}, "pred_summary": {"actor": "Pm", "action": "prepare", "object": "Daily standup materials", "deadline": "2025-11-11", "notes": "Reminder for daily standup; include completed, blocked, and next steps."}, "gt_summary": {"actor": "PM", "action": "remind", "object": "status update", "deadline": "2025-11-11", "notes": "Update Jira ticket"}}
+{"id": "email_006", "summary_slots": {"actor": 1.0, "action": 1.0, "object": 1.0, "deadline": 0.0}, "pred_summary": {"actor": "Ops", "action": "send", "object": "Server logs (past 24 hours)", "deadline": null, "notes": "Required for incident review and security analysis."}, "gt_summary": {"actor": "Ops", "action": "request", "object": "server logs", "deadline": "2025-11-10", "notes": "Security analysis pending"}}
+{"id": "email_009", "summary_slots": {"actor": 0.0, "action": 1.0, "object": 1.0, "deadline": 0.0}, "pred_summary": {"actor": "Data", "action": "remove", "object": "Unused columns from analytics pipeline", "deadline": "2025-11-16", "notes": "Quarterly cleanup to avoid schema drift"}, "gt_summary": {"actor": "Data Team", "action": "request", "object": "pipeline cleanup", "deadline": "2025-11-14", "notes": ""}}
+{"id": "email_010", "summary_slots": {"actor": 1.0, "action": 1.0, "object": 1.0, "deadline": 0.0}, "pred_summary": {"actor": "Finance", "action": "send", "object": "Travel receipts and hotel invoice", "deadline": "2025-11-16", "notes": "Required for last month's reimbursement processing"}, "gt_summary": {"actor": "Finance", "action": "request", "object": "travel receipts", "deadline": "2025-11-17", "notes": "Attach hotel invoice"}}
+{"id": "email_012", "summary_slots": {"actor": 1.0, "action": 0.0, "object": 1.0, "deadline": 1.0}, "pred_summary": {"actor": "It Ops", "action": "prepare", "object": "Sev-1 server outage", "deadline": "2025-11-16", "notes": "Escalate and start troubleshooting immediately due to critical Sev-1 outage."}, "gt_summary": {"actor": "IT Ops", "action": "notify", "object": "Sev-1 server outage", "deadline": "2025-11-16T11:00:00Z", "notes": "Requires immediate escalation and troubleshooting"}}
+{"id": "email_014", "summary_slots": {"actor": 1.0, "action": 0.0, "object": 1.0, "deadline": 0.0}, "pred_summary": {"actor": "Coordinator", "action": "confirm", "object": "Optional Team Building Lunch", "deadline": "2025-11-21", "notes": "No RSVP required"}, "gt_summary": {"actor": "Coordinator", "action": "inform", "object": "Team Building Lunch", "deadline": null, "notes": "Optional event this Friday at 12:30 PM"}}
+{"id": "email_018", "summary_slots": {"actor": 1.0, "action": 0.0, "object": 1.0, "deadline": 1.0}, "pred_summary": {"actor": "Hr System", "action": "approve", "object": "Vacation request", "deadline": null, "notes": "For Dec 15th to Dec 22nd"}, "gt_summary": {"actor": "HR System", "action": "notify approval", "object": "vacation request", "deadline": null, "notes": "No further action needed"}}
+{"id": "email_020", "summary_slots": {"actor": 1.0, "action": 0.0, "object": 0.0, "deadline": 1.0}, "pred_summary": {"actor": "Newsletter", "action": "update", "object": "Latest edition on AI in the workplace", "deadline": null, "notes": "Informational newsletter"}, "gt_summary": {"actor": "Newsletter", "action": "inform", "object": "weekly industry trends", "deadline": null, "notes": "Promotional/informational content"}}

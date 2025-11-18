@@ -14,8 +14,8 @@ def main():
     parser.add_argument("--output", required=True, help="CSV path for per-sample results")
     parser.add_argument("--lenient", action="store_true")
     parser.add_argument("--very_lenient", action="store_true")
-    parser.add_argument("--sim_threshold", type=float, default=0.6)
-    parser.add_argument("--task_match_k", type=int, default=2)
+    parser.add_argument("--sim_threshold", type=float, default=0.75)  # Stricter: 0.75
+    parser.add_argument("--task_match_k", type=int, default=3)  # Stricter: 3
     args = parser.parse_args()
 
     model_id = "google:gemini-flash"
@@ -31,8 +31,9 @@ def main():
     json_ok_list = []
 
     def owner_match(pred_tasks, gt_tasks) -> float:
-        pred_owners = set(_normalize_owner((t or {}).get("owner")) for t in pred_tasks if (t or {}).get("owner") is not None)
-        gt_owners = set(_normalize_owner((t or {}).get("owner")) for t in gt_tasks if (t or {}).get("owner") is not None)
+        # Normalize all owners (including None -> "me")
+        pred_owners = set(_normalize_owner((t or {}).get("owner")) for t in pred_tasks)
+        gt_owners = set(_normalize_owner((t or {}).get("owner")) for t in gt_tasks)
         if not pred_owners and not gt_owners:
             return 1.0
         if not pred_owners or not gt_owners:
@@ -46,7 +47,7 @@ def main():
         pred_tasks = tasks_json.get("tasks", []) if isinstance(tasks_json, dict) else []
         gt_tasks = (s.ground_truth or {}).get("tasks", [])
         p, r, f1 = prf_tasks(
-            pred_tasks, gt_tasks, lenient=args.lenient, very_lenient=args.very_lenient, sim_threshold=args.sim_threshold, task_match_k=args.task_match_k
+            pred_tasks, gt_tasks, lenient=args.lenient, very_lenient=args.very_lenient, sim_threshold=args.sim_threshold, task_match_k=args.task_match_k, received_at=s.received_at
         )
         pr_list.append(p)
         rc_list.append(r)

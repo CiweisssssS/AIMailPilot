@@ -1,9 +1,9 @@
 {
   "model": "google:gemini-flash",
-  "task_precision": 0.7166666666666667,
-  "task_recall": 0.75,
-  "task_f1": 0.73,
+  "task_precision": 0.7833333333333333,
+  "task_recall": 0.825,
+  "task_f1": 0.79,
   "due_date_correctness": 0.75,
-  "owner_match": 0.8,
+  "owner_match": 0.85,
   "json_parse_rate": 1.0
 }

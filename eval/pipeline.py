@@ -68,37 +68,106 @@ def _extract_sender_name(from_addr: str) -> str:
 
 
 def _normalize_action(current_action: str, email_text: str) -> str:
-    # Map common patterns to canonical verb phrases
-    mapping = [
-        ("approve", ["approve", "approval", "sign off", "signoff", "sign-off", "ok it"]),
-        ("send", ["send", "submit", "share", "forward", "provide", "deliver", "attach"]),
-        ("review", ["review", "check", "look over", "double-check", "verify", "audit", "go through"]),
-        ("schedule", ["schedule", "arrange", "set up", "book", "invite", "organize", "plan"]),
-        ("prepare", ["prepare", "draft", "create", "write"]),
-        ("update", ["update", "revise", "refresh", "edit"]),
-        ("confirm", ["confirm", "acknowledge", "verify receipt", "respond yes", "rsvp"]),
-        ("align", ["align", "sync", "follow up", "touch base"]),
+    """
+    Normalize action to intent labels: "request", "remind", "notify", "inform"
+    This maps task verbs to the intent labels used in ground truth.
+    """
+    if not current_action:
+        return ""
+    
+    action_lower = current_action.lower().strip()
+    text = f"{action_lower} {email_text or ''}".lower()
+    
+    # First, check if it's already an intent label
+    if action_lower in ["request", "remind", "notify", "inform"]:
+        return action_lower
+    
+    # Check for composite labels (e.g., "request action", "notify approval")
+    if action_lower.startswith("request "):
+        return "request"
+    if action_lower.startswith("notify "):
+        return "notify"
+    if action_lower.startswith("remind "):
+        return "remind"
+    if action_lower.startswith("inform "):
+        return "notify"  # "inform" maps to "notify"
+    
+    # Map task verbs to intent labels
+    # Task verbs that map to "request"
+    request_verbs = [
+        "send", "submit", "share", "forward", "provide", "deliver", "attach", 
+        "circulate", "distribute", "transmit", "review", "check", "look over", 
+        "double-check", "verify", "audit", "go through", "examine", "inspect", 
+        "assess", "evaluate", "approve", "approval", "sign off", "signoff", 
+        "sign-off", "ok it", "okay", "endorse", "authorize", "schedule", 
+        "arrange", "set up", "book", "invite", "organize", "plan", "coordinate", 
+        "setup", "arrange for", "prepare", "draft", "create", "write", "compile", 
+        "develop", "generate", "update", "revise", "refresh", "edit", "modify", 
+        "amend", "correct", "confirm", "acknowledge", "verify receipt", "respond yes", 
+        "rsvp", "validate", "affirm", "request", "ask", "need", "require", 
+        "solicit", "petition", "troubleshoot", "fix", "resolve", "debug", 
+        "investigate", "escalate", "process", "handle", "manage", "deal with", 
+        "address", "complete", "finish", "finalize"
     ]
-    text = f"{current_action or ''} {email_text or ''}".lower()
-    for canon, keys in mapping:
-        if any(k in text for k in keys):
-            return canon
-    # Heuristic: pick first verb-like token from current action
-    if current_action:
-        tokens = current_action.lower().split()
-        for t in tokens:
-            if t.endswith("e") or t.endswith("d") or t.endswith("te") or t in {"send", "review", "approve", "schedule", "prepare", "update"}:
-                return t
-    return (current_action or "").strip()
+    
+    # Task verbs that map to "remind"
+    remind_verbs = ["remind", "prepare"]  # "prepare" can be a reminder in context
+    
+    # Task verbs that map to "notify"
+    notify_verbs = ["notify", "alert", "inform", "announce", "report"]
+    
+    # Check if action matches any request verb
+    for verb in request_verbs:
+        if verb in action_lower or action_lower == verb:
+            return "request"
+    
+    # Check if action matches any remind verb
+    for verb in remind_verbs:
+        if verb in action_lower or action_lower == verb:
+            # Check context: if email text suggests it's a reminder, use "remind"
+            if "remind" in text or "remember" in text or "don't forget" in text:
+                return "remind"
+            # Otherwise, "prepare" usually maps to "request"
+            if verb == "prepare":
+                return "request"
+            return "remind"
+    
+    # Check if action matches any notify verb
+    for verb in notify_verbs:
+        if verb in action_lower or action_lower == verb:
+            return "notify"
+    
+    # Default: return as-is (might be a phrase we don't recognize)
+    return action_lower
 
 
 def postprocess_summary(summary_json: Dict, email: EmailSample) -> Dict:
     actor = (summary_json or {}).get("actor")
-    # Normalize actor: avoid "you/we/our team/null"
+    # Normalize actor: avoid "you/we/our team/null" or email addresses
     if not actor or str(actor).strip().lower() in {"you", "recipient", "assignee", "we", "our team"} or isinstance(actor, list):
         inferred = _extract_sender_name(email.from_addr)
         if inferred:
             summary_json["actor"] = inferred
+    else:
+        actor_str = str(actor).strip()
+        # Check if actor is an email address (contains @)
+        if "@" in actor_str:
+            # Extract name from email address
+            inferred = _extract_sender_name(actor_str)
+            if inferred:
+                summary_json["actor"] = inferred
+            else:
+                # Fallback: extract from original from_addr
+                inferred = _extract_sender_name(email.from_addr)
+                if inferred:
+                    summary_json["actor"] = inferred
+        else:
+            # Normalize actor format: ensure consistent capitalization and remove suffixes
+            if actor_str:
+                # Remove common suffixes that don't add meaning
+                actor_str = actor_str.replace(" Team", "").replace(" Department", "").replace(" Group", "").strip()
+                # Normalize to Title Case
+                summary_json["actor"] = actor_str.title()
     # Normalize action to canonical verb phrase
     action = (summary_json or {}).get("action")
     summary_json["action"] = _normalize_action(str(action or ""), email.body_text)

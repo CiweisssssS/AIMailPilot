@@ -5,11 +5,18 @@ import importlib
 import inspect
 import json
 import re
+import sys
 from collections import Counter
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Tuple
+
+# Import eval logic for consistency
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from eval.run_pipeline import slot_acc
+from eval.metrics.summarizer import fact_prf, format_compliance, rouge_l_like
+from eval.pipeline import postprocess_summary, _extract_sender_name
 
 
 RougeScores = Tuple[float, float]
@@ -430,6 +437,10 @@ async def evaluate_dataset(
     json_out: Optional[Path],
     max_examples: int,
 ) -> AggregateResult:
+    """
+    Evaluate dataset using eval script logic (structured JSON comparison).
+    This matches the evaluation approach in eval/run_summarizer_*.py scripts.
+    """
     results: List[CaseResult] = []
     per_case_dump: List[Dict[str, Any]] = []
     csv_rows: List[Dict[str, str]] = []
@@ -440,82 +451,141 @@ async def evaluate_dataset(
     fn_examples: List[Dict[str, Any]] = []
     fp_examples: List[Dict[str, Any]] = []
     signature = inspect.signature(agent)
+    
+    # Import EmailSample for postprocess_summary
+    from eval.common.types import EmailSample
+    
     for row in data:
-        summary, json_ok = await invoke_agent(agent, signature, row, max_words)
-        summary = summary.strip()
-        gold_summary = row.get("gold_summary", "").strip()
-
-        ref_tokens = tokenize(gold_summary)
-        hyp_tokens = tokenize(summary)
-        rouge1 = rouge_n_recall(ref_tokens, hyp_tokens, n=1)
-        rouge_l = rouge_l_recall(ref_tokens, hyp_tokens)
-
-        pred_facts = extract_predicted_facts(summary)
-        gold_facts = row.get("key_facts", {})
-        fact_score = score_facts(gold_facts, pred_facts)
-
-        strict_tp_total += fact_score.strict_tp
-        partial_tp_total += fact_score.partial_tp
-        fp_total += fact_score.fp
-        fn_total += fact_score.fn
+        # Get structured JSON from agent (matching eval script logic)
+        pred_json, json_ok = await invoke_agent(agent, signature, row, max_words)
+        
+        # Create EmailSample for postprocess_summary
+        email_sample = EmailSample(
+            id=row.get("id", ""),
+            subject=row.get("subject", ""),
+            from_addr=row.get("sender", ""),
+            to_addrs=[],
+            cc_addrs=[],
+            received_at=row.get("received_at", ""),
+            body_text=row.get("body", "") or format_thread_text(row.get("messages", [])),
+            ground_truth={},
+        )
+        
+        # Apply postprocessing (same as eval script)
+        if json_ok and isinstance(pred_json, dict):
+            pred_json = postprocess_summary(pred_json, email_sample)
+        
+        # Get ground truth (expecting same format as eval script)
+        gt_json = row.get("ground_truth", {}).get("summary", {})
+        if not gt_json and row.get("key_facts"):
+            # Convert key_facts format to summary format
+            gt_json = {
+                "actor": row.get("key_facts", {}).get("actor"),
+                "action": row.get("key_facts", {}).get("action"),
+                "object": row.get("key_facts", {}).get("object"),
+                "deadline": row.get("key_facts", {}).get("deadline"),
+                "notes": None,
+            }
+        
+        # Use eval script's slot_acc for slot-level accuracy
+        sa = slot_acc(
+            pred_json if json_ok else {},
+            gt_json,
+            lenient=False,  # Can be made configurable
+            very_lenient=False,  # Can be made configurable
+            sim_threshold=0.6,
+        )
+        
+        # Use eval script's fact_prf for fact-level metrics
+        fact_p, fact_r, fact_f1 = fact_prf(pred_json if json_ok else {}, gt_json)
+        
+        # Use eval script's format_compliance
+        fmt_ok = format_compliance(pred_json if json_ok else {})
+        
+        # ROUGE-like score (using eval script's rouge_l_like)
+        # Convert JSON to text for ROUGE
+        pred_text = json.dumps(pred_json if json_ok else {}, ensure_ascii=False)
+        gt_text = json.dumps(gt_json, ensure_ascii=False)
+        rouge_l_score = rouge_l_like(pred_text, gt_text)
+        
+        # Calculate fact-level metrics (matching eval script approach)
+        # Count TP/FP/FN based on slot accuracy
+        slot_correct = {k: sa[k] for k in FACT_KEYS}
+        case_strict_tp = 0
+        case_partial_tp = 0
+        case_fp = 0
+        case_fn = 0
+        
         for key in FACT_KEYS:
-            per_fact_totals[key] += fact_score.field_totals[key]
-            per_fact_strict[key] += fact_score.field_strict[key]
-            per_fact_partial[key] += fact_score.field_partial[key]
+            per_fact_totals[key] += 1
+            if slot_correct[key] >= 1.0:  # Exact match
+                per_fact_strict[key] += 1
+                case_strict_tp += 1
+            elif slot_correct[key] > 0.0:  # Partial match
+                per_fact_partial[key] += 1
+                case_partial_tp += 1
+            else:  # Mismatch
+                # Check if it's FP (predicted but wrong) or FN (missing)
+                if pred_json.get(key) and not gt_json.get(key):
+                    case_fp += 1
+                elif gt_json.get(key) and not pred_json.get(key):
+                    case_fn += 1
+                else:
+                    # Both present but mismatch
+                    case_fp += 1
+                    case_fn += 1
+        
+        # Accumulate totals
+        strict_tp_total += case_strict_tp
+        partial_tp_total += case_partial_tp
+        fp_total += case_fp
+        fn_total += case_fn
+        
+        # Extract summary text for compliance checks (if available)
+        summary_text = ""
+        if isinstance(pred_json, dict):
+            # Try to get summary text if available
+            summary_text = str(pred_json.get("summary", ""))
+            if not summary_text:
+                # Build summary from structured fields
+                actor = str(pred_json.get("actor", ""))
+                action = str(pred_json.get("action", ""))
+                obj = str(pred_json.get("object", ""))
+                deadline = str(pred_json.get("deadline", ""))
+                parts = [p for p in [actor, action, obj] if p]
+                if deadline:
+                    parts.append(f"by {deadline}")
+                summary_text = " ".join(parts)
+        
+        contains_action = has_action(summary_text) if summary_text else False
+        sender_starts = starts_with_sender(summary_text, row.get("sender", "")) if summary_text else False
+        length_ok = word_count(summary_text) <= max_words if summary_text else False
+        ends_period = ends_with_period(summary_text) if summary_text else False
+        wc = word_count(summary_text) if summary_text else 0
+        
+        # ROUGE-1 (approximate, using token overlap)
+        ref_tokens = tokenize(gt_text)
+        hyp_tokens = tokenize(pred_text)
+        rouge1 = rouge_n_recall(ref_tokens, hyp_tokens, n=1) if ref_tokens and hyp_tokens else 0.0
 
-        fact_tp = fact_score.strict_tp + fact_score.partial_tp
-        pred_count = fact_tp + fact_score.fp
-        gold_count = fact_tp + fact_score.fn
-        fact_prec = fact_tp / pred_count if pred_count else 0.0
-        fact_rec = fact_tp / gold_count if gold_count else 0.0
-
-        for detail in fact_score.detail_rows:
-            if detail["status"] == "strict":
-                continue
-            csv_rows.append({
-                "email_id": row.get("id", ""),
-                "subject": row.get("subject", ""),
-                "fact_type": detail["fact_type"],
-                "status": detail["status"],
-                "similarity": f"{detail['similarity']:.2f}",
-                "gold": detail["gold"],
-                "pred": detail["pred"],
-            })
-        for fn_record in fact_score.fn_records:
-            fn_examples.append({
-                "email_id": row.get("id", ""),
-                "subject": row.get("subject", ""),
-                **fn_record,
-            })
-        for fp_record in fact_score.fp_records:
-            fp_examples.append({
-                "email_id": row.get("id", ""),
-                "subject": row.get("subject", ""),
-                **fp_record,
-            })
-
-        contains_action = has_action(summary)
-        sender_starts = starts_with_sender(summary, row.get("sender", ""))
-        length_ok = word_count(summary) <= max_words
-        ends_period = ends_with_period(summary)
-        wc = word_count(summary)
-
+        # case_strict_tp, case_partial_tp, case_fp, case_fn already calculated above
+        
         results.append(
             CaseResult(
                 email_id=row.get("id", ""),
                 rouge1=rouge1,
-                rouge_l=rouge_l,
-                fact_precision=fact_prec,
-                fact_recall=fact_rec,
-                fact_strict_tp=fact_score.strict_tp,
-                fact_partial_tp=fact_score.partial_tp,
-                fact_fp=fact_score.fp,
-                fact_fn=fact_score.fn,
+                rouge_l=rouge_l_score,
+                fact_precision=fact_p,
+                fact_recall=fact_r,
+                fact_strict_tp=case_strict_tp,
+                fact_partial_tp=case_partial_tp,
+                fact_fp=case_fp,
+                fact_fn=case_fn,
                 has_action_verb=contains_action,
                 starts_with_sender=sender_starts,
                 length_ok=length_ok,
                 ends_with_period=ends_period,
-                json_parse_ok=json_ok,
+                json_parse_ok=json_ok and fmt_ok > 0.0,
                 word_count=wc,
             )
         )
@@ -524,26 +594,20 @@ async def evaluate_dataset(
             {
                 "id": row.get("id", ""),
                 "subject": row.get("subject", ""),
-                "body": row.get("body") or row.get("messages"),
-                "sender": row.get("sender", ""),
-                "gold_summary": gold_summary,
-                "predicted_summary": summary,
+                "pred_json": pred_json if json_ok else {},
+                "gt_json": gt_json,
+                "slot_acc": sa,
+                "fact_precision": fact_p,
+                "fact_recall": fact_r,
+                "fact_f1": fact_f1,
+                "rouge_l": rouge_l_score,
                 "rouge1": rouge1,
-                "rougeL": rouge_l,
-                "gold_facts": gold_facts,
-                "pred_facts": pred_facts,
-                "fact_precision": fact_prec,
-                "fact_recall": fact_rec,
-                "fact_strict_tp": fact_score.strict_tp,
-                "fact_partial_tp": fact_score.partial_tp,
-                "fact_fp": fact_score.fp,
-                "fact_fn": fact_score.fn,
-                "fact_details": fact_score.detail_rows,
+                "format_ok": fmt_ok,
+                "json_ok": json_ok,
                 "has_action_verb": contains_action,
                 "starts_with_sender": sender_starts,
                 "length_ok": length_ok,
                 "ends_with_period": ends_period,
-                "json_parse_ok": json_ok,
                 "word_count": wc,
             }
         )
@@ -598,7 +662,11 @@ def _report_examples(fn_examples: List[Dict[str, Any]], fp_examples: List[Dict[s
             )
 
 
-async def invoke_agent(agent: AgentFn, signature: inspect.Signature, row: Dict[str, Any], max_words: int) -> Tuple[str, bool]:
+async def invoke_agent(agent: AgentFn, signature: inspect.Signature, row: Dict[str, Any], max_words: int) -> Tuple[Dict[str, Any], bool]:
+    """
+    Invoke agent and extract structured JSON (actor, action, object, deadline) from response.
+    Returns (structured_json, json_ok) instead of (summary_text, json_ok) to match eval script logic.
+    """
     kwargs: Dict[str, Any] = {}
     params = signature.parameters
 
@@ -620,28 +688,105 @@ async def invoke_agent(agent: AgentFn, signature: inspect.Signature, row: Dict[s
     if "text" in params and "text" not in kwargs and "messages" in row:
         kwargs["text"] = format_thread_text(row["messages"])
 
+    # Try to get structured JSON directly from LLM if agent is summarize_text
+    # This matches eval script logic which calls LLM directly
+    agent_name = getattr(agent, '__name__', '')
+    if agent_name == 'summarize_text':
+        try:
+            from app.core.llm import LLMProvider
+            from app.core.prompts import get_summary_system_prompt, SUMMARY_FEW_SHOT_EXAMPLES
+            from app.services.summarizer import extract_sender_name
+            
+            llm_provider = LLMProvider()
+            subject = kwargs.get("subject", "")
+            text = kwargs.get("text", "")
+            sender = kwargs.get("sender", "")
+            sender_name = extract_sender_name(sender)
+            
+            system_prompt = get_summary_system_prompt(max_words)
+            user_message = f"""Subject: {subject}
+From: {sender_name}
+Body (trimmed): {text}
+
+Return JSON only with keys: summary, actor, action, object, deadline."""
+            
+            messages = [
+                {"role": "system", "content": system_prompt}
+            ]
+            messages.extend(SUMMARY_FEW_SHOT_EXAMPLES)
+            messages.append({"role": "user", "content": user_message})
+            
+            response = await llm_provider.call_with_json_mode(
+                messages=messages,
+                temperature=0.2
+            )
+            
+            if isinstance(response, str):
+                response_data = json.loads(response)
+            else:
+                response_data = response
+            
+            # Extract structured fields
+            structured_json = {
+                "actor": response_data.get("actor"),
+                "action": response_data.get("action"),
+                "object": response_data.get("object"),
+                "deadline": response_data.get("deadline"),
+                "notes": response_data.get("notes"),
+            }
+            return structured_json, True
+        except Exception:
+            # Fall back to regular agent call
+            pass
+
     result = await agent(**kwargs)  # type: ignore[misc]
 
     json_ok = True
-    summary_text: str
+    structured_json: Dict[str, Any] = {}
 
+    # Extract structured JSON from response
     if isinstance(result, dict):
-        summary_text = str(result.get("summary", ""))
+        # Check if it already has structured fields
+        if any(k in result for k in ["actor", "action", "object", "deadline"]):
+            structured_json = {
+                "actor": result.get("actor"),
+                "action": result.get("action"),
+                "object": result.get("object"),
+                "deadline": result.get("deadline"),
+                "notes": result.get("notes"),
+            }
+        else:
+            # Try to extract from summary text (fallback)
+            summary_text = str(result.get("summary", ""))
+            if summary_text:
+                structured_json = extract_predicted_facts(summary_text)
     elif isinstance(result, str):
         parsed: Optional[Any] = None
         try:
             parsed = json.loads(result)
+            if isinstance(parsed, dict):
+                if any(k in parsed for k in ["actor", "action", "object", "deadline"]):
+                    structured_json = {
+                        "actor": parsed.get("actor"),
+                        "action": parsed.get("action"),
+                        "object": parsed.get("object"),
+                        "deadline": parsed.get("deadline"),
+                        "notes": parsed.get("notes"),
+                    }
+                elif "summary" in parsed:
+                    structured_json = extract_predicted_facts(str(parsed.get("summary", "")))
+                else:
+                    structured_json = extract_predicted_facts(result)
+            else:
+                structured_json = extract_predicted_facts(result)
         except json.JSONDecodeError:
             json_ok = False
-        if isinstance(parsed, dict) and "summary" in parsed:
-            summary_text = str(parsed.get("summary", ""))
-        else:
-            summary_text = result
+            structured_json = extract_predicted_facts(result)
     else:
         json_ok = False
-        summary_text = str(result)
+        structured_json = {}
 
-    return summary_text, json_ok
+    return structured_json, json_ok
 
 
 def format_thread_text(messages: List[Dict[str, Any]]) -> str:
