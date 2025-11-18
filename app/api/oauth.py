@@ -1,7 +1,7 @@
 """
 OAuth routes for Google authentication
 """
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, Request
 from fastapi.responses import RedirectResponse
 from fastapi import Cookie
 from typing import Optional
@@ -153,15 +153,23 @@ async def google_callback(
         )
         
         # Set session cookie
+        # For cross-origin (Vercel -> Render), we'll use both cookie and URL param
+        # as fallback since cross-origin cookies can be tricky
         frontend_url = os.getenv("FRONTEND_URL", "https://ai-mail-pilot.vercel.app")
-        response = RedirectResponse(url=frontend_url)
+        
+        # Redirect with session_id in URL as fallback (frontend will store it)
+        redirect_url = f"{frontend_url}?session_id={session_id}&auth=success"
+        response = RedirectResponse(url=redirect_url)
+        
+        # Also set cookie (may not work cross-origin, but try anyway)
         response.set_cookie(
             key="session_id",
             value=session_id,
             httponly=True,
             secure=True,
-            samesite="lax",
-            max_age=60 * 60 * 24 * 7  # 7 days
+            samesite="none",  # Required for cross-origin
+            max_age=60 * 60 * 24 * 7,  # 7 days
+            path="/"
         )
         return response
         
@@ -172,12 +180,19 @@ async def google_callback(
 
 
 @router.get("/api/auth/status")
-async def auth_status(session_id: Optional[str] = Cookie(None)):
+async def auth_status(
+    request: Request,
+    session_id: Optional[str] = Cookie(None)
+):
     """
     Check authentication status
     Returns user info if authenticated, otherwise returns authenticated: false
+    Accepts session_id from cookie or query parameter
     """
-    session = get_session(session_id)
+    # Try cookie first, then query param
+    session_id_param = request.query_params.get("session_id")
+    actual_session_id = session_id or session_id_param
+    session = get_session(actual_session_id)
     
     if session and session.get("user"):
         return {

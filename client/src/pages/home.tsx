@@ -50,6 +50,9 @@ export default function Home() {
       // Clear all data on logout
       queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, []);
       setSelectedEmailId(undefined);
+      // Clear session from localStorage
+      const { clearSessionId } = await import("@/lib/queryClient");
+      clearSessionId();
       refetchAuth();
     }
   });
