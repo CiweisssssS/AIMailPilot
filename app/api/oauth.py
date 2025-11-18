@@ -11,7 +11,10 @@ router = APIRouter()
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://aimailpilot-api.onrender.com/oauth/google/callback")
+# Redirect URI should be the Vercel frontend URL which rewrites to backend
+# Default to Vercel URL, but can be overridden via env var
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://ai-mail-pilot.vercel.app")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_URL}/auth/google/callback")
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
