@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
 import { apiRequest, queryClient, clearSessionId, getSessionId } from "@/lib/queryClient";
+import { ENDPOINTS } from "@/lib/endpoints";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
@@ -26,7 +27,7 @@ export default function Home() {
   
   // Check authentication status
   const { data: authStatus, isLoading: authLoading, refetch: refetchAuth } = useQuery<AuthStatus>({
-    queryKey: ["/api/auth/status"],
+    queryKey: [ENDPOINTS.authStatus],
   });
   
   // Extract session_id from URL on mount (from OAuth callback) and refetch auth
@@ -59,7 +60,7 @@ export default function Home() {
   // Mutations
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout");
+      await apiRequest("POST", ENDPOINTS.logout);
     },
     onSuccess: () => {
       // Clear all data on logout
@@ -86,6 +87,13 @@ export default function Home() {
       });
     }
   }, [emailsError, toast]);
+
+  // Log triage call after auth success for verification
+  useEffect(() => {
+    if (authStatus?.authenticated && !emailsLoading && triageData) {
+      console.log(`[API] Triage call successful: ${triageData.analyzed_emails.length} emails loaded`);
+    }
+  }, [authStatus?.authenticated, emailsLoading, triageData]);
 
   // Event handlers
   const handleEmailClick = (email: AnalyzedEmail) => {

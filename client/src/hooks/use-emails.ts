@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { ENDPOINTS } from "@/lib/endpoints";
 import type { TriageResponse, GmailEmail, AnalyzedEmail } from "@shared/schema";
 
 // Cache key for analyzed emails
@@ -15,7 +16,7 @@ export const LABEL_MAP: Record<string, GmailLabel> = {
   "Promotions": "CATEGORY_PROMOTIONS",
 };
 
-// Fetch Gmail emails using POST /api/triage
+// Fetch Gmail emails using POST /triage (NO /api prefix per backend Swagger)
 export function useGmailEmails(
   label: GmailLabel = "IMPORTANT",
   pageToken?: string,
@@ -39,10 +40,15 @@ export function useAnalyzedEmails() {
 }
 
 // Analyze emails with AI (legacy - may not be needed if triage already analyzes)
+// Note: This endpoint may not exist in backend - verify and remove if not needed
 export function useAnalyzeEmails() {
   return useMutation({
     mutationFn: async (emails: GmailEmail[]) => {
-      const response = await apiRequest("POST", "/api/analyze-emails", { emails });
+      // Using triage endpoint instead of analyze-emails if that doesn't exist
+      const response = await apiRequest("POST", ENDPOINTS.triage, { 
+        label: "IMPORTANT",
+        emails 
+      });
       const data = await response.json();
       return data as TriageResponse;
     },
