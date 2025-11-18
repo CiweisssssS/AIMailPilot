@@ -386,8 +386,8 @@ async def triage_emails(
             primary_params = {
                 "labelIds": ["INBOX"],
                 "maxResults": max_results,
-                "includeSpamTrash": False,
-                "q": ""  # NO query initially
+                "includeSpamTrash": False
+                # NO q parameter - omit it entirely to avoid filtering
             }
             if page_token:
                 primary_params["pageToken"] = page_token
@@ -411,10 +411,9 @@ async def triage_emails(
             if primary_query_count == 0:
                 logger.info("Primary query returned 0 messages, trying fallback (no label filter)")
                 fallback_params = {
-                    "labelIds": [],  # No label filter
                     "maxResults": max_results,
-                    "includeSpamTrash": False,
-                    "q": ""  # NO query
+                    "includeSpamTrash": False
+                    # NO labelIds and NO q parameter - get all messages
                 }
                 if page_token:
                     fallback_params["pageToken"] = page_token
