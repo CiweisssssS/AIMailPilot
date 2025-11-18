@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { apiUrl } from "./api";
+import { ENDPOINTS } from "./endpoints";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -81,10 +82,10 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const sessionId = getSessionId();
     
-    // Handle triage endpoint (POST /api/triage)
+    // Handle triage endpoint (POST /triage - NO /api prefix per backend)
     if (isTriageRequest(queryKey)) {
       const params = queryKey[1] as { label: string; pageToken?: string };
-      const triageUrl = apiUrl('/api/triage');
+      const triageUrl = apiUrl(ENDPOINTS.triage);
       const urlWithSession = sessionId 
         ? `${triageUrl}${triageUrl.includes("?") ? "&" : "?"}session_id=${encodeURIComponent(sessionId)}`
         : triageUrl;
@@ -115,8 +116,11 @@ export const getQueryFn: <T>(options: {
     }
     
     // Default: GET request for other endpoints
-    // Query key is array like ["/api/auth/status"] - join and convert to absolute URL
-    const relativeUrl = queryKey.join("/") as string;
+    // Query key can be array like ["/api/auth/status"] or [ENDPOINTS.authStatus]
+    // If first element is a string starting with '/', treat as path; otherwise join
+    const relativeUrl = typeof queryKey[0] === 'string' && queryKey[0].startsWith('/')
+      ? queryKey[0]
+      : queryKey.join("/") as string;
     const absoluteUrl = apiUrl(relativeUrl);
     
     // Add session_id as query param if available

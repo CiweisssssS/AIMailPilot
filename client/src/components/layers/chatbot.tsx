@@ -2,6 +2,7 @@ import { ArrowLeft, Mail, Send, User, Bot } from "lucide-react";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { ENDPOINTS } from "@/lib/endpoints";
 import type { AnalyzedEmail } from "@shared/schema";
 
 interface Message {
@@ -84,7 +85,7 @@ export default function Chatbot({ onBack, analyzedEmails = [] }: ChatbotProps) {
       const threadData = prepareThreadData();
       const response = await apiRequest(
         "POST",
-        "/api/chatbot-qa",
+        ENDPOINTS.chatbotQA,
         {
           question,
           thread: threadData

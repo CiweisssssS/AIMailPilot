@@ -7,9 +7,14 @@ const API_BASE =
   import.meta.env.NEXT_PUBLIC_API_BASE ||
   '';
 
+// Log API base on module load for verification
+if (typeof window !== 'undefined') {
+  console.log(`[API] Base URL: ${API_BASE || '(relative - local dev)'}`);
+}
+
 /**
  * Build absolute API URL from relative path
- * @param path - Relative API path (e.g., "/api/auth/status")
+ * @param path - Relative API path (e.g., "/api/auth/status" or "/triage")
  * @returns Absolute URL if API_BASE is set, otherwise returns path as-is (dev fallback)
  * 
  * Guards against numeric-only paths (e.g., "15") - they must be part of a full path.
@@ -24,17 +29,24 @@ export function apiUrl(path: string): string {
     // Still return it, but log a warning
   }
   
-  // Ensure path starts with /api/ if it doesn't already
+  // Allow paths that start with /api/, /oauth/, /auth/, /health, or /triage (and other root-level endpoints)
   // This prevents numeric paths from being used directly
-  if (!path.startsWith('/api/') && !path.startsWith('/oauth/') && !path.startsWith('/auth/') && !path.startsWith('/health')) {
-    // If it's not a known API prefix and is numeric, it's likely an error
-    if (/^\d+$/.test(path)) {
-      throw new Error(`Invalid API path: "${path}". Numeric paths must be part of a full API endpoint.`);
-    }
+  const validPrefixes = ['/api/', '/oauth/', '/auth/', '/health', '/triage', '/version'];
+  const hasValidPrefix = validPrefixes.some(prefix => path.startsWith(prefix));
+  
+  if (!hasValidPrefix && /^\d+$/.test(path)) {
+    throw new Error(`Invalid API path: "${path}". Numeric paths must be part of a full API endpoint.`);
   }
   
   const p = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE}${p}`;
+  const fullUrl = `${API_BASE}${p}`;
+  
+  // Log triage URLs for verification
+  if (path === '/triage' || path.startsWith('/triage')) {
+    console.log(`[API] Triage URL: ${fullUrl}`);
+  }
+  
+  return fullUrl;
 }
 
 /**

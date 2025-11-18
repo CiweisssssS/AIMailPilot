@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, AlertTriangle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { useToast } from "@/hooks/use-toast";
 
 interface DeadlineEditorProps {
@@ -36,7 +37,7 @@ export function DeadlineEditor({
       const formatted = `${monthNames[date.getMonth()]} ${date.getDate().toString().padStart(2, '0')}, ${date.getFullYear()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
       
       // Save to database via deadline override API
-      await apiRequest("POST", "/api/deadline-overrides", {
+      await apiRequest("POST", ENDPOINTS.deadlineSet, {
         email_id: emailId,
         task_index: taskIndex,
         original_deadline: currentDeadline || "TBD",
@@ -48,7 +49,7 @@ export function DeadlineEditor({
       setNewDeadline("");
       
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['/api/deadline-overrides'] });
+      queryClient.invalidateQueries({ queryKey: [ENDPOINTS.deadlineGet] });
       
       // Call callback if provided
       onDeadlineUpdated?.(formatted);
@@ -140,7 +141,7 @@ export function AddToCalendarButton({
         throw new Error("Cannot add TBD deadline to calendar");
       }
 
-      return await apiRequest("POST", "/api/calendar/create-event", {
+      return await apiRequest("POST", ENDPOINTS.calendarCreateEvent, {
         title: title,
         description: description || "",
         startDateTime: deadline,

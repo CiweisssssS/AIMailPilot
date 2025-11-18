@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { limitWords } from "@/lib/text-utils";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ENDPOINTS } from "@/lib/endpoints";
 import { DeadlineEditor, AddToCalendarButton } from "@/components/deadline-editor";
 import { ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
 
@@ -146,7 +147,7 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
   // Flag toggle mutation
   const flagMutation = useMutation({
     mutationFn: async (newFlagStatus: boolean) => {
-      return await apiRequest("POST", "/api/flags/toggle", {
+      return await apiRequest("POST", ENDPOINTS.flagsToggle, {
         email_id: email.id,
         is_flagged: newFlagStatus
       });

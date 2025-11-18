@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import type { AnalyzedEmail } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { ENDPOINTS } from "@/lib/endpoints";
 
 interface FlaggedMailsProps {
   analyzedEmails: AnalyzedEmail[];
@@ -98,7 +99,7 @@ function sortFlaggedEmails(emails: AnalyzedEmail[]): AnalyzedEmail[] {
 export default function FlaggedMails({ analyzedEmails, onBack, onChatbotClick }: FlaggedMailsProps) {
   // Fetch flagged emails from database
   const { data: flaggedData, isLoading } = useQuery<{ flagged_emails: Array<{ email_id: string }> }>({
-    queryKey: ["/api/flags"],
+    queryKey: [ENDPOINTS.flagsGet],
   });
 
   // Filter analyzed emails to only show flagged ones
