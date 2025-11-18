@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Sparkles } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, clearSessionId } from "@/lib/queryClient";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
@@ -51,7 +51,6 @@ export default function Home() {
       queryClient.setQueryData(ANALYZED_EMAILS_CACHE_KEY, []);
       setSelectedEmailId(undefined);
       // Clear session from localStorage
-      const { clearSessionId } = await import("@/lib/queryClient");
       clearSessionId();
       refetchAuth();
     }

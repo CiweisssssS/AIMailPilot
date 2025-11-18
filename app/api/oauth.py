@@ -1,7 +1,7 @@
 """
 OAuth routes for Google authentication
 """
-from fastapi import APIRouter, HTTPException, Request, Response, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi import Cookie
 from typing import Optional
