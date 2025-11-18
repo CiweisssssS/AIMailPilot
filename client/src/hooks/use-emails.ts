@@ -16,17 +16,17 @@ export const LABEL_MAP: Record<string, GmailLabel> = {
   "Promotions": "CATEGORY_PROMOTIONS",
 };
 
-// Fetch Gmail emails using GET /api/triage (returns new tasks only)
+// Fetch Inbox Reminder tasks using GET /api/triage (returns { summary, items })
 export function useGmailEmails(
-  label: GmailLabel = "IMPORTANT",
-  pageToken?: string,
+  label?: GmailLabel, // Not used anymore, kept for backward compatibility
+  pageToken?: string, // Not used anymore
   options?: { enabled?: boolean }
 ) {
-  return useQuery<TriageResponse>({
-    queryKey: [ENDPOINTS.triage, { label, pageToken }],
+  return useQuery<{ summary: { total: number; urgent: number; todo: number; fyi: number }; items: any[]; message?: string }>({
+    queryKey: [ENDPOINTS.triage], // No params - backend doesn't use label/limit
     refetchInterval: 60000, // Refetch every 60 seconds
     retry: 1,
-    enabled: options?.enabled ?? true, // Default to enabled if not specified
+    enabled: options?.enabled ?? true,
   });
 }
 

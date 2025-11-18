@@ -879,13 +879,13 @@ async def refresh_emails(
 ):
     """
     Refresh emails: run incremental sync or cold start backfill
-    Returns sync result with mode, counts, and latest_history_id
+    Returns: { added_tasks, total_new_count, mode, latest_history_id }
     """
     try:
         from app.api.oauth import get_session
         from app.services.gmail_sync import sync_emails
         from app.services.task_extractor import process_unprocessed_emails
-        from app.db.supabase_client import get_sync_meta
+        from app.db.supabase_client import get_sync_meta, get_tasks
         
         # Get session
         session_id_param = request.query_params.get("session_id")
@@ -914,13 +914,22 @@ async def refresh_emails(
         # Process unprocessed emails for tasks
         added_tasks = await process_unprocessed_emails(user_email, limit=50)
         
-        return {
+        # Get count of new tasks after processing
+        new_tasks = await get_tasks(user_email, state="new", limit=1000)
+        total_new_count = len(new_tasks)
+        
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(content={
+            "added_tasks": added_tasks,
+            "total_new_count": total_new_count,
             "mode": sync_result["mode"],
             "scanned_messages": sync_result["scanned_messages"],
             "added_emails": sync_result["added_emails"],
-            "added_tasks": added_tasks,
             "latest_history_id": sync_result["latest_history_id"]
-        }
+        })
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "https://ai-mail-pilot.vercel.app"
+        return response
     
     except HTTPException:
         raise
@@ -932,29 +941,21 @@ async def refresh_emails(
 @router.api_route("/api/triage", methods=["GET", "POST"])
 async def get_triage_tasks(
     request: Request,
-    limit: int = 50,
     session_id: Optional[str] = None
 ):
     """
     Get Inbox Reminder: tasks with state="new" only
-    Returns summary counts and new tasks
-    Accepts both GET and POST for compatibility
+    Returns: { summary: { total, urgent, todo, fyi }, items: [...] }
+    Does NOT depend on URL query params (label/limit removed)
     """
     try:
         from app.api.oauth import get_session
         from app.db.supabase_client import get_tasks, get_email_by_id
+        from fastapi.responses import JSONResponse
         
         # Get session_id from query params (works for both GET and POST)
         session_id_param = request.query_params.get("session_id")
         actual_session_id = session_id or session_id_param
-        
-        # Also support limit from query params
-        limit_param = request.query_params.get("limit")
-        if limit_param:
-            try:
-                limit = int(limit_param)
-            except:
-                pass
         
         if not actual_session_id:
             raise HTTPException(status_code=401, detail="Not authenticated")
@@ -967,50 +968,56 @@ async def get_triage_tasks(
         if not user_email:
             raise HTTPException(status_code=401, detail="Missing user email")
         
-        # Get new tasks only
-        new_tasks = await get_tasks(user_email, state="new", limit=limit)
+        # Get new tasks only (state="new")
+        new_tasks = await get_tasks(user_email, state="new", limit=1000)
         
-        # Get all tasks for summary counts
+        # Get all tasks for summary counts (excluding done)
         all_tasks = await get_tasks(user_email, state="all", limit=1000)
         urgent_count = sum(1 for t in all_tasks if t.get("priority") == "urgent" and t.get("state") != "done")
         todo_count = sum(1 for t in all_tasks if t.get("priority") == "todo" and t.get("state") != "done")
         fyi_count = sum(1 for t in all_tasks if t.get("priority") == "fyi" and t.get("state") != "done")
         
-        # Build analyzed_emails from tasks (for frontend compatibility)
-        analyzed_emails = []
+        # Build items from tasks
+        items = []
         for task in new_tasks:
             message_id = task.get("message_id")
             email = await get_email_by_id(user_email, message_id)
             
             if email:
-                analyzed_emails.append({
-                    "id": message_id,
-                    "threadId": email.get("thread_id", ""),
+                items.append({
+                    "task_id": task.get("task_id"),
+                    "message_id": message_id,
+                    "thread_id": email.get("thread_id", ""),
+                    "priority": task.get("priority", "fyi"),  # urgent|todo|fyi
+                    "title": task.get("normalized_title", ""),
+                    "snippet": email.get("snippet", "")[:100],
                     "from_name": email.get("from_name", ""),
                     "from_email": email.get("from_email", ""),
-                    "from": email.get("from_email", ""),
                     "subject": email.get("subject", ""),
                     "date": email.get("date_iso", ""),
-                    "snippet": email.get("snippet", ""),
                     "body_html": email.get("normalized_html"),
                     "body_text": email.get("normalized_text"),
-                    "summary": email.get("snippet", "")[:100],
-                    "priority": {"label": f"P{1 if task.get('priority') == 'urgent' else 2 if task.get('priority') == 'todo' else 3}", "score": 0.0, "reasons": []},
-                    "tasks": [{"title": task.get("normalized_title", ""), "type": "action"}],
-                    "task_extracted": task.get("normalized_title", ""),
-                    "is_flagged": False,
-                    "task_id": task.get("task_id")  # Include task_id for state transitions
                 })
         
-        return {
-            "analyzed_emails": analyzed_emails,
+        # Build response with proper CORS headers
+        response_data = {
             "summary": {
-                "total": len(analyzed_emails),
+                "total": len(items),
                 "urgent": urgent_count,
                 "todo": todo_count,
                 "fyi": fyi_count
-            }
+            },
+            "items": items
         }
+        
+        # Add helpful message if no items
+        if len(items) == 0:
+            response_data["message"] = "No reminders yet — click Refresh to fetch recent emails (last 7 days)."
+        
+        response = JSONResponse(content=response_data)
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "https://ai-mail-pilot.vercel.app"
+        return response
     
     except HTTPException:
         raise
@@ -1072,7 +1079,11 @@ async def get_tasks_route(
                 } if email else None
             })
         
-        return {"tasks": enriched_tasks}
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(content={"tasks": enriched_tasks})
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "https://ai-mail-pilot.vercel.app"
+        return response
     
     except HTTPException:
         raise
@@ -1127,6 +1138,7 @@ async def mark_task_saved(
     try:
         from app.api.oauth import get_session
         from app.db.supabase_client import update_task_state
+        from fastapi.responses import JSONResponse
         
         session_id_param = request.query_params.get("session_id")
         actual_session_id = session_id or session_id_param
@@ -1144,7 +1156,10 @@ async def mark_task_saved(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        return {"success": True, "task_id": task_id, "state": "saved"}
+        response = JSONResponse(content={"success": True, "task_id": task_id, "state": "saved"})
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "https://ai-mail-pilot.vercel.app"
+        return response
     
     except HTTPException:
         raise
@@ -1163,6 +1178,7 @@ async def mark_task_done(
     try:
         from app.api.oauth import get_session
         from app.db.supabase_client import update_task_state
+        from fastapi.responses import JSONResponse
         
         session_id_param = request.query_params.get("session_id")
         actual_session_id = session_id or session_id_param
@@ -1180,7 +1196,10 @@ async def mark_task_done(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        return {"success": True, "task_id": task_id, "state": "done"}
+        response = JSONResponse(content={"success": True, "task_id": task_id, "state": "done"})
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "https://ai-mail-pilot.vercel.app"
+        return response
     
     except HTTPException:
         raise
