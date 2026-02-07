@@ -5,10 +5,11 @@ import type { AnalyzedEmail } from "@shared/schema";
 interface EmailListItemProps {
   email: AnalyzedEmail;
   active?: boolean;
+  isRead?: boolean;
   onClick?: () => void;
 }
 
-function EmailListItem({ email, active, onClick }: EmailListItemProps) {
+function EmailListItem({ email, active, isRead, onClick }: EmailListItemProps) {
   // Use from_name if available, otherwise parse from email field, fallback to email local part
   const fromName = email.from_name || 
     (email.from_email ? email.from_email.split("@")[0] : 
@@ -40,6 +41,7 @@ function EmailListItem({ email, active, onClick }: EmailListItemProps) {
       className={`
         flex gap-3 px-4 py-3 border-b border-border cursor-pointer hover-elevate transition-colors
         ${active ? "bg-accent" : ""}
+        ${isRead ? "opacity-70" : ""}
       `}
       data-testid={`email-item-${email.id}`}
     >
@@ -68,6 +70,7 @@ function EmailListItem({ email, active, onClick }: EmailListItemProps) {
 interface EmailListProps {
   emails: AnalyzedEmail[];
   selectedEmailId?: string;
+  readEmailIds?: Set<string>;
   onEmailClick?: (email: AnalyzedEmail) => void;
   isLoading?: boolean;
   error?: string | null;
@@ -76,6 +79,7 @@ interface EmailListProps {
 export default function EmailList({ 
   emails, 
   selectedEmailId, 
+  readEmailIds,
   onEmailClick,
   isLoading,
   error 
@@ -115,6 +119,7 @@ export default function EmailList({
           key={email.id}
           email={email}
           active={selectedEmailId === email.id}
+          isRead={readEmailIds?.has(email.id)}
           onClick={() => onEmailClick?.(email)}
         />
       ))}

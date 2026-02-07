@@ -8,7 +8,7 @@ import { ENDPOINTS } from "@/lib/endpoints";
 import MailLayout from "@/components/mail-layout";
 import EmailList from "@/components/email-list";
 import EmailDetail from "@/components/email-detail";
-import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY, GmailLabel, LABEL_MAP, useMarkTaskViewed } from "@/hooks/use-emails";
+import { useGmailEmails, useAnalyzeEmails, useRefreshEmails, useAnalyzedEmails, ANALYZED_EMAILS_CACHE_KEY, GmailLabel, LABEL_MAP } from "@/hooks/use-emails";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AnalyzedEmail } from "@shared/schema";
@@ -43,6 +43,7 @@ export default function Home() {
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<{ emailId: string; taskIndex: number } | undefined>();
   const [currentLabel, setCurrentLabel] = useState<GmailLabel>("IMPORTANT");
+  const [readEmailIds, setReadEmailIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   
   // Fetch Inbox Reminder tasks using GET /api/triage (returns { summary, items })
@@ -119,22 +120,14 @@ export default function Home() {
     }
   }, [authStatus?.authenticated, emailsLoading, triageData]);
 
-  // Task state mutations
-  const markTaskViewedMutation = useMarkTaskViewed();
-
   // Event handlers
   const handleEmailClick = (email: AnalyzedEmail) => {
     setSelectedEmailId(email.id);
-    
-    // Mark task as viewed if task_id exists (fire-and-forget, optimistic UI)
-    if ((email as any).task_id) {
-      markTaskViewedMutation.mutate((email as any).task_id, {
-        onError: (error) => {
-          console.warn("Failed to mark task as viewed:", error);
-          // Don't show error toast - this is fire-and-forget
-        }
-      });
-    }
+    setReadEmailIds((prev) => {
+      const next = new Set(prev);
+      next.add(email.id);
+      return next;
+    });
   };
 
   const handleBackToList = () => {
@@ -147,6 +140,11 @@ export default function Home() {
     setSelectedEmailId(emailId);
     // Highlight the task card
     setSelectedTaskId({ emailId, taskIndex });
+    setReadEmailIds((prev) => {
+      const next = new Set(prev);
+      next.add(emailId);
+      return next;
+    });
   };
 
   // Find selected email from analyzed emails
@@ -309,6 +307,7 @@ export default function Home() {
             <EmailList 
               emails={analyzedEmails}
               selectedEmailId={selectedEmailId}
+              readEmailIds={readEmailIds}
               onEmailClick={handleEmailClick}
               isLoading={emailsLoading}
               error={emailsError?.message || null}
