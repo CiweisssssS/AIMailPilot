@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { DeadlineEditor, AddToCalendarButton } from "@/components/deadline-editor";
-import { ANALYZED_EMAILS_CACHE_KEY } from "@/hooks/use-emails";
+import { ANALYZED_EMAILS_CACHE_KEY, useMarkTaskViewed } from "@/hooks/use-emails";
 
 interface CategoryDetailProps {
   category: "urgent" | "todo" | "fyi";
@@ -124,6 +124,7 @@ interface EmailItemProps {
 function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
   const { toast } = useToast();
   const [isFlagged, setIsFlagged] = useState(false);
+  const markTaskViewedMutation = useMarkTaskViewed();
   
   // Initialize flag status from email if available
   useEffect(() => {
@@ -181,6 +182,13 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
       title: "Task completed", 
       description: "Mark as done feature coming soon!" 
     });
+  };
+
+  const handleClearClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent email item click
+    const taskId = (email as any).task_id as number | undefined;
+    if (!taskId) return;
+    markTaskViewedMutation.mutate(taskId);
   };
 
   const handleDeadlineUpdated = (newDeadline: string) => {
@@ -270,6 +278,15 @@ function EmailItem({ email, onTaskClick, selectedTaskId }: EmailItemProps) {
           disabled={isTBD}
           className="text-sm bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg"
         />
+        <button
+          type="button"
+          onClick={handleClearClick}
+          disabled={!((email as any).task_id)}
+          className="text-sm bg-muted hover:bg-muted/80 text-foreground px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid={`button-clear-${email.id}`}
+        >
+          Clear
+        </button>
       </div>
     </div>
   );
